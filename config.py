@@ -32,8 +32,9 @@ DAILY_LOSS_LIMIT      = -500.0
 MARGIN_PER_TRADE = 2000.0
 MARGIN_HARD_CAP  = 25000.0
 
-SESSION_FILTER_ENABLED  = False
-BTC_REGIME_FILTER_ENABLED = False  # Set to True to re-enable when BTC has clear directional trend
-PLACE_EXCHANGE_SL       = True
+ADX_FADE_MAX = 60
+
+SESSION_FILTER_ENABLED = False
+PLACE_EXCHANGE_SL      = True
 
 PAIR_ADX_OVERRIDES: dict = {}
