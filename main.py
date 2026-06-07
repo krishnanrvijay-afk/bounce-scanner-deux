@@ -56,6 +56,7 @@ class AppState:
         self.pair_states:          list[dict]        = []
         self.alerts:               list[dict]        = []
         self.prices:               dict[str, float]  = {}
+        self.price_changes:        dict[str, float]  = {}
         self.open_trades:          dict[str, dict]   = {}
         self.trade_log:            list[dict]        = []
         self.margin_deployed:      float             = 0.0
@@ -159,6 +160,7 @@ class AppState:
             },
             "scan_count":       get_scan_count(),
             "last_scan_at":     self.last_scan_at,
+            "price_changes":    self.price_changes,
             "deploy_time":      DEPLOY_TIME,
         }
 
@@ -340,12 +342,21 @@ async def _scan_loop():
 
 
 async def _price_loop():
+    _chg_tick = 0
     while True:
         try:
             all_prices = await hl_client.get_all_prices()
             for sym in PAIRS:
                 if sym in all_prices:
                     app_state.prices[sym] = all_prices[sym]
+
+            # Fetch 24h changes every 5 price ticks (~40s) to avoid extra rate pressure
+            _chg_tick += 1
+            if _chg_tick >= 5:
+                _chg_tick = 0
+                changes = await hl_client.get_all_price_changes(PAIRS)
+                if changes:
+                    app_state.price_changes.update(changes)
 
             # Auto-reset daily PnL at UTC midnight
             global daily_pnl, trading_halted_today, _last_midnight_day
@@ -406,7 +417,6 @@ async def get_account():
         "cap":             MARGIN_HARD_CAP,
         "paper_mode":      PAPER_MODE,
         "slots_used":      app_state.slots_used,
-        "btc_regime":      get_btc_regime(),
     }
 
 
