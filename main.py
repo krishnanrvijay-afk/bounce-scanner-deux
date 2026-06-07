@@ -305,7 +305,12 @@ async def _scan_loop():
             app_state.pair_states  = await scan_pair_state(hl_client)
             for alert in new_alerts:
                 sym, dir_ = alert["symbol"], alert["direction"]
-                key = app_state.trade_key(sym, dir_)
+
+                # Issue 2 fix: set cooldown immediately when alert fires so scanner
+                # stops re-confirming the same signal on subsequent scans
+                set_close_cooldown(sym, dir_)
+
+                # Update alerts panel
                 existing = next(
                     (a for a in app_state.alerts
                      if a["symbol"] == sym and a["direction"] == dir_), None
@@ -313,6 +318,23 @@ async def _scan_loop():
                 if existing:
                     app_state.alerts.remove(existing)
                 app_state.alerts.insert(0, alert)
+
+                # Issue 1 fix: auto-open a paper trade for every confirmed alert
+                trade, err = await _do_open_trade(
+                    sym, dir_,
+                    MARGIN_PER_TRADE, alert["leverage"],
+                    alert_data=alert,
+                    exchange="HL",
+                )
+                if trade:
+                    print(
+                        f"[AUTO TRADE] {sym} {dir_} opened "
+                        f"tier={alert.get('tier')} lev={alert.get('leverage')}x "
+                        f"entry={trade.get('entry_price')} sl={trade.get('sl_price')} "
+                        f"margin=${MARGIN_PER_TRADE:.0f}"
+                    )
+                elif err:
+                    print(f"[AUTO TRADE] {sym} {dir_} skipped: {err}")
         except Exception as e:
             print(f"[SCAN LOOP] error: {e}")
         await asyncio.sleep(SCAN_INTERVAL_SECONDS)
