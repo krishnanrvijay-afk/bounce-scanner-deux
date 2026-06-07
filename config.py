@@ -1,4 +1,11 @@
+import os
+
 HL_API_URL = "https://api.hyperliquid.xyz/info"
+
+# ── Persistent storage paths ───────────────────────────────────────────────────
+DATA_DIR       = os.environ.get("DATA_DIR", "./data")
+STATE_FILE     = os.path.join(DATA_DIR, "app_state.json")
+TRADE_LOG_FILE = os.path.join(DATA_DIR, "trade_log.csv")
 
 PAIRS = ["DOGE", "SUI", "BTC", "LINK", "ETH", "NEAR", "XRP", "SOL", "WIF", "AVAX", "HYPE", "INJ"]
 
