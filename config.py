@@ -3,7 +3,7 @@ HL_API_URL = "https://api.hyperliquid.xyz/info"
 PAIRS = ["DOGE", "SUI", "BTC", "LINK", "ETH", "NEAR", "XRP", "SOL", "WIF", "AVAX", "HYPE", "INJ"]
 
 SCAN_INTERVAL_SECONDS  = 20
-PRICE_INTERVAL_SECONDS = 1
+PRICE_INTERVAL_SECONDS = 5
 PAPER_MODE             = True
 
 J15M_SHORT_GATE  = 80
