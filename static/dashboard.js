@@ -11,13 +11,15 @@ const ADX_FADE_MAX = 60;
 let _scanCdSec   = 0;   // counts down to next scan
 let _priceCdSec  = 0;   // counts down to next price update
 
-// Tick every second — scan countdown, price countdown
+// Tick every second — scan countdown, per-card price countdown
 setInterval(() => {
   _scanCdSec  = Math.max(0, _scanCdSec  - 1);
   _priceCdSec = Math.max(0, _priceCdSec - 1);
   updateScanStatus();
-  const cdEl = document.getElementById('ck-price-cd');
-  if (cdEl) cdEl.textContent = `· next in ${_priceCdSec}s`;
+  // Update all per-card price countdown spans in-place (no re-render)
+  document.querySelectorAll('.price-cd-val').forEach(el => {
+    el.textContent = `${_priceCdSec}s`;
+  });
 }, 1000);
 
 // Fetch state every 2s
@@ -228,7 +230,7 @@ function buildCard(p, alerts, trades, changes) {
       <div class="card-sym">${sym}</div>
       <div class="card-right">
         <div class="card-price-line">
-          <span class="card-price">${fmtPrice(price)}</span>${chgHtml}
+          <span class="card-price">${fmtPrice(price)}</span>${chgHtml}<span class="card-price-cd price-cd-val">${_priceCdSec}s</span>
         </div>
         <div class="card-adx-block">
           <span class="card-adx-label">ADX</span>
@@ -289,19 +291,32 @@ function renderCockpit() {
   const pairs   = STATE?.pair_states || [];
   const changes = STATE?.price_changes || {};
 
-  // Section 1: J15M range bar — one dot per pair
-  const bar = document.getElementById('ck-range-bar');
-  // Remove old markers, keep zone/sep divs
-  bar.querySelectorAll('.ck-marker').forEach(m => m.remove());
-  pairs.forEach(p => {
-    const j = Math.min(100, Math.max(0, p.j15m || 50));
-    const col = j < 50 ? '#00ff88' : '#ff4444';
-    const m = document.createElement('div');
-    m.className = 'ck-marker';
-    m.style.cssText = `left:${j}%;background:${col};`;
-    m.title = `${p.symbol} J15M=${j.toFixed(1)}`;
-    bar.appendChild(m);
+  // Section 1: pair-name labels below the bar, stacked to avoid overlap
+  const labelRow = document.getElementById('ck-label-row');
+  const sorted = [...pairs]
+    .map(p => ({ sym: p.symbol, j: Math.min(99, Math.max(1, p.j15m || 50)) }))
+    .sort((a, b) => a.j - b.j);
+
+  // Anti-overlap: track rightmost extent per row (label ~5% wide at this font size)
+  const rowEdge = [];   // rowEdge[rowIndex] = last placed right-edge percent
+  const placed  = sorted.map(({ sym, j }) => {
+    let row = 0;
+    while (rowEdge[row] !== undefined && rowEdge[row] > j - 3) row++;
+    rowEdge[row] = j + 5;
+    return { sym, j, row };
   });
+
+  const rowH   = 11; // px
+  const maxRow = placed.reduce((m, p) => Math.max(m, p.row), 0);
+  labelRow.style.height = `${(maxRow + 1) * rowH}px`;
+  labelRow.innerHTML = placed.map(({ sym, j, row }) => {
+    const col = j < 20 ? '#00ff88'
+              : j < 35 ? '#4d8a4d'
+              : j < 65 ? '#cccccc'
+              : j < 80 ? '#8a4d4d'
+              : '#ff4444';
+    return `<div class="ck-pair-label" style="left:${j}%;top:${row * rowH}px;color:${col};">${sym}</div>`;
+  }).join('');
 
   // Section 2: Oversold (J15M <= 35)
   const osEl = document.getElementById('ck-os');
@@ -338,19 +353,6 @@ function renderCockpit() {
     ? nearList.join('<span style="color:#333"> · </span>')
     : `<span style="color:#333">none</span>`;
 
-  // Section 5: Price ticker
-  const tickEl = document.getElementById('ck-ticker');
-  tickEl.innerHTML = pairs.map(p => {
-    const chg    = changes[p.symbol] ?? null;
-    const chgStr = chg !== null
-      ? `<span class="ck-pair-chg" style="color:${chg >= 0 ? '#00ff88' : '#ff4444'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`
-      : `<span class="ck-pair-chg" style="color:#333">—</span>`;
-    return `<div class="ck-pair-cell">
-      <div class="ck-pair-sym">${p.symbol}</div>
-      <div class="ck-pair-price">${fmtPrice(p.price)}</div>
-      ${chgStr}
-    </div>`;
-  }).join('');
 }
 
 // ── Alerts tab ────────────────────────────────────────────────────────────────
