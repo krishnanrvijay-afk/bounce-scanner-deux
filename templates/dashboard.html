@@ -10,7 +10,7 @@
   body { background: #080808; color: #fff; font-family: 'Inter', sans-serif; font-size: 13px; overflow-x: hidden; }
 
   /* ── HEADER ── */
-  .header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 52px; border-bottom: 1px solid #1a1a1a; background: #0a0a0a; position: sticky; top: 0; z-index: 100; }
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 52px; border-bottom: 1px solid #1a1a1a; background: #0a0a0a; position: sticky; top: 0; z-index: 200; }
   .logo { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 3px; }
   .logo span { color: #00ff88; }
   .header-right { display: flex; align-items: center; gap: 14px; }
@@ -20,69 +20,80 @@
   .sep { width: 1px; height: 28px; background: #1a1a1a; }
   .paper-badge { background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 1px; }
 
+  /* Market popover button */
+  .mkt-btn-wrap { position: relative; }
+  .mkt-btn { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 4px 11px; border-radius: 4px; cursor: pointer; letter-spacing: 1px; background: #111; color: #aaa; border: 1px solid #2a2a2a; transition: all 0.15s; user-select: none; }
+  .mkt-btn:hover, .mkt-btn.open { background: rgba(255,255,255,0.08); color: #fff; border-color: #444; }
+  .mkt-popover { display: none; position: absolute; top: calc(100% + 8px); right: 0; width: 240px; background: #0e0e0e; border: 1px solid #222; border-radius: 6px; padding: 12px 14px; z-index: 300; box-shadow: 0 8px 32px rgba(0,0,0,0.6); }
+  .mkt-popover.open { display: block; }
+  .mkt-title { font-family: 'Bebas Neue', sans-serif; font-size: 11px; letter-spacing: 2px; color: #555; margin-bottom: 8px; }
+  .mkt-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 7px; }
+  .mkt-label { font-size: 8px; font-weight: 700; color: #555; letter-spacing: 0.5px; white-space: nowrap; padding-top: 2px; }
+  .mkt-chips { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+  .mkt-chip { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 9px; padding: 1px 5px; border-radius: 3px; background: #111; border: 1px solid #1a1a1a; }
+
   /* ── NAV BAR ── */
   .nav-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; border-bottom: 1px solid #111; background: #0a0a0a; gap: 12px; flex-wrap: wrap; }
   .nav-pills { display: flex; gap: 5px; flex-wrap: wrap; }
   .fp { padding: 4px 12px; border-radius: 20px; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; letter-spacing: 1px; cursor: pointer; background: #111; color: #555; border: 1px solid #1a1a1a; transition: all 0.15s; }
   .fp.active { background: #00ff88; color: #000; border-color: #00ff88; }
-  .fp.tab-pos.active { background: #66aaff; color: #000; border-color: #66aaff; }
-  .fp.tab-log.active { background: #ffaa00; color: #000; border-color: #ffaa00; }
+  .fp.tab-alerts.active { background: #ff4444; color: #000; border-color: #ff4444; }
+  .fp.tab-pos.active    { background: #66aaff; color: #000; border-color: #66aaff; }
+  .fp.tab-log.active    { background: #ffaa00; color: #000; border-color: #ffaa00; }
   .fp-count { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 0 5px; margin-left: 3px; font-size: 8px; }
   .scan-status { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #555; }
   .scan-status span { color: #00ff88; }
 
-  /* ── LAYOUT ── */
-  .main { display: flex; gap: 0; min-height: calc(100vh - 90px); }
-  .left-col { flex: 1; min-width: 0; }
-  .right-col { width: 340px; border-left: 1px solid #111; flex-shrink: 0; }
+  /* ── PAIR GRID (4-col, full width) ── */
+  .card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #111; }
+  @media (max-width: 1100px) { .card-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 800px)  { .card-grid { grid-template-columns: repeat(2, 1fr); } }
 
-  /* ── PAIR CARDS ── */
-  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1px; background: #111; }
   .pair-card { background: #0a0a0a; padding: 14px 16px; cursor: default; transition: background 0.1s; position: relative; }
   .pair-card:hover { background: #0e0e0e; }
+
+  /* Card header */
   .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-  .card-sym { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 1px; line-height: 1; }
-  .card-price { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #aaa; font-weight: 700; text-align: right; }
-  .card-price .pch { font-size: 9px; display: block; margin-top: 1px; }
-  .gate-row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
-  .gate-item { display: flex; align-items: center; gap: 3px; }
-  .gate-dot { width: 6px; height: 6px; border-radius: 50%; background: #2a2a2a; flex-shrink: 0; }
-  .gate-dot.pass { background: #00ff88; box-shadow: 0 0 4px rgba(0,255,136,0.5); }
-  .gate-dot.fail { background: #333; }
-  .gate-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #555; font-weight: 700; letter-spacing: 0.5px; }
-  .gate-val { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; }
-  .ind-row { display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
-  .ind-item { display: flex; flex-direction: column; }
-  .ind-label { font-size: 7px; font-weight: 700; color: #555; letter-spacing: 1px; text-transform: uppercase; }
-  .ind-value { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
-  .ma-strip { display: flex; gap: 4px; margin-bottom: 8px; }
-  .ma-chip { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.5px; }
-  .ma-bull { background: rgba(0,255,136,0.1); color: #00ff88; border: 1px solid rgba(0,255,136,0.2); }
-  .ma-bear { background: rgba(255,68,68,0.1);  color: #ff4444; border: 1px solid rgba(255,68,68,0.2); }
-  .ma-neutral { background: #111; color: #555; border: 1px solid #1a1a1a; }
-  .card-bottom { display: flex; justify-content: space-between; align-items: center; }
-  .score-badge { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 7px; border-radius: 3px; letter-spacing: 1px; }
-  .sb-pass-short { background: rgba(255,68,68,0.12); color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
-  .sb-pass-long  { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
-  .sb-fail { background: #111; color: #333; border: 1px solid #1a1a1a; }
-  .cooldown-tag { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #555; }
-  .in-trade-badge { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); }
+  .card-sym { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; line-height: 1; }
+  .card-price-block { text-align: right; }
+  .card-price { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; color: #aaa; }
+  .card-adx   { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #555; margin-top: 2px; }
 
-  /* ── SIDEBAR PANELS ── */
-  .panel-hdr { padding: 10px 16px; border-bottom: 1px solid #111; font-family: 'Bebas Neue', sans-serif; font-size: 13px; letter-spacing: 2px; color: #555; display: flex; justify-content: space-between; align-items: center; }
-  .panel-hdr-right { display: flex; align-items: center; gap: 6px; }
-  .panel-count { color: #00ff88; font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
-  .panel-btn { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 8px; border-radius: 3px; cursor: pointer; letter-spacing: 0.5px; border: 1px solid #2a2a2a; background: #111; color: #555; transition: all 0.15s; }
-  .panel-btn:hover { color: #ff4444; border-color: rgba(255,68,68,0.4); }
-  .alerts-wrap { overflow-y: auto; max-height: calc(60vh - 60px); }
-  .no-content { padding: 30px 16px; text-align: center; color: #333; font-size: 11px; }
+  /* Direction row */
+  .dir-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; margin-bottom: 4px; }
+  .dir-row.long-row  { background: rgba(0,255,136,0.05); border: 1px solid rgba(0,255,136,0.12); }
+  .dir-row.short-row { background: rgba(255,68,68,0.05);  border: 1px solid rgba(255,68,68,0.12); }
+  .dir-arrow { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; flex-shrink: 0; width: 14px; }
+  .arrow-long  { color: #00ff88; }
+  .arrow-short { color: #ff4444; }
+  .dir-vals { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .dv-item { display: flex; flex-direction: column; align-items: center; min-width: 30px; }
+  .dv-label { font-size: 6px; font-weight: 700; color: #555; letter-spacing: 0.5px; text-transform: uppercase; }
+  .dv-val   { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; }
+  .gate-dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; margin-right: 2px; vertical-align: middle; }
+  .gate-dot.pass { background: #00ff88; box-shadow: 0 0 3px rgba(0,255,136,0.6); }
+  .gate-dot.fail { background: #2a2a2a; }
 
-  /* Alert cards */
-  .alert-card { padding: 12px 14px; border-bottom: 1px solid #0d0d0d; position: relative; }
-  .alert-card.short-card { border-left: 2px solid #ff4444; }
-  .alert-card.long-card  { border-left: 2px solid #00ff88; }
+  /* Card footer pills */
+  .card-footer { display: flex; gap: 5px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .pill { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 7px; border-radius: 3px; letter-spacing: 0.5px; }
+  .pill-scanning  { background: #111; color: #333; border: 1px solid #1a1a1a; }
+  .pill-near      { background: transparent; color: #fff; border: 1px solid #444; }
+  .pill-diverge   { background: rgba(255,170,0,0.1); color: #ffaa00; border: 1px solid rgba(255,170,0,0.3); }
+  .pill-alert     { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
+  .pill-alert-s   { background: rgba(255,68,68,0.12);  color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
+  .pill-intrade   { background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); }
+  .pill-cd        { background: #111; color: #555; border: 1px solid #1a1a1a; }
+  .pill-adxmax    { background: rgba(255,68,68,0.07); color: #ff4444; border: 1px solid rgba(255,68,68,0.2); }
+
+  /* ── ALERTS TAB ── */
+  #tab-alerts { display: none; padding: 20px 24px; }
+  .alert-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+  .alert-card { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 5px; padding: 12px 14px; position: relative; }
+  .alert-card.short-card { border-left: 3px solid #ff4444; }
+  .alert-card.long-card  { border-left: 3px solid #00ff88; }
   .ac-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
-  .ac-sym { font-family: 'Bebas Neue', sans-serif; font-size: 16px; }
+  .ac-sym { font-family: 'Bebas Neue', sans-serif; font-size: 18px; }
   .ac-dir { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 3px; letter-spacing: 1px; }
   .dir-short { background: rgba(255,68,68,0.12); color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
   .dir-long  { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
@@ -94,8 +105,7 @@
   .ac-px { background: #111; border-radius: 3px; padding: 5px 7px; }
   .ac-px-label { font-size: 7px; font-weight: 700; color: #555; letter-spacing: 1px; text-transform: uppercase; }
   .ac-px-val { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; margin-top: 1px; }
-  .ac-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
-  .ac-meta-item { font-size: 9px; }
+  .ac-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; font-size: 9px; }
   .ac-meta-label { color: #555; font-weight: 700; }
   .ac-meta-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #aaa; }
   .ac-btns { display: flex; gap: 5px; flex-wrap: wrap; }
@@ -105,14 +115,12 @@
   .ac-btn:hover { opacity: 0.75; }
   .ac-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   .in-trade-stamp { position: absolute; top: 10px; right: 10px; font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); }
-
-  /* ── MARKET SNAPSHOT ── */
-  .snapshot-wrap { padding: 12px 16px; border-top: 1px solid #111; }
-  .snap-title { font-family: 'Bebas Neue', sans-serif; font-size: 12px; letter-spacing: 2px; color: #555; margin-bottom: 8px; }
-  .snap-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 9px; }
-  .snap-label { color: #555; font-weight: 700; letter-spacing: 0.5px; }
-  .snap-vals { display: flex; gap: 4px; flex-wrap: wrap; }
-  .snap-sym { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 9px; padding: 1px 5px; border-radius: 3px; background: #111; color: #888; border: 1px solid #1a1a1a; }
+  .alerts-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .alerts-title { font-family: 'Bebas Neue', sans-serif; font-size: 14px; letter-spacing: 2px; color: #555; }
+  .alerts-count { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: #00ff88; }
+  .panel-btn { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 3px 10px; border-radius: 3px; cursor: pointer; letter-spacing: 0.5px; border: 1px solid #2a2a2a; background: #111; color: #555; transition: all 0.15s; }
+  .panel-btn:hover { color: #ff4444; border-color: rgba(255,68,68,0.4); }
+  .no-content { padding: 60px 24px; text-align: center; color: #333; font-size: 12px; }
 
   /* ── POSITIONS TAB ── */
   #tab-positions { display: none; padding: 20px 24px; }
@@ -128,22 +136,18 @@
   .pb-short { background: rgba(255,68,68,0.12);  color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
   .pb-exch  { background: #111; color: #888; border: 1px solid #2a2a2a; }
   .pb-paper { background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); }
-
-  /* Progress bar area */
   .pos-bar-wrap { padding: 4px 16px 12px; }
   .pos-bar-labels { display: flex; justify-content: space-between; margin-bottom: 4px; }
   .pos-bar-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; color: #555; }
-  .pos-bar-label.sl  { color: #ff4444; }
-  .pos-bar-label.tp  { color: #00ff88; }
-  .pos-bar-track { height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; position: relative; }
+  .pos-bar-label.sl { color: #ff4444; }
+  .pos-bar-label.tp { color: #00ff88; }
+  .pos-bar-track { height: 6px; background: #1a1a1a; border-radius: 3px; overflow: hidden; }
   .pos-bar-fill  { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
   .fill-long  { background: linear-gradient(90deg, rgba(0,255,136,0.3), #00ff88); }
   .fill-short { background: linear-gradient(90deg, #ff4444, rgba(255,68,68,0.3)); }
-  .pos-bar-prices { display: flex; justify-content: space-between; margin-top: 5px; align-items: flex-end; }
+  .pos-bar-prices { display: flex; justify-content: space-between; margin-top: 5px; }
   .pos-bar-entry { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #555; text-align: center; flex: 1; }
   .pos-bar-live  { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; text-align: center; flex: 1; }
-
-  /* PnL row */
   .pos-pnl-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-top: 1px solid #111; }
   .pos-pnl { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; }
   .pos-pnl.pos { color: #00ff88; }
@@ -165,11 +169,10 @@
   .lb-clear { background: rgba(255,68,68,0.08);  color: #ff4444; border-color: rgba(255,68,68,0.3); }
   .log-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #555; margin-left: auto; }
   .log-table-wrap { overflow-x: auto; }
-  .log-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .log-table { width: 100%; border-collapse: collapse; }
   .log-table th { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; letter-spacing: 1px; color: #555; text-transform: uppercase; padding: 6px 10px; border-bottom: 1px solid #1a1a1a; text-align: left; white-space: nowrap; }
   .log-table td { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 7px 10px; border-bottom: 1px solid #0d0d0d; white-space: nowrap; }
   .log-table tr:hover td { background: #0d0d0d; }
-  .log-table td.td-sym { font-weight: 700; font-size: 12px; }
   .reason-tp1    { color: #00ff88; font-weight: 700; }
   .reason-tp2    { color: #00dd66; font-weight: 700; }
   .reason-sl     { color: #ff4444; font-weight: 700; }
@@ -177,12 +180,12 @@
   .log-empty { padding: 50px; text-align: center; color: #333; font-size: 12px; }
 
   /* colors */
-  .green  { color: #00ff88; }
-  .amber  { color: #ffaa00; }
-  .red    { color: #ff4444; }
-  .blue   { color: #66aaff; }
-  .grey   { color: #555; }
-  .white  { color: #fff; }
+  .green { color: #00ff88; }
+  .amber { color: #ffaa00; }
+  .red   { color: #ff4444; }
+  .blue  { color: #66aaff; }
+  .grey  { color: #555; }
+  .white { color: #fff; }
 </style>
 </head>
 <body>
@@ -191,11 +194,6 @@
   <div class="logo">BOUNCE SCANNER <span>II</span></div>
   <div class="header-right">
     <div class="hstat">
-      <div class="hstat-label">BTC REGIME</div>
-      <div class="hstat-value" id="h-regime">—</div>
-    </div>
-    <div class="sep"></div>
-    <div class="hstat">
       <div class="hstat-label">DAILY P&L</div>
       <div class="hstat-value" id="h-pnl">$0.00</div>
     </div>
@@ -203,6 +201,18 @@
     <div class="hstat">
       <div class="hstat-label">MARGIN</div>
       <div class="hstat-value" id="h-margin">$0</div>
+    </div>
+    <div class="sep"></div>
+    <!-- MARKET popover pill -->
+    <div class="mkt-btn-wrap">
+      <div class="mkt-btn" id="mkt-btn" onclick="toggleMarket(event)">MARKET ▾</div>
+      <div class="mkt-popover" id="mkt-popover">
+        <div class="mkt-title">MARKET SNAPSHOT</div>
+        <div class="mkt-row"><span class="mkt-label">BULL TREND 1H</span><div class="mkt-chips" id="mkt-bull"></div></div>
+        <div class="mkt-row"><span class="mkt-label">BEAR TREND 1H</span><div class="mkt-chips" id="mkt-bear"></div></div>
+        <div class="mkt-row"><span class="mkt-label">J15M OVERBOUGHT</span><div class="mkt-chips" id="mkt-ob"></div></div>
+        <div class="mkt-row"><span class="mkt-label">J15M OVERSOLD</span><div class="mkt-chips" id="mkt-os"></div></div>
+      </div>
     </div>
     <div class="sep"></div>
     <div class="hstat">
@@ -222,43 +232,38 @@
 
 <div class="nav-row">
   <div class="nav-pills">
-    <div class="fp active"    data-tab="grid"   data-filter="ALL"          onclick="setNav(this)">ALL</div>
-    <div class="fp"           data-tab="grid"   data-filter="BOUNCE_SHORT" onclick="setNav(this)">BOUNCE SHORT</div>
-    <div class="fp"           data-tab="grid"   data-filter="BOUNCE_LONG"  onclick="setNav(this)">BOUNCE LONG</div>
-    <div class="fp"           data-tab="grid"   data-filter="ALERTS"       onclick="setNav(this)">ALERTS</div>
-    <div class="fp tab-pos"   data-tab="pos"    data-filter=""             onclick="setNav(this)">POSITIONS <span class="fp-count" id="nav-pos-count">0</span></div>
-    <div class="fp"           data-tab="grid"   data-filter="COOLDOWN"     onclick="setNav(this)">COOLDOWN</div>
-    <div class="fp tab-log"   data-tab="log"    data-filter=""             onclick="setNav(this)">LOG <span class="fp-count" id="nav-log-count">0</span></div>
+    <div class="fp active"         data-tab="grid"    data-filter="ALL"          onclick="setNav(this)">ALL</div>
+    <div class="fp"                data-tab="grid"    data-filter="BOUNCE_SHORT" onclick="setNav(this)">BOUNCE SHORT</div>
+    <div class="fp"                data-tab="grid"    data-filter="BOUNCE_LONG"  onclick="setNav(this)">BOUNCE LONG</div>
+    <div class="fp tab-alerts"     data-tab="alerts"  data-filter=""             onclick="setNav(this)">ALERTS <span class="fp-count" id="nav-alert-count">0</span></div>
+    <div class="fp tab-pos"        data-tab="pos"     data-filter=""             onclick="setNav(this)">POSITIONS <span class="fp-count" id="nav-pos-count">0</span></div>
+    <div class="fp"                data-tab="grid"    data-filter="COOLDOWN"     onclick="setNav(this)">COOLDOWN</div>
+    <div class="fp tab-log"        data-tab="log"     data-filter=""             onclick="setNav(this)">LOG <span class="fp-count" id="nav-log-count">0</span></div>
   </div>
   <div class="scan-status" id="scan-status">waiting for scan…</div>
 </div>
 
-<!-- ── SCANNER GRID VIEW ── -->
+<!-- ── SCANNER GRID VIEW (full width) ── -->
 <div id="view-grid">
-  <div class="main">
-    <div class="left-col">
-      <div class="card-grid" id="card-grid"></div>
-    </div>
-    <div class="right-col">
-      <div class="panel-hdr">
-        ALERTS
-        <div class="panel-hdr-right">
-          <span class="panel-count" id="alert-count">0</span>
-          <button class="panel-btn" onclick="clearAlerts()">CLEAR</button>
-        </div>
-      </div>
-      <div class="alerts-wrap" id="alerts-wrap">
-        <div class="no-content">No alerts yet</div>
-      </div>
-      <div class="snapshot-wrap" id="snapshot-wrap"></div>
-    </div>
+  <div class="card-grid" id="card-grid"></div>
+</div>
+
+<!-- ── ALERTS TAB ── -->
+<div id="tab-alerts">
+  <div class="alerts-toolbar">
+    <span class="alerts-title">ALERTS</span>
+    <span class="alerts-count" id="alert-count">0</span>
+    <button class="panel-btn" onclick="clearAlerts()">CLEAR ALL</button>
+  </div>
+  <div class="alert-grid" id="alert-grid">
+    <div class="no-content">No alerts yet</div>
   </div>
 </div>
 
 <!-- ── POSITIONS TAB ── -->
 <div id="tab-positions">
   <div class="pos-grid" id="pos-grid">
-    <div class="no-content" style="padding:50px;color:#333;text-align:center;">No open positions</div>
+    <div class="no-content">No open positions</div>
   </div>
 </div>
 
