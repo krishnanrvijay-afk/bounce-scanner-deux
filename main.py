@@ -36,7 +36,7 @@ from config import (
 from hl_client import HLClient
 from mexc_client import MexcClient
 from scanner import (
-    run_full_scan, scan_pair_state, get_pending, get_btc_regime,
+    run_full_scan, scan_pair_state, get_pending,
     get_scan_count, set_close_cooldown, clear_cooldown,
     get_cooldown_remaining, clear_all_scanner_state, log_startup_config,
 )
@@ -157,7 +157,6 @@ class AppState:
                 "limit":  DAILY_LOSS_LIMIT,
                 "halted": trading_halted_today,
             },
-            "btc_regime":       get_btc_regime(),
             "scan_count":       get_scan_count(),
             "last_scan_at":     self.last_scan_at,
             "deploy_time":      DEPLOY_TIME,
