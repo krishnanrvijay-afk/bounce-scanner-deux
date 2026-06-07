@@ -2,8 +2,8 @@ HL_API_URL = "https://api.hyperliquid.xyz/info"
 
 PAIRS = ["DOGE", "SUI", "BTC", "LINK", "ETH", "NEAR", "XRP", "SOL", "WIF", "AVAX", "HYPE", "INJ"]
 
-SCAN_INTERVAL_SECONDS  = 20
-PRICE_INTERVAL_SECONDS = 5
+SCAN_INTERVAL_SECONDS  = 30
+PRICE_INTERVAL_SECONDS = 8
 PAPER_MODE             = True
 
 J15M_SHORT_GATE  = 80
@@ -33,7 +33,7 @@ MARGIN_PER_TRADE = 2000.0
 MARGIN_HARD_CAP  = 25000.0
 
 SESSION_FILTER_ENABLED  = False
-BTC_REGIME_FILTER_ENABLED = True
+BTC_REGIME_FILTER_ENABLED = False  # Set to True to re-enable when BTC has clear directional trend
 PLACE_EXCHANGE_SL       = True
 
 PAIR_ADX_OVERRIDES: dict = {}
