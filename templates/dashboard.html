@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOUNCE SCANNER II</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #080808; color: #fff; font-family: 'Inter', sans-serif; font-size: 13px; overflow-x: hidden; }
+
+  /* ── HEADER ── */
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 52px; border-bottom: 1px solid #1a1a1a; background: #0a0a0a; position: sticky; top: 0; z-index: 100; }
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 3px; }
+  .logo span { color: #00ff88; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .hstat { display: flex; flex-direction: column; align-items: flex-end; }
+  .hstat-label { font-size: 8px; font-weight: 700; color: #555; letter-spacing: 1px; text-transform: uppercase; }
+  .hstat-value { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; }
+  .sep { width: 1px; height: 28px; background: #1a1a1a; }
+  .regime-pill { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 1px; }
+  .rp-bull { background: rgba(0,255,136,0.1); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
+  .rp-bear { background: rgba(255,68,68,0.1);  color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
+  .rp-neutral { background: rgba(255,255,255,0.05); color: #888; border: 1px solid #2a2a2a; }
+  .paper-badge { background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 1px; }
+
+  /* ── FILTER BAR + TABS ── */
+  .filter-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; border-bottom: 1px solid #111; background: #0a0a0a; gap: 12px; flex-wrap: wrap; }
+  .filter-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+  .fp { padding: 4px 12px; border-radius: 20px; font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; letter-spacing: 1px; cursor: pointer; background: #111; color: #555; border: 1px solid #1a1a1a; transition: all 0.15s; }
+  .fp.active { background: #00ff88; color: #000; border-color: #00ff88; }
+  .scan-status { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #555; }
+  .scan-status span { color: #00ff88; }
+
+  /* ── LAYOUT ── */
+  .main { display: flex; gap: 0; min-height: calc(100vh - 90px); }
+  .left-col { flex: 1; min-width: 0; }
+  .right-col { width: 340px; border-left: 1px solid #111; flex-shrink: 0; }
+
+  /* ── PAIR CARDS ── */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1px; background: #111; padding: 0; }
+  .pair-card { background: #0a0a0a; padding: 14px 16px; cursor: default; transition: background 0.1s; position: relative; }
+  .pair-card:hover { background: #0e0e0e; }
+
+  .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .card-sym { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 1px; line-height: 1; }
+  .card-price { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #aaa; font-weight: 700; text-align: right; }
+  .card-price .pch { font-size: 9px; display: block; margin-top: 1px; }
+
+  /* Gate row */
+  .gate-row { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+  .gate-item { display: flex; align-items: center; gap: 3px; }
+  .gate-dot { width: 6px; height: 6px; border-radius: 50%; background: #2a2a2a; flex-shrink: 0; }
+  .gate-dot.pass { background: #00ff88; box-shadow: 0 0 4px rgba(0,255,136,0.5); }
+  .gate-dot.fail { background: #333; }
+  .gate-label { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #555; font-weight: 700; letter-spacing: 0.5px; }
+  .gate-val { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; }
+
+  /* Indicator values */
+  .ind-row { display: flex; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .ind-item { display: flex; flex-direction: column; }
+  .ind-label { font-size: 7px; font-weight: 700; color: #555; letter-spacing: 1px; text-transform: uppercase; }
+  .ind-value { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+
+  /* MA strip */
+  .ma-strip { display: flex; gap: 4px; margin-bottom: 8px; }
+  .ma-chip { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.5px; }
+  .ma-bull { background: rgba(0,255,136,0.1); color: #00ff88; border: 1px solid rgba(0,255,136,0.2); }
+  .ma-bear { background: rgba(255,68,68,0.1);  color: #ff4444; border: 1px solid rgba(255,68,68,0.2); }
+  .ma-neutral { background: #111; color: #555; border: 1px solid #1a1a1a; }
+
+  /* Card bottom */
+  .card-bottom { display: flex; justify-content: space-between; align-items: center; }
+  .score-badge { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 7px; border-radius: 3px; letter-spacing: 1px; }
+  .sb-pass-short { background: rgba(255,68,68,0.12); color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
+  .sb-pass-long  { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
+  .sb-fail { background: #111; color: #333; border: 1px solid #1a1a1a; }
+  .cooldown-tag { font-family: 'JetBrains Mono', monospace; font-size: 8px; color: #555; }
+  .in-trade-badge { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); }
+
+  /* ── ALERTS PANEL ── */
+  .panel-hdr { padding: 12px 16px; border-bottom: 1px solid #111; font-family: 'Bebas Neue', sans-serif; font-size: 13px; letter-spacing: 2px; color: #555; display: flex; justify-content: space-between; align-items: center; }
+  .panel-hdr span { color: #00ff88; font-size: 11px; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+  .alerts-wrap { overflow-y: auto; max-height: calc(50vh - 60px); }
+  .no-alerts { padding: 30px 16px; text-align: center; color: #333; font-size: 11px; }
+
+  /* Alert card */
+  .alert-card { padding: 12px 14px; border-bottom: 1px solid #0d0d0d; position: relative; }
+  .alert-card.short-card { border-left: 2px solid #ff4444; }
+  .alert-card.long-card  { border-left: 2px solid #00ff88; }
+  .ac-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+  .ac-sym { font-family: 'Bebas Neue', sans-serif; font-size: 16px; }
+  .ac-dir { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 3px; letter-spacing: 1px; }
+  .dir-short { background: rgba(255,68,68,0.12); color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
+  .dir-long  { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
+  .tier-pill { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 3px; letter-spacing: 1px; }
+  .tp-high  { background: rgba(255,68,68,0.1);  color: #ff4444; border: 1px solid rgba(255,68,68,0.25); }
+  .tp-strong { background: rgba(255,170,0,0.1); color: #ffaa00; border: 1px solid rgba(255,170,0,0.25); }
+  .tp-regular { background: #111; color: #888; border: 1px solid #2a2a2a; }
+
+  .ac-prices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 7px; }
+  .ac-px { background: #111; border-radius: 3px; padding: 5px 7px; }
+  .ac-px-label { font-size: 7px; font-weight: 700; color: #555; letter-spacing: 1px; text-transform: uppercase; }
+  .ac-px-val { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; margin-top: 1px; }
+  .ac-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .ac-meta-item { font-size: 9px; }
+  .ac-meta-label { color: #555; font-weight: 700; }
+  .ac-meta-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #aaa; }
+  .ac-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+  .btn-hl   { background: rgba(0,255,136,0.08); color: #00ff88; border: 1px solid rgba(0,255,136,0.25); }
+  .btn-mexc { background: rgba(100,160,255,0.08); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); }
+  .btn-close { background: rgba(255,68,68,0.08); color: #ff4444; border: 1px solid rgba(255,68,68,0.2); }
+  .ac-btn { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 4px 10px; border-radius: 3px; cursor: pointer; letter-spacing: 0.5px; transition: opacity 0.15s; }
+  .ac-btn:hover { opacity: 0.75; }
+  .ac-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .in-trade-stamp { position: absolute; top: 10px; right: 10px; font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); }
+
+  /* ── OPEN TRADES ── */
+  .trades-wrap { overflow-y: auto; max-height: calc(50vh - 30px); }
+  .trade-card { padding: 10px 14px; border-bottom: 1px solid #0d0d0d; }
+  .trade-card.long-card  { border-left: 2px solid #00ff88; }
+  .trade-card.short-card { border-left: 2px solid #ff4444; }
+  .tc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .tc-sym { font-family: 'Bebas Neue', sans-serif; font-size: 14px; }
+  .tc-pnl { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+  .tc-pnl.pos { color: #00ff88; }
+  .tc-pnl.neg { color: #ff4444; }
+  .tc-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 9px; color: #555; margin-bottom: 5px; }
+  .tc-meta span { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+  .tc-close-btn { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 3px 9px; border-radius: 3px; cursor: pointer; letter-spacing: 0.5px; background: rgba(255,68,68,0.08); color: #ff4444; border: 1px solid rgba(255,68,68,0.2); }
+  .tc-close-btn:hover { opacity: 0.75; }
+
+  /* ── MARKET SNAPSHOT ── */
+  .snapshot-wrap { padding: 12px 16px; border-top: 1px solid #111; }
+  .snap-title { font-family: 'Bebas Neue', sans-serif; font-size: 12px; letter-spacing: 2px; color: #555; margin-bottom: 8px; }
+  .snap-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 9px; }
+  .snap-label { color: #555; font-weight: 700; letter-spacing: 0.5px; }
+  .snap-vals { display: flex; gap: 4px; flex-wrap: wrap; }
+  .snap-sym { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 9px; padding: 1px 5px; border-radius: 3px; background: #111; color: #888; border: 1px solid #1a1a1a; }
+
+  /* colors */
+  .green  { color: #00ff88; }
+  .amber  { color: #ffaa00; }
+  .red    { color: #ff4444; }
+  .blue   { color: #66aaff; }
+  .grey   { color: #555; }
+  .white  { color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">BOUNCE SCANNER <span>II</span></div>
+  <div class="header-right">
+    <div class="hstat">
+      <div class="hstat-label">BTC REGIME</div>
+      <div class="hstat-value" id="h-regime">—</div>
+    </div>
+    <div class="sep"></div>
+    <div class="hstat">
+      <div class="hstat-label">DAILY P&L</div>
+      <div class="hstat-value" id="h-pnl">$0.00</div>
+    </div>
+    <div class="sep"></div>
+    <div class="hstat">
+      <div class="hstat-label">MARGIN</div>
+      <div class="hstat-value" id="h-margin">$0</div>
+    </div>
+    <div class="sep"></div>
+    <div class="hstat">
+      <div class="hstat-label">SCANS</div>
+      <div class="hstat-value" id="h-scans">0</div>
+    </div>
+    <div class="sep"></div>
+    <div id="paper-badge" class="paper-badge" style="display:none;">PAPER</div>
+    <div id="cb-badge" style="display:none; font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; padding:3px 8px; border-radius:4px; background:rgba(255,68,68,0.1); color:#ff4444; border:1px solid rgba(255,68,68,0.3);">⚡ CIRCUIT BREAKER</div>
+  </div>
+</div>
+
+<div class="filter-row">
+  <div class="filter-pills">
+    <div class="fp active" data-filter="ALL" onclick="setFilter(this)">ALL</div>
+    <div class="fp" data-filter="BOUNCE_SHORT" onclick="setFilter(this)">BOUNCE SHORT</div>
+    <div class="fp" data-filter="BOUNCE_LONG"  onclick="setFilter(this)">BOUNCE LONG</div>
+    <div class="fp" data-filter="ALERTS"       onclick="setFilter(this)">ALERTS</div>
+    <div class="fp" data-filter="COOLDOWN"     onclick="setFilter(this)">COOLDOWN</div>
+  </div>
+  <div class="scan-status" id="scan-status">waiting for scan…</div>
+</div>
+
+<div class="main">
+  <div class="left-col">
+    <div class="card-grid" id="card-grid"></div>
+  </div>
+  <div class="right-col">
+    <div class="panel-hdr">ALERTS <span id="alert-count">0</span></div>
+    <div class="alerts-wrap" id="alerts-wrap">
+      <div class="no-alerts">No alerts yet</div>
+    </div>
+    <div class="panel-hdr" style="border-top:1px solid #111;">OPEN POSITIONS <span id="trade-count">0</span></div>
+    <div class="trades-wrap" id="trades-wrap">
+      <div class="no-alerts">No open trades</div>
+    </div>
+    <div class="snapshot-wrap" id="snapshot-wrap"></div>
+  </div>
+</div>
+
+<script src="/static/dashboard.js"></script>
+</body>
+</html>
