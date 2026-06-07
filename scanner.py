@@ -1,3 +1,4 @@
+import asyncio
 import time
 import logging
 from typing import Optional
@@ -14,11 +15,12 @@ log = logging.getLogger("scanner")
 
 # ── Module-level state ────────────────────────────────────────────────────────
 
-_last_scores:  dict[str, int]   = {}   # keyed "BTCSHORT" / "BTCLONG"
-_cooldowns:    dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" → expiry ts
-_btc_regime:   str              = "Neutral"
-_scan_count:   int              = 0
-_pending:      dict[str, dict]  = {}   # first-scan confirmed, awaiting 2nd
+_last_scores:     dict[str, int]   = {}   # keyed "BTCSHORT" / "BTCLONG"
+_cooldowns:       dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" → expiry ts
+_btc_regime:      str              = "Neutral"  # from PREVIOUS completed scan cycle
+_btc_regime_next: str              = "Neutral"  # staged from current scan cycle
+_scan_count:      int              = 0
+_pending:         dict[str, dict]  = {}   # first-scan confirmed, awaiting 2nd
 
 
 # ── Indicator helpers ─────────────────────────────────────────────────────────
@@ -199,17 +201,19 @@ def get_scan_count() -> int:
 
 
 def clear_all_scanner_state():
-    global _scan_count
+    global _scan_count, _btc_regime, _btc_regime_next
     _last_scores.clear()
     _cooldowns.clear()
     _pending.clear()
-    _scan_count = 0
+    _scan_count       = 0
+    _btc_regime       = "Neutral"
+    _btc_regime_next  = "Neutral"
 
 
 # ── Main scan ─────────────────────────────────────────────────────────────────
 
 async def run_full_scan(hl_client) -> list[dict]:
-    global _btc_regime, _scan_count
+    global _btc_regime, _btc_regime_next, _scan_count
 
     _scan_count += 1
     new_alerts: list[dict] = []
@@ -218,6 +222,7 @@ async def run_full_scan(hl_client) -> list[dict]:
 
     for symbol in PAIRS:
         try:
+            await asyncio.sleep(0.5)  # rate-limit spacing — 12 pairs × 0.5s = 6s minimum spread
             candles_5m, candles_15m, candles_1h, book, price = await _fetch_pair_data(hl_client, symbol)
 
             if not price or price == 0:
@@ -244,10 +249,11 @@ async def run_full_scan(hl_client) -> list[dict]:
             vol_ma15m  = (sum(c["volume"] for c in candles_15m[-10:]) / min(10, len(candles_15m))
                           if candles_15m else 0)
 
-            # ── BTC regime (first pair = BTC) ─────────────────────────────────
-            if symbol == PAIRS[0]:
-                _btc_regime = trend
-                log.info(f"[REGIME] current={_btc_regime} blocked_shorts={blocked_shorts} allowed_longs={allowed_longs}")
+            # ── BTC regime — stage for NEXT scan cycle (avoid circular dependency) ──
+            if symbol == "BTC":
+                _btc_regime_next = trend
+                log.info(f"[REGIME] current={_btc_regime} (from prev scan) next={_btc_regime_next} "
+                         f"blocked_shorts={blocked_shorts} allowed_longs={allowed_longs}")
 
             # ── SL distance ───────────────────────────────────────────────────
             sl_dist = atr15m * ATR_SL_MULTIPLIER
@@ -294,16 +300,18 @@ async def run_full_scan(hl_client) -> list[dict]:
                 # Second consecutive scan — emit alert
                 _last_scores[key] = 4
 
-                # BTC regime filter
+                # BTC regime filter — BTC itself is exempt (self-referential pair)
                 if BTC_REGIME_FILTER_ENABLED:
-                    if _btc_regime == "Strong Bull" and direction == "SHORT":
+                    if symbol == "BTC":
+                        log.info(f"[REGIME EXEMPT] BTC {direction} exempt from regime filter — self-referential pair")
+                    elif _btc_regime == "Strong Bull" and direction == "SHORT":
                         log.info(f"[REGIME BLOCK] {symbol} SHORT blocked — BTC regime is Strong Bull")
                         blocked_shorts += 1
                         continue
-                    if _btc_regime == "Strong Bear" and direction == "LONG":
+                    elif _btc_regime == "Strong Bear" and direction == "LONG":
                         log.info(f"[REGIME BLOCK] {symbol} LONG blocked — BTC regime is Strong Bear")
                         continue
-                    if _btc_regime == "Neutral":
+                    elif _btc_regime == "Neutral":
                         log.info(f"[REGIME BLOCK] {symbol} {direction} blocked — BTC regime is Neutral")
                         continue
 
@@ -360,7 +368,9 @@ async def run_full_scan(hl_client) -> list[dict]:
         except Exception as e:
             log.error(f"[SCAN] {symbol} error: {e}", exc_info=True)
 
-    log.info(f"[SCAN] #{_scan_count} complete — {len(new_alerts)} new alerts")
+    # Commit staged BTC regime — now safe to use on the NEXT scan cycle
+    _btc_regime = _btc_regime_next
+    log.info(f"[SCAN] #{_scan_count} complete — {len(new_alerts)} new alerts — regime committed: {_btc_regime}")
     return new_alerts
 
 
@@ -369,6 +379,7 @@ async def scan_pair_state(hl_client) -> list[dict]:
     states = []
     for symbol in PAIRS:
         try:
+            await asyncio.sleep(0.5)  # rate-limit spacing between pairs
             candles_5m, candles_15m, candles_1h, book, price = await _fetch_pair_data(hl_client, symbol)
             if not price:
                 states.append({"symbol": symbol, "price": 0})
@@ -420,7 +431,6 @@ async def scan_pair_state(hl_client) -> list[dict]:
 
 
 async def _fetch_pair_data(hl_client, symbol: str):
-    import asyncio
     candles_5m, candles_15m, candles_1h, book, price = await asyncio.gather(
         hl_client.get_candles(symbol, "5m",  100),
         hl_client.get_candles(symbol, "15m", 100),
