@@ -543,6 +543,14 @@ async def download_tradelog_csv():
     )
 
 
+@app.delete("/api/alerts")
+async def clear_alerts_endpoint():
+    app_state.alerts.clear()
+    clear_all_scanner_state()
+    print("[CLEAR ALERTS] alerts cleared, consecutive-scan state reset")
+    return {"status": "ok"}
+
+
 @app.delete("/api/tradelog")
 async def clear_tradelog():
     global consecutive_losses, circuit_breaker_active, daily_pnl, trading_halted_today
