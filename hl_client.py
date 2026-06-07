@@ -8,7 +8,8 @@ from config import HL_API_URL, PAPER_MODE
 
 class HLClient:
     def __init__(self):
-        self._http = httpx.AsyncClient(timeout=10.0)
+        self._http = httpx.AsyncClient(timeout=15.0)
+        self._sem  = asyncio.Semaphore(4)
         self._paper_mode = PAPER_MODE
         self._exchange = None
         self._info = None
@@ -35,17 +36,18 @@ class HLClient:
             print(f"[HLClient] Failed to init live client: {e}")
 
     async def _post(self, payload: dict) -> dict | list:
-        resp = await self._http.post(HL_API_URL, json=payload)
-        if resp.status_code == 429:
-            coin = payload.get("req", {}).get("coin", payload.get("type", "?"))
-            print(f"[RATE LIMIT] {coin} 429 received — waiting 2s before retry")
-            await asyncio.sleep(2)
+        async with self._sem:
             resp = await self._http.post(HL_API_URL, json=payload)
             if resp.status_code == 429:
-                print(f"[RATE LIMIT] {coin} 429 on retry — returning None")
-                return None
-        resp.raise_for_status()
-        return resp.json()
+                coin = payload.get("req", {}).get("coin", payload.get("type", "?"))
+                print(f"[RATE LIMIT] {coin} 429 — backing off 3s")
+                await asyncio.sleep(3)
+                resp = await self._http.post(HL_API_URL, json=payload)
+                if resp.status_code == 429:
+                    print(f"[RATE LIMIT] {coin} 429 on retry — giving up")
+                    return None
+            resp.raise_for_status()
+            return resp.json()
 
     async def get_price(self, symbol: str) -> Optional[float]:
         try:
