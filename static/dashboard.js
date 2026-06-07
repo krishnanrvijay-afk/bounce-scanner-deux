@@ -306,7 +306,7 @@ function renderCockpit() {
     return { sym, j, row };
   });
 
-  const rowH   = 11; // px
+  const rowH   = 14; // px — matches 10px label font-size
   const maxRow = placed.reduce((m, p) => Math.max(m, p.row), 0);
   labelRow.style.height = `${(maxRow + 1) * rowH}px`;
   labelRow.innerHTML = placed.map(({ sym, j, row }) => {
@@ -383,12 +383,12 @@ function buildAlertCard(a, trades) {
   const elpStr  = elapsed < 60 ? `${elapsed}s ago` : `${Math.floor(elapsed/60)}m ago`;
 
   return `<div class="alert-card ${dirClass}">
-    ${stamp}
     <div class="ac-top">
       <div class="ac-sym">${a.symbol}</div>
-      <div style="display:flex;gap:4px;align-items:center;">
+      <div style="display:flex;gap:4px;align-items:flex-start;flex-wrap:wrap;justify-content:flex-end;max-width:68%;">
         ${dirPill}
         <span class="tier-pill ${tierCls}">${a.tier} ${a.leverage}x</span>
+        ${inTrade ? '<span class="in-trade-badge">IN TRADE</span>' : ''}
       </div>
     </div>
     <div class="ac-prices">
@@ -460,15 +460,31 @@ function buildPosCard(t, prices) {
     </div>
     <div class="pos-bar-wrap">
       <div class="pos-bar-labels">
-        <span class="pos-bar-label sl">SL ${fmtPrice(sl)}</span>
-        <span class="pos-bar-label tp">TP1 ${fmtPrice(tp1)}</span>
+        <div class="pos-sl-block">
+          <div class="pos-px-label">SL</div>
+          <div class="pos-sl-val">${fmtPrice(sl)}</div>
+        </div>
+        <div class="pos-tp1-block">
+          <div class="pos-px-label" style="text-align:right">TP1</div>
+          <div class="pos-tp1-val">${fmtPrice(tp1)}</div>
+        </div>
       </div>
       <div class="pos-bar-track">
         <div class="pos-bar-fill ${isLong?'fill-long':'fill-short'}" style="width:${pct.toFixed(1)}%"></div>
       </div>
       <div class="pos-bar-prices">
-        <div class="pos-bar-entry" style="color:#555;">entry ${fmtPrice(entry)}</div>
-        <div class="pos-bar-live" style="color:${liveColor};">${fmtPrice(current)}</div>
+        <div class="pos-entry-block">
+          <div class="pos-px-label">ENTRY</div>
+          <div class="pos-entry-val">${fmtPrice(entry)}</div>
+        </div>
+        <div class="pos-live-block">
+          <div class="pos-px-label" style="text-align:center">LIVE</div>
+          <div class="pos-live-val" style="color:${liveColor}">${fmtPrice(current)}</div>
+        </div>
+        <div class="pos-tp2-block">
+          <div class="pos-px-label" style="text-align:right">TP2</div>
+          <div class="pos-tp2-val">${fmtPrice(t.tp2_price)}</div>
+        </div>
       </div>
     </div>
     <div class="pos-pnl-row">
@@ -476,7 +492,6 @@ function buildPosCard(t, prices) {
       <span class="pos-r" style="color:${r>=0?'#555':'#ff4444'}">${r>=0?'+':''}${r.toFixed(2)}R</span>
     </div>
     <div class="pos-meta-row">
-      <div class="pos-meta-item"><span class="pos-meta-label">TP2 </span><span class="pos-meta-val">${fmtPrice(t.tp2_price)}</span></div>
       <div class="pos-meta-item"><span class="pos-meta-label">AGE </span><span class="pos-meta-val">${elapsedStr}</span></div>
       <div class="pos-meta-item"><span class="pos-meta-label">ADX </span><span class="pos-meta-val">${(t.adx1h||0).toFixed(1)}</span></div>
     </div>
