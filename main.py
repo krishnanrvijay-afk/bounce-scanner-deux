@@ -372,6 +372,140 @@ async def _price_loop():
         await asyncio.sleep(PRICE_INTERVAL_SECONDS)
 
 
+# ── Exit monitor helpers ───────────────────────────────────────────────────────
+
+def _compute_r(pnl: float, trade: dict) -> float:
+    entry       = trade.get("entry_price") or 0
+    sl_dist     = trade.get("sl_dist") or 0
+    lev         = trade.get("leverage", 1)
+    margin      = trade.get("margin", MARGIN_PER_TRADE)
+    dollar_risk = margin * lev * (sl_dist / entry) if entry else 0
+    return round(pnl / dollar_risk, 2) if dollar_risk else 0.0
+
+
+def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
+    """Synchronous internal close — no exchange call, price already known."""
+    sym       = trade["symbol"]
+    direction = trade["direction"]
+    remaining = trade.get("remaining_size", trade["size"])
+    entry     = trade["entry_price"]
+
+    pnl = (exit_price - entry) * remaining if direction == "LONG" \
+          else (entry - exit_price) * remaining
+    r   = _compute_r(pnl, trade)
+
+    _append_trade_log(trade, exit_price, reason, pnl, r)
+    _update_daily_pnl(pnl)
+    _on_trade_close(reason)
+
+    app_state.margin_deployed = max(0.0, app_state.margin_deployed - trade["margin"])
+    if key in app_state.open_trades:
+        del app_state.open_trades[key]
+    _retire_alert(sym, direction)
+    set_close_cooldown(sym, direction)
+
+    print(f"[EXIT] {sym} {direction} closed at {exit_price} reason={reason} "
+          f"pnl=${pnl:.2f} r={r:+.2f}R")
+
+
+def _do_partial_close_tp1(key: str, trade: dict, exit_price: float):
+    """Close half the position at TP1, keep remainder open watching for TP2."""
+    sym       = trade["symbol"]
+    direction = trade["direction"]
+    full_size = trade.get("remaining_size", trade["size"])
+    half_size = full_size / 2
+    entry     = trade["entry_price"]
+
+    pnl = (exit_price - entry) * half_size if direction == "LONG" \
+          else (entry - exit_price) * half_size
+    r   = _compute_r(pnl, trade)
+
+    # Update trade in-place — keep it open
+    trade["remaining_size"] = half_size
+    trade["tp1_hit"]        = True
+    trade["extreme_price"]  = exit_price
+    # Halve the deployed margin to reflect the partial close
+    old_margin = trade.get("margin", MARGIN_PER_TRADE)
+    trade["margin"] = old_margin / 2
+    app_state.open_trades[key]     = trade
+    app_state.margin_deployed      = max(0.0, app_state.margin_deployed - old_margin / 2)
+    _update_daily_pnl(pnl)
+
+    print(f"[EXIT] {sym} {direction} TP1 partial close at {exit_price} "
+          f"half_pnl=${pnl:.2f} r={r:+.2f}R — remainder open watching TP2")
+
+
+# ── Exit monitor loop ──────────────────────────────────────────────────────────
+
+async def _exit_monitor_loop():
+    """Runs every PRICE_INTERVAL_SECONDS. Checks every open trade against SL/TP."""
+    while True:
+        try:
+            for key, trade in list(app_state.open_trades.items()):
+                sym       = trade["symbol"]
+                direction = trade["direction"]
+                sl_price  = trade.get("sl_price")
+                tp1_price = trade.get("tp1_price")
+                tp2_price = trade.get("tp2_price")
+                current   = app_state.prices.get(sym)
+                tp1_hit   = trade.get("tp1_hit", False)
+                is_short  = direction == "SHORT"
+
+                if current is None or not sl_price:
+                    print(f"[EXIT CHECK] {sym} {direction} skipped — "
+                          f"no price ({current}) or no sl ({sl_price})")
+                    continue
+
+                # Track extreme price (lowest for SHORT, highest for LONG)
+                ep = trade.get("extreme_price") or current
+                trade["extreme_price"] = min(ep, current) if is_short else max(ep, current)
+
+                # ── SL breach ──────────────────────────────────────────────────
+                # SHORT: SL triggers when price RISES above sl_price
+                # LONG : SL triggers when price FALLS below sl_price
+                sl_breached = (is_short and current >= sl_price) or \
+                              (not is_short and current <= sl_price)
+
+                if sl_breached:
+                    print(f"[EXIT CHECK] {sym} {direction} price={current} "
+                          f"sl={sl_price} tp1={tp1_price} → SL BREACHED → closing")
+                    _do_close_trade(key, trade, current, "SL")
+                    continue
+
+                # ── TP2 (only after TP1 has been hit) ─────────────────────────
+                if tp1_hit and tp2_price:
+                    # SHORT: TP2 when price falls below tp2_price
+                    # LONG : TP2 when price rises above tp2_price
+                    tp2_reached = (is_short and current <= tp2_price) or \
+                                  (not is_short and current >= tp2_price)
+                    if tp2_reached:
+                        print(f"[EXIT CHECK] {sym} {direction} price={current} "
+                              f"tp2={tp2_price} → TP2 REACHED → closing remainder")
+                        _do_close_trade(key, trade, current, "TP2")
+                        continue
+
+                # ── TP1 (first hit only) ───────────────────────────────────────
+                if not tp1_hit and tp1_price:
+                    # SHORT: TP1 when price falls below tp1_price
+                    # LONG : TP1 when price rises above tp1_price
+                    tp1_reached = (is_short and current <= tp1_price) or \
+                                  (not is_short and current >= tp1_price)
+                    if tp1_reached:
+                        print(f"[EXIT CHECK] {sym} {direction} price={current} "
+                              f"tp1={tp1_price} → TP1 REACHED → partial close")
+                        _do_partial_close_tp1(key, trade, current)
+                        continue
+
+                # No exit this cycle
+                print(f"[EXIT CHECK] {sym} {direction} price={current} "
+                      f"sl={sl_price} tp1={tp1_price} tp2={tp2_price} → no exit")
+
+        except Exception as e:
+            print(f"[EXIT MONITOR] error: {e}")
+
+        await asyncio.sleep(PRICE_INTERVAL_SECONDS)
+
+
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -382,9 +516,11 @@ async def lifespan(app: FastAPI):
     log_startup_config()
     scan_task  = asyncio.create_task(_scan_loop())
     price_task = asyncio.create_task(_price_loop())
+    exit_task  = asyncio.create_task(_exit_monitor_loop())
     yield
     scan_task.cancel()
     price_task.cancel()
+    exit_task.cancel()
     await hl_client.close()
     await mexc_client.close()
 
