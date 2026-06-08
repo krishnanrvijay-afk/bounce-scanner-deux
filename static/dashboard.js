@@ -127,7 +127,22 @@ function renderHeader() {
   document.getElementById('h-positions').textContent = account?.slots_used || 0;
   document.getElementById('h-scans').textContent     = scan_count || 0;
 
-  document.getElementById('paper-badge').style.display = account?.paper_mode ? 'block' : 'none';
+  const modeBadge = document.getElementById('mode-badge');
+  if (modeBadge) {
+    if (account?.paper_mode) {
+      modeBadge.style.display    = 'block';
+      modeBadge.className        = 'mode-badge mode-badge-paper';
+      modeBadge.textContent      = 'PAPER';
+    } else if (account?.live_manual_entry_only) {
+      modeBadge.style.display    = 'block';
+      modeBadge.className        = 'mode-badge mode-badge-live-safe';
+      modeBadge.textContent      = 'LIVE 🔒';
+    } else {
+      modeBadge.style.display    = 'block';
+      modeBadge.className        = 'mode-badge mode-badge-live-danger';
+      modeBadge.textContent      = 'LIVE ⚠';
+    }
+  }
   document.getElementById('cb-badge').style.display    = circuit_breaker?.active ? 'block' : 'none';
 }
 
