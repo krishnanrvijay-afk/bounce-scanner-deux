@@ -191,38 +191,42 @@ function buildCard(p, alerts, trades, changes) {
   }
 
   const adxFade  = adx1h > ADX_FADE_MAX;
-  const adxColor = adxFade    ? '#ff4444'
+  const adxColor = adxFade     ? '#ff4444'
                  : adx1h >= 50 ? '#00ff88'
                  : adx1h >= 25 ? '#ffaa00'
                  : '#ffffff';
 
-  // Gate counts per direction
+  // Gate counts
   const shortGates = [j15m > 80, j1h > 60, rsi15m > 65, askPct >= 55];
   const longGates  = [j15m < 20, j1h < 40, rsi15m < 35, bidPct >= 55];
   const shortCount = shortGates.filter(Boolean).length;
   const longCount  = longGates.filter(Boolean).length;
+  const shortFull  = shortCount === 4;
+  const longFull   = longCount  === 4;
+  const diverge    = shortCount === longCount && !shortFull;
+  const showShort  = shortCount >= longCount || diverge;
+  const showLong   = longCount  >= shortCount || diverge;
+  const leadCount  = Math.max(shortCount, longCount);
+  const nearTrig   = !shortFull && !longFull && leadCount === 3;
+  const hasAlert   = alerts.some(a => a.symbol === sym);
 
-  const shortFull = shortCount === 4;
-  const longFull  = longCount  === 4;
-  const diverge   = shortCount === longCount && !shortFull;
-  const showShort = shortCount >= longCount || diverge;
-  const showLong  = longCount  >= shortCount || diverge;
-  const leadCount = Math.max(shortCount, longCount);
-  const nearTrig  = !shortFull && !longFull && leadCount === 3;
-  const hasAlert  = alerts.some(a => a.symbol === sym);
+  // Confluence detection
+  const longConf   = j15m < 20 && j1h < 40;
+  const shortConf  = j15m > 80 && j1h > 60;
+  const isConf     = longConf || shortConf;
+  const confIsLong = longConf;
 
-  // Confluence: both TFs in trigger zone simultaneously
-  const longConf  = j15m < 20 && j1h < 40;
-  const shortConf = j15m > 80 && j1h > 60;
-
-  // ── Glow border state (confluence overrides all except in-trade) ─────────────
+  // ── Card class + glow ─────────────────────────────────────────────────────────
+  let cardCls = 'pair-card';
   let glowStyle;
   if (inTrade) {
     glowStyle = 'border:1px solid rgba(41,121,255,0.6);box-shadow:0 0 20px rgba(41,121,255,0.15),0 2px 8px rgba(0,0,0,0.6)';
   } else if (longConf) {
-    glowStyle = 'border:1px solid rgba(0,230,118,0.9);box-shadow:0 0 28px rgba(0,230,118,0.25),0 2px 8px rgba(0,0,0,0.6)';
+    cardCls  += ' card-conf-long';
+    glowStyle = '';
   } else if (shortConf) {
-    glowStyle = 'border:1px solid rgba(255,61,87,0.9);box-shadow:0 0 28px rgba(255,61,87,0.25),0 2px 8px rgba(0,0,0,0.6)';
+    cardCls  += ' card-conf-short';
+    glowStyle = '';
   } else if (hasAlert && shortFull) {
     glowStyle = 'border:1px solid rgba(255,61,87,0.8);box-shadow:0 0 20px rgba(255,61,87,0.2),0 2px 8px rgba(0,0,0,0.6)';
   } else if (hasAlert && longFull) {
@@ -235,46 +239,102 @@ function buildCard(p, alerts, trades, changes) {
     glowStyle = 'border:1px solid #1e1e1e;box-shadow:0 2px 8px rgba(0,0,0,0.4)';
   }
 
-  // ── Inline direction row (symbol line: arrow + 4 gate dots) ─────────────────
-  function dotRow(dir, gateArr) {
-    const isL = dir === 'LONG';
-    const pfx = isL ? 'long' : 'short';
-    const arCls = isL ? 'arrow-long' : 'arrow-short';
-    const arrow = isL ? '▲' : '▼';
-    const dots = gateArr.map(g =>
-      `<span class="gc-dot ${pfx}-${g ? 'pass' : 'fail'}"></span>`).join('');
-    return `<div class="sym-dir-row"><span class="dir-arrow ${arCls}">${arrow}</span><div class="gate-cluster">${dots}</div></div>`;
+  // ── Symbol class for confluence name glow ────────────────────────────────────
+  const symCls = longConf ? 'card-sym card-sym-conf-long' : shortConf ? 'card-sym card-sym-conf-short' : 'card-sym';
+
+  // ── Inline direction rows: arrow + 4 gate dots + J15M/J1H values ─────────────
+  function dotRowJ(dir, gateArr) {
+    const isL    = dir === 'LONG';
+    const arrow  = isL ? '▲' : '▼';
+    const arCls  = isL ? 'arrow-long' : 'arrow-short';
+    const pfx    = isL ? 'long' : 'short';
+    const dots   = gateArr.map(g => `<span class="gc-dot ${pfx}-${g ? 'pass' : 'fail'}"></span>`).join('');
+    const j15Col = isL ? (j15m < 20 ? '#00e676' : '#555') : (j15m > 80 ? '#ff3d57' : '#555');
+    const j1hCol = isL ? (j1h  < 40 ? '#00e676' : '#555') : (j1h  > 60 ? '#ff3d57' : '#555');
+    return `<div class="sym-dir-row">
+      <span class="dir-arrow ${arCls}">${arrow}</span>
+      <div class="gate-cluster">${dots}</div>
+      <span class="j-inline"><span style="color:${j15Col}">${j15m.toFixed(0)}</span><span class="j-slash">/</span><span style="color:${j1hCol}">${j1h.toFixed(0)}</span></span>
+    </div>`;
   }
 
   let inlineDir = '';
   if (diverge && shortCount > 0) {
-    inlineDir = `<div class="sym-dir-wrap">${dotRow('SHORT', shortGates)}${dotRow('LONG', longGates)}</div>`;
+    inlineDir = `<div class="sym-dir-wrap">${dotRowJ('SHORT', shortGates)}${dotRowJ('LONG', longGates)}</div>`;
   } else if (shortCount > longCount) {
-    inlineDir = `<div class="sym-dir-wrap">${dotRow('SHORT', shortGates)}</div>`;
+    inlineDir = `<div class="sym-dir-wrap">${dotRowJ('SHORT', shortGates)}</div>`;
   } else if (longCount > shortCount) {
-    inlineDir = `<div class="sym-dir-wrap">${dotRow('LONG', longGates)}</div>`;
+    inlineDir = `<div class="sym-dir-wrap">${dotRowJ('LONG', longGates)}</div>`;
   }
 
-  // ── Body rows (metrics only, no arrow/dots — those moved to symbol line) ─────
+  // ── Gate rows: RSI + DEPTH only (J moved to symbol line) ─────────────────────
   let rows = '';
-  if (showShort) rows += dirRow('SHORT', j15m, j1h, rsi15m, askPct);
-  if (showLong)  rows += dirRow('LONG',  j15m, j1h, rsi15m, bidPct);
+  if (showShort) rows += dirRow('SHORT', rsi15m, askPct);
+  if (showLong)  rows += dirRow('LONG',  rsi15m, bidPct);
 
-  const symCls = longConf ? 'card-sym card-sym-conf-long' : shortConf ? 'card-sym card-sym-conf-short' : 'card-sym';
+  // ── Confluence mini bars (RSI + Depth) — shown only on confluence cards ───────
+  let confBars = '';
+  if (isConf) {
+    const depthPct   = confIsLong ? bidPct : askPct;
+    const depthLabel = confIsLong ? 'BID' : 'ASK';
+    const depthPass  = depthPct >= 55;
+    const rsiPass    = confIsLong ? rsi15m < 35 : rsi15m > 65;
+    const rsiPct     = Math.min(100, Math.max(0, rsi15m));
+    const rsiCurCol  = confIsLong ? (rsi15m < 35 ? '#00e676' : '#555') : (rsi15m > 65 ? '#ff3d57' : '#555');
+    const rsiDotCls  = rsiPass ? (confIsLong ? 'long-pass' : 'short-pass') : (confIsLong ? 'long-fail' : 'short-fail');
+    const dptDotCls  = depthPass ? (confIsLong ? 'long-pass' : 'short-pass') : (confIsLong ? 'long-fail' : 'short-fail');
+    const fillPct    = Math.min(100, Math.max(0, depthPct));
+    const fillColor  = confIsLong
+      ? (depthPass ? 'rgba(0,230,118,0.7)' : 'rgba(0,230,118,0.25)')
+      : (depthPass ? 'rgba(255,61,87,0.7)'  : 'rgba(255,61,87,0.25)');
+    const fillStyle  = confIsLong
+      ? `left:0;width:${fillPct}%;background:${fillColor}`
+      : `right:0;width:${fillPct}%;background:${fillColor}`;
+    const gateLinePct = confIsLong ? 55 : 45;
 
+    confBars = `<div class="cbar-row">
+      <span class="gc-dot cbar-dot ${rsiDotCls}"></span>
+      <span class="cbar-label">RSI</span>
+      <div class="cbar-track">
+        <div class="cbar-zg" style="width:35%"></div>
+        <div class="cbar-zr" style="left:65%;width:35%"></div>
+        <div class="cbar-thresh cbar-thresh-l" style="left:35%"></div>
+        <div class="cbar-thresh cbar-thresh-r" style="left:65%"></div>
+        <div class="cbar-cursor" style="left:${rsiPct}%;background:${rsiCurCol};box-shadow:0 0 5px ${rsiCurCol}"></div>
+      </div>
+    </div>
+    <div class="cbar-row">
+      <span class="gc-dot cbar-dot ${dptDotCls}"></span>
+      <span class="cbar-label">${depthLabel}</span>
+      <div class="cbar-track">
+        <div class="cbar-fill" style="${fillStyle}"></div>
+        <div class="cbar-thresh" style="left:${gateLinePct}%;border-color:rgba(255,170,0,0.5)"></div>
+      </div>
+      <span class="cbar-val">${depthPct.toFixed(0)}%</span>
+    </div>`;
+  }
+
+  // ── Pills / readiness ─────────────────────────────────────────────────────────
   let pills = '';
-  if (longConf)  pills += `<span class="pill pill-conf-long">✦ CONFLUENCE LONG</span>`;
-  if (shortConf) pills += `<span class="pill pill-conf-short">✦ CONFLUENCE SHORT</span>`;
-  if (inTrade)   pills += `<span class="pill pill-intrade">IN TRADE</span>`;
-  if (cdS > 0)   pills += `<span class="pill pill-cd">CD-S ${fmtCd(cdS)}</span>`;
-  if (cdL > 0)   pills += `<span class="pill pill-cd">CD-L ${fmtCd(cdL)}</span>`;
-  if (diverge)   pills += `<span class="pill pill-diverge">DIVERGENCE</span>`;
-  if (nearTrig)  pills += `<span class="pill pill-near">NEAR TRIGGER</span>`;
-  if (adxFade)   pills += `<span class="pill pill-adxmax">ADX ${adx1h.toFixed(0)} FADE MAX</span>`;
-  if (shortFull && hasAlert) pills += `<span class="pill pill-alert-s">▼ ALERT</span>`;
-  if (longFull  && hasAlert) pills += `<span class="pill pill-alert">▲ ALERT</span>`;
+  if (isConf) {
+    const gateArr = confIsLong ? longGates : shortGates;
+    const passing  = gateArr.filter(Boolean).length;
+    const rdyCls   = confIsLong ? 'pill-ready-long' : 'pill-ready-short';
+    if      (passing === 4) pills = `<span class="pill ${rdyCls}">✦ READY</span>`;
+    else if (passing === 3) pills = `<span class="pill pill-near-rdy">NEAR 3/4</span>`;
+    else                    pills = `<span class="pill pill-partial">PARTIAL ${passing}/4</span>`;
+  } else {
+    if (inTrade)   pills += `<span class="pill pill-intrade">IN TRADE</span>`;
+    if (cdS > 0)   pills += `<span class="pill pill-cd">CD-S ${fmtCd(cdS)}</span>`;
+    if (cdL > 0)   pills += `<span class="pill pill-cd">CD-L ${fmtCd(cdL)}</span>`;
+    if (diverge)   pills += `<span class="pill pill-diverge">DIVERGENCE</span>`;
+    if (nearTrig)  pills += `<span class="pill pill-near">NEAR TRIGGER</span>`;
+    if (adxFade)   pills += `<span class="pill pill-adxmax">ADX ${adx1h.toFixed(0)} FADE MAX</span>`;
+    if (shortFull && hasAlert) pills += `<span class="pill pill-alert-s">▼ ALERT</span>`;
+    if (longFull  && hasAlert) pills += `<span class="pill pill-alert">▲ ALERT</span>`;
+  }
 
-  return `<div class="pair-card" style="${glowStyle}">
+  return `<div class="${cardCls}" style="${glowStyle}">
     <div class="card-top">
       <div class="card-sym-block">
         <span class="${symCls}">${sym}</span>
@@ -284,37 +344,24 @@ function buildCard(p, alerts, trades, changes) {
         <div class="card-price-line">
           <span class="card-price">${fmtPrice(price)}</span>${chgHtml}<span class="card-price-cd price-cd-val">${_priceCdSec}s</span>
         </div>
-        <div class="card-adx-block">
-          <span class="card-adx-label">ADX</span>
-          <span class="card-adx-val" style="color:${adxColor}">${adx1h.toFixed(1)}</span>
-        </div>
       </div>
     </div>
+    <div class="card-adx-compact"><span class="adx-cl">ADX</span><span class="adx-cv" style="color:${adxColor}">${adx1h.toFixed(1)}</span></div>
     ${rows}
+    ${confBars}
     <div class="card-footer">${pills || `<span class="pill pill-scanning">SCANNING</span>`}</div>
   </div>`;
 }
 
-function dirRow(direction, j15m, j1h, rsi15m, depthPct) {
+function dirRow(direction, rsi15m, depthPct) {
   const isLong     = direction === 'LONG';
   const rowCls     = isLong ? 'long-row' : 'short-row';
   const depthLabel = isLong ? 'BID%' : 'ASK%';
-
-  const j15mColor  = isLong ? (j15m  < 20 ? 'green' : 'grey') : (j15m  > 80 ? 'red' : 'grey');
-  const j1hColor   = isLong ? (j1h   < 40 ? 'green' : 'grey') : (j1h   > 60 ? 'red' : 'grey');
   const rsiColor   = isLong ? (rsi15m < 35 ? 'green' : 'grey') : (rsi15m > 65 ? 'red' : 'grey');
   const depthColor = depthPct >= 55 ? (isLong ? 'green' : 'red') : 'grey';
 
   return `<div class="dir-row ${rowCls}">
     <div class="dir-vals">
-      <div class="dv-item">
-        <span class="dv-label">J15M</span>
-        <span class="dv-val ${j15mColor}">${j15m.toFixed(0)}</span>
-      </div>
-      <div class="dv-item">
-        <span class="dv-label">J1H</span>
-        <span class="dv-val ${j1hColor}">${j1h.toFixed(0)}</span>
-      </div>
       <div class="dv-item">
         <span class="dv-label">RSI15</span>
         <span class="dv-val ${rsiColor}">${rsi15m.toFixed(0)}</span>
@@ -342,7 +389,7 @@ function setBannerTF(tf) {
   renderBanner();
 }
 
-// ── J15M Dual-TF Opportunity Banner ──────────────────────────────────────────
+// ── Compact J Opportunity Banner — chips on bar ───────────────────────────────
 function renderBanner() {
   const pairs = STATE?.pair_states || [];
   if (!pairs.length) return;
@@ -351,47 +398,36 @@ function renderBanner() {
     const container = document.getElementById(containerId);
     if (!container || container.style.display === 'none') return;
 
-    const ROW_H = 30;
     const items = [...pairs].map(p => {
       const raw = tfKey === '15m' ? (p.j15m || 50) : (p.j1h || 50);
-      const j   = Math.min(98, Math.max(2, +raw));
+      const j   = Math.min(97, Math.max(3, +raw));
       const longConf  = (p.j15m || 0) < 20 && (p.j1h || 0) < 40;
       const shortConf = (p.j15m || 0) > 80 && (p.j1h || 0) > 60;
       return { sym: p.symbol, j, longConf, shortConf };
     }).sort((a, b) => a.j - b.j);
 
-    const rowEdge = [];
+    // Anti-overlap: pairs within 4 pts alternate between row 0 and row 1 (max 2 rows)
+    const rowEdge = [undefined, undefined];
     const placed = items.map(item => {
       let row = 0;
-      while (rowEdge[row] !== undefined && rowEdge[row] > item.j - 5) row++;
-      rowEdge[row] = item.j + 5;
+      if (rowEdge[0] !== undefined && rowEdge[0] > item.j - 4) row = 1;
+      rowEdge[row] = item.j + 4;
       return { ...item, row };
     });
-
-    const maxRow = placed.reduce((m, p) => Math.max(m, p.row), 0);
-    container.style.height = `${(maxRow + 1) * ROW_H + 6}px`;
 
     container.innerHTML = placed.map(({ sym, j, row, longConf, shortConf }) => {
       const isConf = longConf || shortConf;
       const col = tfKey === '15m'
-        ? (j < 20 ? '#00e676' : j < 35 ? 'rgba(0,230,118,0.55)' : j < 65 ? '#ccc' : j < 80 ? 'rgba(255,61,87,0.55)' : '#ff3d57')
-        : (j < 35 ? '#00e676' : j < 40 ? 'rgba(0,230,118,0.55)' : j < 60 ? '#ccc' : j < 65 ? 'rgba(255,61,87,0.55)' : '#ff3d57');
-      const lineH     = row * ROW_H + 5;
-      const pulseCls  = isConf ? ' jb-pin-conf' : '';
-      const confBadge = isConf
-        ? `<div class="jb-conf-badge ${longConf ? 'jb-conf-long' : 'jb-conf-short'}" style="top:${lineH + 22}px">${longConf ? 'LONG' : 'SHORT'}</div>`
-        : '';
-      return `<div class="jb-pin" style="left:${j.toFixed(1)}%">
-        <div class="jb-pin-line" style="height:${lineH}px"></div>
-        <div class="jb-pin-name${pulseCls}" style="top:${lineH}px;color:${col}">${sym}${isConf ? '✦' : ''}</div>
-        <div class="jb-pin-val" style="top:${lineH + 12}px;color:${col}">${j.toFixed(0)}</div>
-        ${confBadge}
-      </div>`;
+        ? (j < 20 ? '#00e676' : j < 35 ? 'rgba(0,230,118,0.5)' : j < 65 ? 'rgba(255,255,255,0.4)' : j < 80 ? 'rgba(255,61,87,0.5)' : '#ff3d57')
+        : (j < 40 ? '#00e676' : j < 50 ? 'rgba(0,230,118,0.5)' : j < 60 ? 'rgba(255,255,255,0.4)' : j < 70 ? 'rgba(255,61,87,0.5)' : '#ff3d57');
+      const pulseCls   = isConf ? ' cb-conf' : '';
+      const extraBot   = row * 12;
+      return `<div class="cb-chip${pulseCls}" style="left:${j.toFixed(1)}%;bottom:${extraBot}px;color:${col}">${sym}${isConf ? '✦' : ''}<div class="cb-tick"></div></div>`;
     }).join('');
   }
 
-  fillRuler('jb-pins-15m', '15m');
-  fillRuler('jb-pins-1h',  '1h');
+  fillRuler('jb-chips-15m', '15m');
+  fillRuler('jb-chips-1h',  '1h');
 }
 
 // ── Alerts tab ────────────────────────────────────────────────────────────────
