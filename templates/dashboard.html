@@ -115,7 +115,7 @@
   .alert-card.short-card { border-left: 3px solid #ff4444; }
   .alert-card.long-card  { border-left: 3px solid #00ff88; }
   .ac-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
-  .ac-sym { font-family: 'Bebas Neue', sans-serif; font-size: 18px; }
+  .ac-sym { font-family: 'Bebas Neue', sans-serif; font-size: 26px; }
   .ac-dir { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 3px; letter-spacing: 1px; }
   .dir-short { background: rgba(255,68,68,0.12); color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
   .dir-long  { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
@@ -143,6 +143,38 @@
   .panel-btn { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 3px 10px; border-radius: 3px; cursor: pointer; letter-spacing: 0.5px; border: 1px solid #2a2a2a; background: #111; color: #555; transition: all 0.15s; }
   .panel-btn:hover { color: #ff4444; border-color: rgba(255,68,68,0.4); }
   .no-content { padding: 60px 24px; text-align: center; color: #333; font-size: 12px; }
+  /* ── ALERT CARD v2 ── */
+  .ac-paper-badge { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); white-space: nowrap; }
+  .ac2-prices { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; margin-bottom: 8px; }
+  .ac2-px { background: #111; border-radius: 3px; padding: 6px 8px; text-align: center; }
+  .ac2-px-label { font-size: 8px; font-weight: 800; color: #fff; letter-spacing: 1px; text-transform: uppercase; }
+  .ac2-px-val { font-family: 'JetBrains Mono', monospace; font-size: 20px; font-weight: 800; margin-top: 2px; line-height: 1; }
+  .ac2-px-val.white { color: #fff; }
+  .ac2-px-val.red   { color: #ff4444; }
+  .ac2-px-val.green { color: #00ff88; }
+  .ac2-live-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; padding: 6px 10px; background: #111; border-radius: 3px; }
+  .ac2-live-label { font-size: 8px; color: #555; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; flex-shrink: 0; }
+  .ac2-live-val { font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 800; color: #fff; line-height: 1; }
+  .ac2-chg { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; }
+  .ac2-warn { color: #ffaa00; font-size: 12px; margin-left: 2px; }
+  .ac2-metric-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .ac2-row-pill { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 3px; letter-spacing: 1px; flex-shrink: 0; }
+  .ac2-pill-snap { background: rgba(255,255,255,0.06); color: #888; border: 1px solid #2a2a2a; }
+  .ac2-pill-now  { background: rgba(255,170,0,0.1); color: #ffaa00; border: 1px solid rgba(255,170,0,0.3); }
+  .ac2-metrics { display: flex; gap: 0; flex: 1; }
+  .ac2-metric { display: flex; flex-direction: column; align-items: center; flex: 1; }
+  .ac2-metric-label { font-size: 7px; font-weight: 800; color: #fff; letter-spacing: 0.5px; text-transform: uppercase; }
+  .ac2-metric-val { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 700; line-height: 1.2; }
+  .ac2-elapsed { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #555; margin-left: auto; flex-shrink: 0; }
+  .ac2-live-tag { font-family: 'JetBrains Mono', monospace; font-size: 9px; color: #ffaa00; margin-left: auto; flex-shrink: 0; }
+  .ac2-stale-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .ac2-stale-label { font-size: 9px; font-weight: 800; min-width: 42px; letter-spacing: 0.5px; }
+  .ac2-bar-track { flex: 1; height: 3px; background: #1a1a1a; border-radius: 2px; overflow: hidden; }
+  .ac2-bar-fill { height: 100%; border-radius: 2px; }
+  .ac2-stale-cd { font-family: 'JetBrains Mono', monospace; font-size: 9px; min-width: 38px; text-align: right; flex-shrink: 0; }
+  .ac2-stale-overlay { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); background: rgba(255,68,68,0.06); border-top: 1px solid rgba(255,68,68,0.15); border-bottom: 1px solid rgba(255,68,68,0.15); text-align: center; padding: 6px; font-size: 9px; font-weight: 800; color: rgba(255,68,68,0.5); letter-spacing: 3px; pointer-events: none; }
+  .ac-btn-dismiss { background: #111; color: #555; border: 1px solid #2a2a2a; margin-left: auto; }
+  .ac-btn-dismiss:hover { color: #ff4444 !important; border-color: rgba(255,68,68,0.4) !important; opacity: 1 !important; }
 
   /* ── POSITIONS TAB ── */
   #tab-positions { display: none; padding: 20px 24px; }
