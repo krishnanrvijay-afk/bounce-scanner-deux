@@ -54,7 +54,12 @@ ADX_FADE_MAX = 60
 SESSION_FILTER_ENABLED = False
 PLACE_EXCHANGE_SL      = True
 
-PAIR_ADX_OVERRIDES: dict = {}
+PAIR_ADX_OVERRIDES: dict = {
+    "SUI":  40,
+    "NEAR": 42,
+    "APT":  45,
+    "LINK": 38,
+}
 
 MIN_SL_PCT: dict = {
     "BTC":  0.008,
