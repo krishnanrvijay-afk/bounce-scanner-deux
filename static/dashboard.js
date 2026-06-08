@@ -356,58 +356,164 @@ function renderCockpit() {
 }
 
 // ── Alerts tab ────────────────────────────────────────────────────────────────
+function dismissAlert(symbol, direction) {
+  fetch('/api/alert/dismiss', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ symbol, direction }),
+  }).then(() => fetchState()).catch(() => {});
+}
+
 function renderAlertsTab() {
-  const alerts = STATE.alerts || [];
-  const trades = STATE.open_trades || {};
+  const alerts  = STATE.alerts || [];
+  const trades  = STATE.open_trades || {};
+  const pairMap = {};
+  (STATE.pair_states || []).forEach(p => { pairMap[p.symbol] = p; });
   document.getElementById('alert-count').textContent = alerts.length;
+
+  // Auto-dismiss alerts older than 15 minutes
+  const nowSec = Date.now() / 1000;
+  alerts.filter(a => a.fired_at && (nowSec - a.fired_at) > 900)
+        .forEach(a => dismissAlert(a.symbol, a.direction));
 
   if (!alerts.length) {
     document.getElementById('alert-grid').innerHTML = '<div class="no-content">No alerts yet</div>';
     return;
   }
-  document.getElementById('alert-grid').innerHTML = alerts.map(a => buildAlertCard(a, trades)).join('');
+  document.getElementById('alert-grid').innerHTML = alerts.map(a => buildAlertCard(a, trades, pairMap)).join('');
 }
 
-function buildAlertCard(a, trades) {
+function buildAlertCard(a, trades, pairMap) {
+  const sym      = a.symbol;
   const isShort  = a.direction === 'SHORT';
   const dirClass = isShort ? 'short-card' : 'long-card';
-  const dirPill  = isShort
+  const key      = `${sym}${a.direction}`;
+  const inTrade  = a.is_in_trade || (key in trades);
+  const isPaper  = STATE.account?.paper_mode;
+
+  // ── Snap data (frozen at alert fire) ──────────────────────────────────────
+  const snapJ15m = +(a.j15m   || 0);
+  const snapRsi  = +(a.rsi15m || 0);
+  const snapAdx  = +(a.adx1h  || 0);
+  const snapAtr  = +(a.atr15m || 0);
+
+  // ── NOW data (live from pair_states) ──────────────────────────────────────
+  const ps      = (pairMap || {})[sym] || {};
+  const nowJ15m = ps.j15m   != null ? +ps.j15m   : snapJ15m;
+  const nowRsi  = ps.rsi15m != null ? +ps.rsi15m : snapRsi;
+  const nowAdx  = ps.adx1h  != null ? +ps.adx1h  : snapAdx;
+  const nowAtr  = ps.atr15m != null ? +ps.atr15m : snapAtr;
+
+  // ── Live price + 24h change ───────────────────────────────────────────────
+  const livePrice     = (STATE.prices || {})[sym] || a.entry_price || 0;
+  const chg24h        = ((STATE.price_changes || {})[sym]) ?? null;
+  const priceDriftPct = a.entry_price ? Math.abs(livePrice - a.entry_price) / a.entry_price * 100 : 0;
+
+  // ── Staleness ─────────────────────────────────────────────────────────────
+  const elapsed    = a.fired_at ? Math.floor(Date.now() / 1000 - a.fired_at) : 0;
+  const j15mDrift  = Math.abs(nowJ15m - snapJ15m);
+  const isStale    = elapsed > 480 || j15mDrift > 30 || priceDriftPct > 1.5;
+  const isAging    = !isStale && (elapsed > 180 || j15mDrift > 15 || priceDriftPct > 0.5);
+  const staleness  = isStale ? 'STALE' : isAging ? 'AGING' : 'FRESH';
+  const staleColor = staleness === 'STALE' ? '#ff4444' : staleness === 'AGING' ? '#ffaa00' : '#00ff88';
+  const barPct     = Math.max(0, Math.min(100, 100 - (elapsed / 600 * 100)));
+  const cdSec      = Math.max(0, 600 - elapsed);
+  const cdStr      = cdSec >= 60
+    ? `${Math.floor(cdSec/60)}m${String(cdSec % 60).padStart(2,'0')}s`
+    : `${cdSec}s`;
+  const elStr      = elapsed < 60
+    ? `${elapsed}s`
+    : `${Math.floor(elapsed/60)}m${String(elapsed % 60).padStart(2,'0')}s`;
+
+  // ── Header badges ─────────────────────────────────────────────────────────
+  const dirPill = isShort
     ? '<span class="ac-dir dir-short">BOUNCE SHORT</span>'
     : '<span class="ac-dir dir-long">BOUNCE LONG</span>';
   const tierCls = a.tier === 'HIGH_PROB' ? 'tp-high' : a.tier === 'STRONG' ? 'tp-strong' : 'tp-regular';
-  const key     = `${a.symbol}${a.direction}`;
-  const inTrade = a.is_in_trade || (key in trades);
-  const stamp   = inTrade ? '<div class="in-trade-stamp">IN TRADE</div>' : '';
-  const dis     = inTrade ? 'disabled' : '';
-  const elapsed = a.fired_at ? Math.floor(Date.now()/1000 - a.fired_at) : 0;
-  const elpStr  = elapsed < 60 ? `${elapsed}s ago` : `${Math.floor(elapsed/60)}m ago`;
+  const tierLbl = a.tier === 'HIGH_PROB' ? 'HIGH PROB' : a.tier === 'STRONG' ? 'STRONG' : 'REGULAR';
 
-  return `<div class="alert-card ${dirClass}">
+  // ── Live price row ────────────────────────────────────────────────────────
+  const chgHtml  = chg24h !== null
+    ? `<span class="ac2-chg" style="color:${chg24h >= 0 ? '#00ff88' : '#ff4444'}">${chg24h >= 0 ? '+' : ''}${chg24h.toFixed(2)}%</span>`
+    : '';
+  const warnHtml = priceDriftPct > 1 ? '<span class="ac2-warn">⚠</span>' : '';
+
+  // ── Metric color helpers ──────────────────────────────────────────────────
+  const j15mClr = v => v > 80 ? '#ff4444' : v < 20 ? '#00ff88' : '#ffaa00';
+  const rsiClr  = v => v > 65 ? '#ff4444' : v < 35 ? '#00ff88' : '#fff';
+  const adxClr  = v => v >= 50 ? '#00ff88' : v >= 25 ? '#ffaa00' : '#fff';
+
+  const mkMetric = (lbl, val, clr, dec) =>
+    `<div class="ac2-metric">
+      <div class="ac2-metric-label">${lbl}</div>
+      <div class="ac2-metric-val" style="color:${clr(val)}">${val.toFixed(dec)}</div>
+    </div>`;
+
+  const snapRow = mkMetric('J15M', snapJ15m, j15mClr, 1)
+    + mkMetric('RSI',  snapRsi,  rsiClr,  1)
+    + mkMetric('ADX',  snapAdx,  adxClr,  1)
+    + mkMetric('ATR',  snapAtr,  () => '#fff', 4);
+
+  const nowRow  = mkMetric('J15M', nowJ15m, j15mClr, 1)
+    + mkMetric('RSI',  nowRsi,  rsiClr,  1)
+    + mkMetric('ADX',  nowAdx,  adxClr,  1)
+    + mkMetric('ATR',  nowAtr,  () => '#fff', 4);
+
+  // ── Buttons ───────────────────────────────────────────────────────────────
+  const dis      = inTrade ? 'disabled' : '';
+  const btnsHtml = isStale
+    ? `<button class="ac-btn ac-btn-dismiss" onclick="dismissAlert('${sym}','${a.direction}')">DISMISS</button>`
+    : `<button class="ac-btn btn-hl"   ${dis} onclick="openTrade('${sym}','${a.direction}','HL',${a.leverage})">OPEN HL</button>
+       <button class="ac-btn btn-mexc" ${dis} onclick="openTrade('${sym}','${a.direction}','MEXC',${a.leverage})">OPEN MEXC</button>
+       <button class="ac-btn ac-btn-dismiss" onclick="dismissAlert('${sym}','${a.direction}')">DISMISS</button>`;
+
+  return `<div class="alert-card ${dirClass}" style="${isStale ? 'opacity:0.6;' : ''}">
+    ${isStale ? '<div class="ac2-stale-overlay">STALE</div>' : ''}
+
     <div class="ac-top">
-      <div class="ac-sym">${a.symbol}</div>
-      <div style="display:flex;gap:4px;align-items:flex-start;flex-wrap:wrap;justify-content:flex-end;max-width:68%;">
+      <div class="ac-sym">${sym}</div>
+      <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
         ${dirPill}
-        <span class="tier-pill ${tierCls}">${a.tier} ${a.leverage}x</span>
+        <span class="tier-pill ${tierCls}">${tierLbl} ${a.leverage}x</span>
         ${inTrade ? '<span class="in-trade-badge">IN TRADE</span>' : ''}
+        ${isPaper ? '<span class="ac-paper-badge">PAPER</span>' : ''}
       </div>
     </div>
-    <div class="ac-prices">
-      <div class="ac-px"><div class="ac-px-label">ENTRY</div><div class="ac-px-val white">${fmtPrice(a.entry_price)}</div></div>
-      <div class="ac-px"><div class="ac-px-label">SL</div><div class="ac-px-val red">${fmtPrice(a.sl_price)}</div></div>
-      <div class="ac-px"><div class="ac-px-label">TP1</div><div class="ac-px-val green">${fmtPrice(a.tp1_price)}</div></div>
+
+    <div class="ac2-prices">
+      <div class="ac2-px"><div class="ac2-px-label">ENTRY</div><div class="ac2-px-val white">${fmtPrice(a.entry_price)}</div></div>
+      <div class="ac2-px"><div class="ac2-px-label">SL</div><div class="ac2-px-val red">${fmtPrice(a.sl_price)}</div></div>
+      <div class="ac2-px"><div class="ac2-px-label">TP1</div><div class="ac2-px-val green">${fmtPrice(a.tp1_price)}</div></div>
+      <div class="ac2-px"><div class="ac2-px-label">TP2</div><div class="ac2-px-val" style="color:rgba(0,255,136,0.6)">${fmtPrice(a.tp2_price)}</div></div>
     </div>
-    <div class="ac-meta">
-      <div><span class="ac-meta-label">TP2 </span><span class="ac-meta-val">${fmtPrice(a.tp2_price)}</span></div>
-      <div><span class="ac-meta-label">J15M </span><span class="ac-meta-val">${(a.j15m||0).toFixed(1)}</span></div>
-      <div><span class="ac-meta-label">RSI </span><span class="ac-meta-val">${(a.rsi15m||0).toFixed(1)}</span></div>
-      <div><span class="ac-meta-label">ADX </span><span class="ac-meta-val amber">${(a.adx1h||0).toFixed(1)}</span></div>
-      <div><span class="ac-meta-label">ATR </span><span class="ac-meta-val amber">${(a.atr15m||0).toFixed(4)}</span></div>
-      <div><span style="color:#555;font-size:9px;">${elpStr}</span></div>
+
+    <div class="ac2-live-row">
+      <span class="ac2-live-label">LIVE</span>
+      <span class="ac2-live-val">${fmtPrice(livePrice)}</span>
+      ${chgHtml}${warnHtml}
     </div>
-    <div class="ac-btns">
-      <button class="ac-btn btn-hl"   ${dis} onclick="openTrade('${a.symbol}','${a.direction}','HL',${a.leverage})">OPEN HL</button>
-      <button class="ac-btn btn-mexc" ${dis} onclick="openTrade('${a.symbol}','${a.direction}','MEXC',${a.leverage})">OPEN MEXC</button>
+
+    <div class="ac2-metric-row">
+      <span class="ac2-row-pill ac2-pill-snap">SNAP</span>
+      <div class="ac2-metrics">${snapRow}</div>
+      <span class="ac2-elapsed">${elStr}</span>
     </div>
+
+    <div class="ac2-metric-row">
+      <span class="ac2-row-pill ac2-pill-now">NOW</span>
+      <div class="ac2-metrics">${nowRow}</div>
+      <span class="ac2-live-tag">LIVE</span>
+    </div>
+
+    <div class="ac2-stale-row">
+      <span class="ac2-stale-label" style="color:${staleColor}">${staleness}</span>
+      <div class="ac2-bar-track">
+        <div class="ac2-bar-fill" style="width:${barPct.toFixed(1)}%;background:${staleColor}"></div>
+      </div>
+      <span class="ac2-stale-cd" style="color:${staleColor}">${cdStr}</span>
+    </div>
+
+    <div class="ac-btns">${btnsHtml}</div>
   </div>`;
 }
 
