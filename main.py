@@ -41,7 +41,7 @@ from scanner import (
     run_full_scan, scan_pair_state, get_pending,
     get_scan_count, set_close_cooldown, clear_cooldown,
     get_cooldown_remaining, clear_all_scanner_state, log_startup_config,
-    compute_market_health,
+    compute_market_health, get_session_name,
 )
 import scanner as _scanner_mod  # direct access to _cooldowns dict for persistence
 
@@ -405,6 +405,73 @@ def _append_trade_log(trade: dict, exit_price: float, reason: str, pnl: float, r
             print(f"[PERSIST] trade_log insert error: {_e}")
 
 
+
+# ── Paper trade Supabase logging ─────────────────────────────────────────────
+
+async def _save_paper_trade(trade: dict, alert: dict):
+    """Insert a row into bounce_paper_trades when a paper trade opens."""
+    if not PAPER_MODE or not supabase:
+        return
+    try:
+        row = {
+            "pair":          trade["symbol"],
+            "direction":     trade["direction"],
+            "score":         alert.get("score"),
+            "tier":          trade.get("tier"),
+            "is_score10":    trade.get("is_score10", False),
+            "leverage":      trade.get("leverage"),
+            "margin":        trade.get("margin"),
+            "entry_price":   trade.get("entry_price"),
+            "sl_price":      trade.get("sl_price"),
+            "tp1_price":     trade.get("tp1_price"),
+            "tp2_price":     trade.get("tp2_price"),
+            "sl_pct":        round(trade.get("sl_dist", 0) / trade.get("entry_price", 1), 6)
+                             if trade.get("entry_price") else None,
+            "adx":           alert.get("adx1h"),
+            "trend":         alert.get("trend"),
+            "j_value":       alert.get("j15m"),
+            "rsi":           alert.get("rsi15m"),
+            "fired_at":      datetime.fromtimestamp(
+                                 trade.get("opened_at", int(time.time())), tz=timezone.utc
+                             ).isoformat(),
+            "session":       trade.get("session", ""),
+            "paper_mode":    True,
+            "status":        "OPEN",
+        }
+        await asyncio.to_thread(
+            lambda: supabase.table("bounce_paper_trades").insert(row).execute()
+        )
+    except Exception as e:
+        print(f"[PAPER LOG] insert error: {e}")
+
+
+async def _update_paper_trade_close(trade: dict, exit_price: float,
+                                    reason: str, pnl: float):
+    """Update the bounce_paper_trades row when a paper trade closes."""
+    if not PAPER_MODE or not supabase:
+        return
+    try:
+        opened_at = trade.get("opened_at", int(time.time()))
+        duration  = round((int(time.time()) - opened_at) / 60, 1)
+        await asyncio.to_thread(
+            lambda: supabase.table("bounce_paper_trades")
+                    .update({
+                        "close_price":      exit_price,
+                        "close_reason":     reason,
+                        "pnl":              round(pnl, 2),
+                        "duration_minutes": duration,
+                        "status":           "WIN" if pnl >= 0 else "LOSS",
+                        "closed_at":        datetime.now(timezone.utc).isoformat(),
+                    })
+                    .eq("pair",      trade["symbol"])
+                    .eq("direction", trade["direction"])
+                    .eq("status",    "OPEN")
+                    .execute()
+        )
+    except Exception as e:
+        print(f"[PAPER LOG] update error: {e}")
+
+
 async def _do_open_trade(
     symbol: str, direction: str,
     margin_usdc: float, leverage: int,
@@ -474,6 +541,9 @@ async def _do_open_trade(
     app_state.open_trades[key] = trade
     app_state.margin_deployed += margin_usdc
     app_state.trades_opened   += 1
+
+    if PAPER_MODE and alert_data:
+        asyncio.create_task(_save_paper_trade(trade, alert_data))
 
     for a in app_state.alerts:
         if a["symbol"] == symbol and a["direction"] == direction:
@@ -658,6 +728,8 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
 
     print(f"[EXIT] {sym} {direction} closed at {exit_price} reason={reason} "
           f"pnl=${pnl:.2f} r={r:+.2f}R")
+    if PAPER_MODE:
+        asyncio.create_task(_update_paper_trade_close(trade, exit_price, reason, pnl))
     _save_state()
 
 
