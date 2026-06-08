@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BOUNCE SCANNER II</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #080808; color: #fff; font-family: 'Inter', sans-serif; font-size: 13px; overflow-x: hidden; }
 
@@ -437,6 +437,29 @@
   .reason-manual { color: #ffaa00; font-weight: 700; }
   .log-empty { padding: 50px; text-align: center; color: #333; font-size: 12px; }
 
+    /* ── STATS PANEL ── */
+    .stats-panel { border-bottom: 1px solid #1a1a1a; }
+    .stats-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px 0; cursor:pointer; user-select:none; }
+    .stats-header-title { font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:800; color:#555; text-transform:uppercase; letter-spacing:1.5px; }
+    .stats-chevron { background:none; border:none; color:#555; cursor:pointer; font-size:13px; line-height:1; padding:0; transition:transform 0.2s; }
+    .stats-header-summary { display:flex; align-items:center; gap:16px; font-family:'JetBrains Mono',monospace; font-size:10px; }
+    .stats-body { padding:10px 16px 14px; }
+    .stats-rows-wrap { display:flex; flex-direction:column; gap:8px; }
+    .stats-row { display:flex; gap:8px; }
+    .stat-card { flex:1; background:#111; border:1px solid #222; border-radius:8px; padding:12px 14px; min-width:0; overflow:hidden; }
+    .stat-label { font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:800; color:#fff; text-transform:uppercase; letter-spacing:1.5px; margin-bottom:6px; }
+    .stat-value { font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:700; line-height:1.1; }
+    .stat-sub { font-family:'JetBrains Mono',monospace; font-size:8px; color:#444; margin-top:3px; }
+    .stat-row2-val { font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:700; line-height:1.2; }
+    .srow { display:flex; align-items:center; gap:6px; padding:4px 0; font-family:'JetBrains Mono',monospace; font-size:9px; border-bottom:1px solid #161616; }
+    .srow:last-child { border-bottom:none; }
+    .srow-label { min-width:70px; font-weight:700; flex-shrink:0; }
+    .srow-count { color:#555; min-width:22px; text-align:right; flex-shrink:0; }
+    .srow-wr { min-width:38px; text-align:right; flex-shrink:0; }
+    .srow-r { min-width:36px; text-align:right; flex-shrink:0; color:#555; }
+    .srow-pnl { margin-left:auto; font-weight:700; }
+    .stats-empty { padding:14px 16px; text-align:center; color:#444; font-size:11px; font-family:'JetBrains Mono',monospace; }
+
 
   /* colors */
   .green { color: #00ff88; }
@@ -583,6 +606,7 @@
     <button class="log-btn lb-clear" onclick="clearLog()">CLEAR LOG</button>
     <span class="log-count" id="log-count">0 trades</span>
   </div>
+  <div id="stats-panel"></div>
   <div class="log-table-wrap">
     <div id="log-body" class="log-empty">No closed trades yet</div>
   </div>
