@@ -1,6 +1,7 @@
 import asyncio
 import time
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from config import (
@@ -8,6 +9,7 @@ from config import (
     RSI15M_SHORT_MIN, RSI15M_LONG_MAX, DEPTH_GATE_PCT, ATR_SL_MULTIPLIER,
     TP1_R, TP2_R, LEVERAGE_HIGH, LEVERAGE_MID, LEVERAGE_LOW,
     COOLDOWN_SECONDS, ADX_FADE_MAX, PAPER_MODE, CONSECUTIVE_LOSS_STOP,
+    MIN_SL_PCT, MIN_SL_PCT_DEFAULT,
 )
 
 log = logging.getLogger("scanner")
@@ -201,6 +203,23 @@ def clear_all_scanner_state():
     _scan_count = 0
 
 
+def get_session_name() -> str:
+    """Return current trading session name based on UTC hour."""
+    h = datetime.now(timezone.utc).hour
+    if h >= 17 or h < 8:  return "ASIA"
+    if 8  <= h < 12:       return "EU"
+    if 12 <= h < 17:       return "US"
+    return "OFF"
+
+
+def get_session_sl_buffer() -> float:
+    """Additional SL buffer (fraction of price) added by session."""
+    s = get_session_name()
+    if s == "ASIA": return 0.003
+    if s == "EU":   return 0.001
+    return 0.0
+
+
 def compute_market_health(pair_states: list[dict], recent_trades: list[dict]) -> dict:
     """Aggregate market-wide health; returns RUN/CAUTION/HALT per direction."""
     total = len(pair_states)
@@ -289,8 +308,12 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             vol_ma15m  = (sum(c["volume"] for c in candles_15m[-10:]) / min(10, len(candles_15m))
                           if candles_15m else 0)
 
-            # ── SL distance ───────────────────────────────────────────────────
-            sl_dist = atr15m * ATR_SL_MULTIPLIER
+            # SL distance (ATR base, floored by MIN_SL_PCT + session buffer)
+            _sl_atr      = atr15m * ATR_SL_MULTIPLIER
+            _min_sl_pct  = MIN_SL_PCT.get(symbol, MIN_SL_PCT_DEFAULT)
+            _sess_buf    = get_session_sl_buffer()
+            _min_sl_dist = price * (_min_sl_pct + _sess_buf)
+            sl_dist      = max(_sl_atr, _min_sl_dist)
 
             # ── Score both directions ─────────────────────────────────────────
             for direction in ("SHORT", "LONG"):

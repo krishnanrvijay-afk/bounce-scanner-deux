@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 
 HL_API_URL = "https://api.hyperliquid.xyz/info"
 
@@ -54,3 +55,16 @@ SESSION_FILTER_ENABLED = False
 PLACE_EXCHANGE_SL      = True
 
 PAIR_ADX_OVERRIDES: dict = {}
+
+MIN_SL_PCT: dict = {
+    "BTC":  0.008,
+    "ETH":  0.006,
+    "SOL":  0.008,
+    "XRP":  0.007,
+    "DOGE": 0.007,
+    "SUI":  0.010,
+    "NEAR": 0.010,
+    "LINK": 0.008,
+    "ARB":  0.012,
+}
+MIN_SL_PCT_DEFAULT = 0.010
