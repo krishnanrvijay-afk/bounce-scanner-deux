@@ -337,7 +337,7 @@ function buildCard(p, alerts, trades, changes) {
   return `<div class="${cardCls}" style="${glowStyle}">
     <div class="card-top">
       <div class="card-sym-block">
-        <span class="${symCls}">${sym}</span>
+        <span class="${symCls}" style="cursor:pointer" onclick="openPairOverlay('${sym}')">${sym}</span>
         ${inlineDir}
       </div>
       <div class="card-right">
@@ -913,6 +913,488 @@ async function clearLog() {
     const r = await fetch('/api/tradelog', { method: 'DELETE' });
     if (!r.ok) { alert('Clear failed'); return; }
     fetchState();
+  } catch (e) { alert('Request failed'); }
+}
+
+// ── Pair Symbol Overlay ───────────────────────────────────────────────────────
+let _ovPollId    = null;
+let _ovPrevGates = null;
+
+function openPairOverlay(sym) {
+  if (document.getElementById('pair-ov-bd')) return;
+  const bd = document.createElement('div');
+  bd.id = 'pair-ov-bd';
+  bd.addEventListener('click', e => { if (e.target === bd) closePairOverlay(); });
+  const pn = document.createElement('div');
+  pn.id = 'pair-ov-pn';
+  pn.dataset.sym   = sym;
+  pn.dataset.state = '';
+  pn.innerHTML = `<div class="pov-loading">Loading ${sym}…</div>`;
+  bd.appendChild(pn);
+  document.body.appendChild(bd);
+  _ovPrevGates = null;
+  _ovFetch(sym, true);
+  _ovPollId = setInterval(() => _ovFetch(sym, false), 2000);
+}
+
+function closePairOverlay() {
+  clearInterval(_ovPollId);
+  _ovPollId    = null;
+  _ovPrevGates = null;
+  const bd = document.getElementById('pair-ov-bd');
+  if (bd) bd.remove();
+}
+
+async function _ovFetch(sym, isFirst) {
+  try {
+    const r = await fetch(`/api/pair/${encodeURIComponent(sym)}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    const pn = document.getElementById('pair-ov-pn');
+    if (!pn) return;
+    isFirst ? _ovRender(pn, d) : _ovUpdate(pn, d);
+  } catch (e) { /* network blip */ }
+}
+
+// ── State helpers ─────────────────────────────────────────────────────────────
+function _ovState(d) {
+  if (d.in_trade_long || d.in_trade_short) return 'IN_TRADE';
+  if (d.alert && d.alert_state !== 'STALE')  return 'READY';
+  return 'WATCHING';
+}
+function _ovDir(d) {
+  if (d.in_trade_long)    return 'LONG';
+  if (d.in_trade_short)   return 'SHORT';
+  if (d.alert)            return d.alert.direction;
+  if (d.confluence_long)  return 'LONG';
+  if (d.confluence_short) return 'SHORT';
+  if (d.score_long  > d.score_short) return 'LONG';
+  if (d.score_short > d.score_long)  return 'SHORT';
+  return null;
+}
+function _ovGates(d, dir) { return dir === 'SHORT' ? d.gate_short : d.gate_long; }
+function _ovBorderCol(state, dir) {
+  if (state === 'IN_TRADE') return 'rgba(100,160,255,0.5)';
+  if (dir === 'LONG')       return 'rgba(0,230,118,0.5)';
+  if (dir === 'SHORT')      return 'rgba(255,61,87,0.5)';
+  return '#2a2a2a';
+}
+function _ovSymCol(state, dir) {
+  if (state === 'IN_TRADE') return '#66aaff';
+  if (dir === 'LONG')       return '#00e676';
+  if (dir === 'SHORT')      return '#ff3d57';
+  return '#fff';
+}
+
+// ── HTML builders ─────────────────────────────────────────────────────────────
+function _ovStatePillHtml(state, dir) {
+  if (state === 'IN_TRADE')                   return `<span class="pov-badge pov-st-trade">IN TRADE</span>`;
+  if (state === 'READY' && dir === 'LONG')    return `<span class="pov-badge pov-st-rdy-l">READY</span>`;
+  if (state === 'READY' && dir === 'SHORT')   return `<span class="pov-badge pov-st-rdy-s">READY</span>`;
+  return `<span class="pov-badge pov-st-watch">WATCHING</span>`;
+}
+
+function _ovGateBarsHtml(d, dir) {
+  const isL     = dir !== 'SHORT';
+  const gArr    = isL ? d.gate_long : d.gate_short;
+  const j15m    = d.j15m    || 0;
+  const j1h     = d.j1h     || 0;
+  const rsi     = d.rsi15m  || 0;
+  const bid     = d.bid_pct || 0;
+  const ask     = d.ask_pct || 0;
+  const dotCls  = (pass) => pass
+    ? (isL ? 'pov-gd pov-gd-pass-l' : 'pov-gd pov-gd-pass-s')
+    : 'pov-gd pov-gd-fail';
+  const j15Col  = j15m < 20 ? '#00e676' : j15m > 80 ? '#ff3d57' : '#666';
+  const j1hCol  = j1h  < 40 ? '#00e676' : j1h  > 60 ? '#ff3d57' : '#666';
+  const rsiCol  = rsi  < 35 ? '#00e676' : rsi  > 65 ? '#ff3d57' : '#666';
+  const depPct  = isL ? bid : ask;
+  const depCol  = gArr[3] ? (isL ? '#00e676' : '#ff3d57') : '#444';
+  const bidW    = Math.min(100, Math.max(0, bid));
+  const askW    = Math.min(100, Math.max(0, ask));
+  return `
+    <div class="pov-gr" data-gi="0">
+      <div class="${dotCls(gArr[0])}" id="pov-gd-0"></div>
+      <span class="pov-gn">J15M</span>
+      <div class="pov-gt">
+        <div class="pov-gzg" style="width:20%"></div>
+        <div class="pov-gzr" style="left:80%;width:20%"></div>
+        <div class="pov-gth" style="left:20%"></div><div class="pov-gth" style="left:80%"></div>
+        <div class="pov-gcur" id="pov-gc-0" style="left:${Math.min(99,j15m).toFixed(1)}%;background:${j15Col}"></div>
+      </div>
+      <span class="pov-gv" id="pov-gv-0" style="color:${j15Col}">${j15m.toFixed(0)}</span>
+    </div>
+    <div class="pov-gr" data-gi="1">
+      <div class="${dotCls(gArr[1])}" id="pov-gd-1"></div>
+      <span class="pov-gn">J1H</span>
+      <div class="pov-gt">
+        <div class="pov-gzg" style="width:40%"></div>
+        <div class="pov-gzr" style="left:60%;width:40%"></div>
+        <div class="pov-gth" style="left:40%"></div><div class="pov-gth" style="left:60%"></div>
+        <div class="pov-gcur" id="pov-gc-1" style="left:${Math.min(99,j1h).toFixed(1)}%;background:${j1hCol}"></div>
+      </div>
+      <span class="pov-gv" id="pov-gv-1" style="color:${j1hCol}">${j1h.toFixed(0)}</span>
+    </div>
+    <div class="pov-gr" data-gi="2">
+      <div class="${dotCls(gArr[2])}" id="pov-gd-2"></div>
+      <span class="pov-gn">RSI</span>
+      <div class="pov-gt">
+        <div class="pov-gzg" style="width:35%"></div>
+        <div class="pov-gzr" style="left:65%;width:35%"></div>
+        <div class="pov-gth" style="left:35%"></div><div class="pov-gth" style="left:65%"></div>
+        <div class="pov-gcur" id="pov-gc-2" style="left:${Math.min(99,rsi).toFixed(1)}%;background:${rsiCol}"></div>
+      </div>
+      <span class="pov-gv" id="pov-gv-2" style="color:${rsiCol}">${rsi.toFixed(0)}</span>
+    </div>
+    <div class="pov-gr" data-gi="3">
+      <div class="${dotCls(gArr[3])}" id="pov-gd-3"></div>
+      <span class="pov-gn">DEPTH</span>
+      <div class="pov-dt">
+        <div class="pov-dbid" id="pov-dbid" style="width:${bidW.toFixed(0)}%;opacity:${isL && bidW >= 55 ? '0.75' : '0.2'}"></div>
+        <div class="pov-dask" id="pov-dask" style="width:${askW.toFixed(0)}%;opacity:${!isL && askW >= 55 ? '0.75' : '0.2'}"></div>
+        <div class="pov-dgln" style="left:55%"></div>
+      </div>
+      <span class="pov-gv" id="pov-gv-3" style="color:${depCol}">${depPct.toFixed(0)}%</span>
+    </div>`;
+}
+
+function _ovRulerHtml(d, dir) {
+  const src = d.in_trade_long || d.in_trade_short || d.alert;
+  if (!src || !src.sl_price || !src.entry_price) return '';
+  const sl   = src.sl_price;
+  const ep   = src.entry_price;
+  const tp1  = src.tp1_price;
+  const tp2  = src.tp2_price;
+  const cur  = d.price || ep;
+  const slD  = Math.abs(ep - sl);
+  const tp2R = tp2 || (dir === 'LONG' ? ep + slD * 2 : ep - slD * 2);
+  const lo   = Math.min(sl, cur, tp2R) - slD * 0.05;
+  const hi   = Math.max(sl, cur, tp2R) + slD * 0.05;
+  const span = hi - lo || 1;
+  const pct  = (v) => Math.min(99, Math.max(1, ((v - lo) / span) * 100));
+  const curP = pct(cur);
+  const epP  = pct(ep);
+  const curCol = (dir === 'LONG' ? cur >= ep : cur <= ep) ? '#00e676' : '#ff3d57';
+  const slZL  = dir === 'LONG' ? pct(sl) : epP;
+  const slZW  = dir === 'LONG' ? epP - pct(sl) : pct(sl) - epP;
+  const pfL   = dir === 'LONG' ? epP : (tp2R ? pct(tp2R) : epP);
+  const pfW   = dir === 'LONG' ? (tp2R ? pct(tp2R) - epP : 0) : epP - (tp2R ? pct(tp2R) : epP);
+  let marks = `<div class="pov-rm pov-rm-ep" style="left:${epP.toFixed(1)}%"></div>`;
+  if (tp1)  marks += `<div class="pov-rm pov-rm-tp1" style="left:${pct(tp1).toFixed(1)}%"></div>`;
+  if (tp2R) marks += `<div class="pov-rm pov-rm-tp2" style="left:${pct(tp2R).toFixed(1)}%"></div>`;
+  return `<div class="pov-ruler-hdr">
+    <span style="color:#ff3d57">SL ${fmtPrice(sl)}</span>
+    ${tp1 ? `<span style="color:#66aaff">TP1 ${fmtPrice(tp1)}</span>` : ''}
+    ${tp2R ? `<span style="color:#00e676">TP2 ${fmtPrice(tp2R)}</span>` : ''}
+  </div>
+  <div class="pov-ruler-track">
+    <div class="pov-rzsl" style="left:${Math.min(slZL,slZL+slZW).toFixed(1)}%;width:${Math.abs(slZW).toFixed(1)}%"></div>
+    <div class="pov-rzpf" style="left:${Math.min(pfL,pfL+pfW).toFixed(1)}%;width:${Math.abs(pfW).toFixed(1)}%"></div>
+    ${marks}
+    <div class="pov-rdot" id="pov-rdot" style="left:${curP.toFixed(1)}%;background:${curCol}"></div>
+  </div>`;
+}
+
+function _ovActionsHtml(d, state, dir, trade) {
+  if (state === 'IN_TRADE' && trade) {
+    const exch = trade.exchange || 'HL';
+    return `<button class="pov-btn pov-btn-close" onclick="_ovCloseTrade('${d.symbol}','${trade.direction}')">CLOSE ${exch}</button>
+            <button class="pov-btn pov-btn-force" onclick="_ovCloseTrade('${d.symbol}','${trade.direction}')">FORCE CLOSE</button>`;
+  }
+  if (state === 'READY' && d.alert && d.alert_state !== 'STALE') {
+    const lev = d.alert.leverage || 5;
+    return `<button class="pov-btn pov-btn-hl"   onclick="_ovOpen('${d.symbol}','${dir}','HL',${lev})">OPEN HL ${lev}x</button>
+            <button class="pov-btn pov-btn-mexc" onclick="_ovOpen('${d.symbol}','${dir}','MEXC',${lev})">OPEN MEXC ${lev}x</button>`;
+  }
+  return `<button class="pov-btn pov-btn-watch" disabled>WATCHING HL</button>
+          <button class="pov-btn pov-btn-watch" disabled>WATCHING MEXC</button>`;
+}
+
+function _ovStaleHtml(d) {
+  const age = d.alert_age_seconds || 0;
+  const MAX = 600;
+  const pct = Math.max(0, Math.min(100, 100 - (age / MAX) * 100));
+  const col = d.alert_state === 'STALE' ? '#ff3d57' : d.alert_state === 'AGING' ? '#ffaa00' : '#00e676';
+  const rem = Math.max(0, MAX - age);
+  const rs  = rem >= 60 ? `${Math.floor(rem/60)}m${rem % 60}s` : `${rem}s`;
+  return `<div class="pov-stale-hdr">
+    <span style="color:${col};font-weight:800">${d.alert_state || 'FRESH'}</span>
+    <span style="color:#555">${rs} remaining</span>
+  </div>
+  <div class="pov-stale-track">
+    <div class="pov-sfill" id="pov-sfill" style="width:${pct.toFixed(1)}%;background:${col}"></div>
+  </div>`;
+}
+
+function _ovScanRowsHtml(snaps) {
+  if (!snaps || !snaps.length) return `<div style="color:#2a2a2a;font-size:9px">no scan data yet</div>`;
+  return snaps.map((s, i) => {
+    const lc = (s.score_long  || 0) === 4 ? '#00e676' : '#444';
+    const sc = (s.score_short || 0) === 4 ? '#ff3d57' : '#444';
+    const jc = (s.j15m || 50) < 20 ? '#00e676' : (s.j15m || 50) > 80 ? '#ff3d57' : '#666';
+    return `<div class="pov-scan-r ${i === 0 ? 'pov-scan-fresh' : ''}">
+      <span style="color:#333">#${s.n}</span>
+      <span>J:<span style="color:${jc}">${(s.j15m||0).toFixed(0)}</span></span>
+      <span>RSI:<span style="color:#666">${(s.rsi15m||0).toFixed(0)}</span></span>
+      <span>B:<span style="color:${(s.bid_pct||0)>=55?'#00e676':'#555'}">${(s.bid_pct||0).toFixed(0)}%</span></span>
+      <span>A:<span style="color:${(s.ask_pct||0)>=55?'#ff3d57':'#555'}">${(s.ask_pct||0).toFixed(0)}%</span></span>
+      <span>ADX:<span style="color:${(s.adx1h||0)>=50?'#00e676':'#555'}">${(s.adx1h||0).toFixed(0)}</span></span>
+      <span style="color:${lc}">L${s.score_long||0}</span>
+      <span style="color:${sc}">S${s.score_short||0}</span>
+    </div>`;
+  }).join('');
+}
+
+function _ovHistHtml(hist) {
+  if (!hist || !hist.length) return `<div style="color:#222;font-family:'JetBrains Mono',monospace;font-size:9px">no history yet</div>`;
+  const rc = (r) => r === 'TP2' ? '#00e676' : r === 'TP1' ? '#66aaff' : r === 'SL' ? '#ff3d57' : '#444';
+  return hist.map(h => {
+    const pnl   = h.pnl_usd || 0;
+    const pc    = pnl >= 0 ? '#00e676' : '#ff3d57';
+    const dirCl = h.direction === 'LONG' ? 'card-dir-l' : 'card-dir-s';
+    const ts    = h.timestamp_closed
+      ? new Date(h.timestamp_closed * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
+      : '—';
+    return `<div class="pov-hr">
+      <span style="color:#333;min-width:36px">${ts}</span>
+      <span class="${dirCl}" style="font-size:8px;padding:1px 5px">${h.direction}</span>
+      <span style="color:#555">${fmtPrice(h.entry_price)}</span>
+      <span style="color:${rc(h.exit_reason)};font-weight:800">${h.exit_reason||'—'}</span>
+      <span style="color:${pc}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</span>
+      <span style="color:#333">${h.r_value != null ? (h.r_value >= 0 ? '+' : '') + h.r_value + 'R' : ''}</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Full render ───────────────────────────────────────────────────────────────
+function _ovRender(pn, d) {
+  const state = _ovState(d);
+  const dir   = _ovDir(d);
+  const trade = d.in_trade_long || d.in_trade_short;
+  const alert = d.alert;
+
+  pn.dataset.state = state;
+  pn.style.border  = `1px solid ${_ovBorderCol(state, dir)}`;
+
+  const symCol    = _ovSymCol(state, dir);
+  const statePill = _ovStatePillHtml(state, dir);
+
+  let dirBadge = '';
+  if (alert || state === 'IN_TRADE') {
+    const dl = dir === 'LONG' ? 'pov-dir-l' : 'pov-dir-s';
+    dirBadge = `<span class="pov-badge ${dl}">BOUNCE ${dir||''}</span>`;
+  }
+  let confBadge = '';
+  if (d.confluence_long || d.confluence_short)
+    confBadge = `<span class="pov-badge pov-badge-conf">✦ CONFL</span>`;
+  let tierBadge = '';
+  const tier = alert?.tier || trade?.tier;
+  const lev  = alert?.leverage || trade?.leverage;
+  if (tier && lev) tierBadge = `<span class="pov-badge pov-badge-tier">${tier} ${lev}x</span>`;
+
+  const chg = d.change_24h;
+  const chgHtml = chg != null
+    ? `<span class="pov-chg" style="color:${chg >= 0 ? '#00e676' : '#ff3d57'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`
+    : '';
+
+  let pnlHtml = '';
+  if (state === 'IN_TRADE' && trade) {
+    const pnl = trade.unrealized_pnl || 0;
+    const r   = trade.r || 0;
+    const pc  = pnl >= 0 ? '#00e676' : '#ff3d57';
+    pnlHtml = `<div class="pov-pnl"><div class="pov-pnl-usd" style="color:${pc}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</div><div class="pov-pnl-r">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</div></div>`;
+  }
+
+  const showRuler = (state === 'READY' || state === 'IN_TRADE') && (alert || trade);
+  const rulerHtml = showRuler ? _ovRulerHtml(d, dir) : '';
+  const gatesHtml = _ovGateBarsHtml(d, dir);
+  const adxCol    = (d.adx||0) >= 50 ? '#00e676' : (d.adx||0) >= 25 ? '#ffaa00' : '#fff';
+  const staleHtml = state === 'READY' && alert ? _ovStaleHtml(d) : '';
+  const actHtml   = _ovActionsHtml(d, state, dir, trade);
+
+  pn.innerHTML = `
+    <div class="pov-hdr">
+      <div>
+        <div class="pov-sym" style="color:${symCol}">${d.symbol}</div>
+        <div class="pov-badges">${dirBadge}${confBadge}${tierBadge}${statePill}</div>
+      </div>
+      <button class="pov-x" onclick="closePairOverlay()">✕</button>
+    </div>
+    <div class="pov-body">
+      <div class="pov-price-row">
+        <div><span class="pov-px" id="pov-px">${fmtPrice(d.price)}</span> <span id="pov-chg">${chgHtml}</span></div>
+        <div id="pov-pnl">${pnlHtml}</div>
+      </div>
+      <div id="pov-ruler" class="pov-ruler-wrap">${rulerHtml}</div>
+      <div class="pov-gates-sec" id="pov-gates">${gatesHtml}</div>
+      <div class="pov-adx-row">
+        <div>
+          <div class="pov-adx-val" id="pov-adx" style="color:${adxCol}">${(d.adx||0).toFixed(1)}</div>
+          <div class="pov-adx-lbl">ADX 1H</div>
+        </div>
+        <div class="pov-scans" id="pov-scans">${_ovScanRowsHtml(d.last_scan_summaries)}</div>
+      </div>
+      ${staleHtml ? `<div class="pov-stale" id="pov-stale">${staleHtml}</div>` : '<div id="pov-stale" style="display:none"></div>'}
+      <div class="pov-hist-sec">
+        <div class="pov-hist-lbl">RECENT TRADES</div>
+        <div id="pov-hist">${_ovHistHtml(d.recent_alerts)}</div>
+      </div>
+    </div>
+    <div class="pov-actions" id="pov-actions">${actHtml}</div>`;
+
+  _ovPrevGates = _ovGates(d, dir);
+}
+
+// ── Targeted update (no full re-render) ───────────────────────────────────────
+function _ovUpdate(pn, d) {
+  const state     = _ovState(d);
+  const dir       = _ovDir(d);
+  const trade     = d.in_trade_long || d.in_trade_short;
+  const prevState = pn.dataset.state;
+
+  // Trade just closed — show exit banner then close
+  if (prevState === 'IN_TRADE' && state !== 'IN_TRADE') {
+    _ovExit(pn, d); return;
+  }
+  // State transition — full re-render
+  if (prevState !== state) { _ovRender(pn, d); return; }
+
+  pn.dataset.state = state;
+
+  // Price
+  const pxEl = document.getElementById('pov-px');
+  if (pxEl) pxEl.textContent = fmtPrice(d.price);
+
+  // Change %
+  const chgEl = document.getElementById('pov-chg');
+  if (chgEl && d.change_24h != null) {
+    const chg = d.change_24h;
+    chgEl.innerHTML = `<span class="pov-chg" style="color:${chg >= 0 ? '#00e676' : '#ff3d57'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`;
+  }
+
+  // Unrealized P&L
+  const pnlEl = document.getElementById('pov-pnl');
+  if (pnlEl && state === 'IN_TRADE' && trade) {
+    const pnl = trade.unrealized_pnl || 0;
+    const r   = trade.r || 0;
+    const pc  = pnl >= 0 ? '#00e676' : '#ff3d57';
+    pnlEl.innerHTML = `<div class="pov-pnl"><div class="pov-pnl-usd" style="color:${pc}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</div><div class="pov-pnl-r">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</div></div>`;
+  }
+
+  // Gate cursors + dot flash on pass/fail change
+  const curGates = _ovGates(d, dir);
+  const vals     = [d.j15m||0, d.j1h||0, d.rsi15m||0];
+  const cols     = [
+    d.j15m   < 20 ? '#00e676' : d.j15m   > 80 ? '#ff3d57' : '#666',
+    d.j1h    < 40 ? '#00e676' : d.j1h    > 60 ? '#ff3d57' : '#666',
+    d.rsi15m < 35 ? '#00e676' : d.rsi15m > 65 ? '#ff3d57' : '#666',
+  ];
+  [0, 1, 2].forEach(i => {
+    const cur = document.getElementById(`pov-gc-${i}`);
+    if (cur) { cur.style.left = `${Math.min(99, vals[i]).toFixed(1)}%`; cur.style.background = cols[i]; }
+    const val = document.getElementById(`pov-gv-${i}`);
+    if (val) { val.textContent = vals[i].toFixed(0); val.style.color = cols[i]; }
+    const dot = document.getElementById(`pov-gd-${i}`);
+    if (dot && _ovPrevGates && _ovPrevGates[i] !== curGates[i]) {
+      dot.classList.remove('pov-gd-flash');
+      void dot.offsetWidth;
+      dot.classList.add('pov-gd-flash');
+      setTimeout(() => dot.classList.remove('pov-gd-flash'), 350);
+    }
+  });
+  // Depth fills
+  const isL = dir !== 'SHORT';
+  const dbid = document.getElementById('pov-dbid');
+  const dask = document.getElementById('pov-dask');
+  if (dbid) { dbid.style.width = `${Math.min(100,d.bid_pct||0).toFixed(0)}%`; dbid.style.opacity = isL && (d.bid_pct||0) >= 55 ? '0.75' : '0.2'; }
+  if (dask) { dask.style.width = `${Math.min(100,d.ask_pct||0).toFixed(0)}%`; dask.style.opacity = !isL && (d.ask_pct||0) >= 55 ? '0.75' : '0.2'; }
+  const gv3 = document.getElementById('pov-gv-3');
+  if (gv3) { gv3.textContent = `${(isL ? d.bid_pct : d.ask_pct || 0).toFixed(0)}%`; }
+
+  // Ruler price dot
+  const rdot = document.getElementById('pov-rdot');
+  if (rdot) {
+    const src = trade || d.alert;
+    if (src?.sl_price && src?.entry_price) {
+      const sl = src.sl_price, ep = src.entry_price;
+      const slD = Math.abs(ep - sl);
+      const tp2R = src.tp2_price || (dir === 'LONG' ? ep + slD * 2 : ep - slD * 2);
+      const lo   = Math.min(sl, d.price, tp2R) - slD * 0.05;
+      const hi   = Math.max(sl, d.price, tp2R) + slD * 0.05;
+      const span = hi - lo || 1;
+      const p    = Math.min(99, Math.max(1, ((d.price - lo) / span) * 100));
+      const col  = (dir === 'LONG' ? d.price >= ep : d.price <= ep) ? '#00e676' : '#ff3d57';
+      rdot.style.left       = `${p.toFixed(1)}%`;
+      rdot.style.background = col;
+    }
+  }
+
+  // Stale bar drain
+  const sfill = document.getElementById('pov-sfill');
+  if (sfill && state === 'READY') {
+    const age = d.alert_age_seconds || 0;
+    const pct = Math.max(0, Math.min(100, 100 - (age / 600) * 100));
+    const col = d.alert_state === 'STALE' ? '#ff3d57' : d.alert_state === 'AGING' ? '#ffaa00' : '#00e676';
+    sfill.style.width      = `${pct.toFixed(1)}%`;
+    sfill.style.background = col;
+  }
+
+  // ADX
+  const adxEl = document.getElementById('pov-adx');
+  if (adxEl) {
+    adxEl.textContent = (d.adx||0).toFixed(1);
+    adxEl.style.color = (d.adx||0) >= 50 ? '#00e676' : (d.adx||0) >= 25 ? '#ffaa00' : '#fff';
+  }
+
+  // Scan rows (updated each poll)
+  const scanEl = document.getElementById('pov-scans');
+  if (scanEl) scanEl.innerHTML = _ovScanRowsHtml(d.last_scan_summaries);
+
+  // Actions
+  const actEl = document.getElementById('pov-actions');
+  if (actEl) actEl.innerHTML = _ovActionsHtml(d, state, dir, trade);
+
+  _ovPrevGates = curGates;
+}
+
+// ── Exit banner (3 s auto-close) ──────────────────────────────────────────────
+function _ovExit(pn, d) {
+  clearInterval(_ovPollId);
+  const last   = d.recent_alerts?.[0];
+  const reason = last?.exit_reason || 'CLOSED';
+  const pnl    = last?.pnl_usd;
+  const pnlStr = pnl != null ? ` · ${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}` : '';
+  const col    = reason === 'SL' ? '#ff3d57' : '#00e676';
+  const banner = document.createElement('div');
+  banner.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;z-index:10;gap:10px';
+  banner.innerHTML = `
+    <div style="font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:800;color:#fff;letter-spacing:3px">TRADE CLOSED</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${col}">${reason}${pnlStr}</div>`;
+  pn.style.position = 'relative';
+  pn.appendChild(banner);
+  setTimeout(() => closePairOverlay(), 3000);
+}
+
+// ── Trade actions (overlay) ───────────────────────────────────────────────────
+async function _ovOpen(sym, dir, exchange, lev) {
+  try {
+    const r = await fetch('/api/trade/open', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: sym, direction: dir, exchange, leverage: lev }),
+    });
+    if (!r.ok) { const d = await r.json(); alert(`Open failed: ${d.detail}`); return; }
+    _ovFetch(sym, true);
+  } catch (e) { alert('Request failed'); }
+}
+
+async function _ovCloseTrade(sym, dir) {
+  try {
+    const r = await fetch('/api/trade/close', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: sym, direction: dir }),
+    });
+    if (!r.ok) { const d = await r.json(); alert(`Close failed: ${d.detail}`); return; }
+    _ovFetch(sym, true);
   } catch (e) { alert('Request failed'); }
 }
 
