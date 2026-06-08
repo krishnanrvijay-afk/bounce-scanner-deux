@@ -30,7 +30,7 @@ from pydantic import BaseModel
 
 from config import (
     PAIRS, SCAN_INTERVAL_SECONDS, PRICE_INTERVAL_SECONDS,
-    MARGIN_PER_TRADE, MARGIN_HARD_CAP, PAPER_MODE,
+    MARGIN_PER_TRADE, MARGIN_HARD_CAP, PAPER_MODE, LIVE_MANUAL_ENTRY_ONLY,
     CONSECUTIVE_LOSS_STOP, DAILY_LOSS_LIMIT, TP1_R, TP2_R,
     SUPABASE_URL, SUPABASE_KEY,
 )
@@ -149,8 +149,9 @@ class AppState:
                 "cap_pct":         round(self.margin_deployed / MARGIN_HARD_CAP * 100, 1),
                 "cap_reached":     self.cap_reached,
                 "trades_opened":   self.trades_opened,
-                "paper_mode":      PAPER_MODE,
-                "slots_used":      self.slots_used,
+                "paper_mode":            PAPER_MODE,
+                "live_manual_entry_only": LIVE_MANUAL_ENTRY_ONLY,
+                "slots_used":            self.slots_used,
             },
             "circuit_breaker": {
                 "active":             circuit_breaker_active,
@@ -523,22 +524,36 @@ async def _scan_loop():
                     app_state.alerts.remove(existing)
                 app_state.alerts.insert(0, alert)
 
-                # Issue 1 fix: auto-open a paper trade for every confirmed alert
-                trade, err = await _do_open_trade(
-                    sym, dir_,
-                    MARGIN_PER_TRADE, alert["leverage"],
-                    alert_data=alert,
-                    exchange="HL",
-                )
-                if trade:
+                # Auto-entry gate: blocked when live and LIVE_MANUAL_ENTRY_ONLY is True
+                if not PAPER_MODE and LIVE_MANUAL_ENTRY_ONLY:
                     print(
-                        f"[AUTO TRADE] {sym} {dir_} opened "
-                        f"tier={alert.get('tier')} lev={alert.get('leverage')}x "
-                        f"entry={trade.get('entry_price')} sl={trade.get('sl_price')} "
-                        f"margin=${MARGIN_PER_TRADE:.0f}"
+                        f"[SIGNAL] {sym} {dir_} tier={alert.get('tier')} "
+                        f"lev={alert.get('leverage')}x entry={alert.get('entry_price')} "
+                        f"sl={alert.get('sl_price')} tp1={alert.get('tp1_price')} "
+                        f"— live manual entry required via overlay. "
+                        f"Do not open position automatically."
                     )
-                elif err:
-                    print(f"[AUTO TRADE] {sym} {dir_} skipped: {err}")
+                else:
+                    if not PAPER_MODE:
+                        print(
+                            "[WARNING] LIVE AUTO-ENTRY ACTIVE — "
+                            "LIVE_MANUAL_ENTRY_ONLY is disabled."
+                        )
+                    trade, err = await _do_open_trade(
+                        sym, dir_,
+                        MARGIN_PER_TRADE, alert["leverage"],
+                        alert_data=alert,
+                        exchange="HL",
+                    )
+                    if trade:
+                        print(
+                            f"[AUTO TRADE] {sym} {dir_} opened "
+                            f"tier={alert.get('tier')} lev={alert.get('leverage')}x "
+                            f"entry={trade.get('entry_price')} sl={trade.get('sl_price')} "
+                            f"margin=${MARGIN_PER_TRADE:.0f}"
+                        )
+                    elif err:
+                        print(f"[AUTO TRADE] {sym} {dir_} skipped: {err}")
         except Exception as e:
             print(f"[SCAN LOOP] error: {e}")
         await asyncio.sleep(SCAN_INTERVAL_SECONDS)
@@ -721,6 +736,15 @@ async def lifespan(app: FastAPI):
     mexc_client = MexcClient()
     log_startup_config()
     _load_state()
+
+    # ── Mode log ──────────────────────────────────────────────────────────────
+    if PAPER_MODE:
+        print("[MODE] PAPER trading — auto-entry enabled")
+    elif LIVE_MANUAL_ENTRY_ONLY:
+        print("[MODE] LIVE trading — manual entry only via overlay. Auto-entry blocked.")
+    else:
+        print("[MODE] LIVE trading — AUTO-ENTRY ACTIVE. All signals will open live positions automatically. Confirm this is intentional.")
+
     scan_task  = asyncio.create_task(_scan_loop())
     price_task = asyncio.create_task(_price_loop())
     exit_task  = asyncio.create_task(_exit_monitor_loop())
@@ -878,6 +902,7 @@ class OpenTradeRequest(BaseModel):
 
 @app.post("/api/trade/open")
 async def open_trade(req: OpenTradeRequest):
+    # Manual entry via overlay — always permitted regardless of LIVE_MANUAL_ENTRY_ONLY setting.
     alert_data = None
     for a in app_state.alerts:
         if a["symbol"] == req.symbol and a["direction"] == req.direction:
