@@ -65,6 +65,7 @@ class AppState:
         self.margin_deployed:      float             = 0.0
         self.trades_opened:        int               = 0
         self.last_scan_at:         Optional[int]     = None
+        self.scan_snapshots:       dict              = {}  # symbol -> last 3 scan snapshots
 
     @property
     def slots_used(self) -> int:
@@ -486,6 +487,25 @@ async def _scan_loop():
             new_alerts = await run_full_scan(hl_client)
             app_state.last_scan_at = int(time.time())
             app_state.pair_states  = await scan_pair_state(hl_client)
+
+            # Capture per-pair scan snapshots for the live overlay
+            for _ps in app_state.pair_states:
+                _sym = _ps.get("symbol")
+                if _sym:
+                    _snap = {
+                        "n":           get_scan_count(),
+                        "ts":          int(time.time()),
+                        "j15m":        _ps.get("j15m"),
+                        "bid_pct":     _ps.get("bid_pct"),
+                        "ask_pct":     _ps.get("ask_pct"),
+                        "rsi15m":      _ps.get("rsi15m"),
+                        "adx1h":       _ps.get("adx1h"),
+                        "score_long":  _ps.get("long_score"),
+                        "score_short": _ps.get("short_score"),
+                    }
+                    _hist = app_state.scan_snapshots.get(_sym, [])
+                    app_state.scan_snapshots[_sym] = ([_snap] + _hist)[:3]
+
             for alert in new_alerts:
                 sym, dir_ = alert["symbol"], alert["direction"]
 
@@ -740,6 +760,108 @@ async def get_account():
         "cap":             MARGIN_HARD_CAP,
         "paper_mode":      PAPER_MODE,
         "slots_used":      app_state.slots_used,
+    }
+
+
+# ── Per-pair overlay endpoint ─────────────────────────────────────────────────
+
+@app.get("/api/pair/{symbol}")
+async def get_pair(symbol: str):
+    ps = next((p for p in app_state.pair_states if p.get("symbol") == symbol), None)
+    if ps is None:
+        raise HTTPException(status_code=404, detail="pair not found")
+
+    j15m    = ps.get("j15m",    50)
+    j1h     = ps.get("j1h",     50)
+    rsi15m  = ps.get("rsi15m",  50)
+    bid_pct = ps.get("bid_pct", 50)
+    ask_pct = ps.get("ask_pct", 50)
+    adx     = ps.get("adx1h",   0)
+    atr     = ps.get("atr15m",  0)
+    price   = app_state.prices.get(symbol, ps.get("price", 0))
+    chg     = app_state.price_changes.get(symbol)
+
+    gate_long  = [j15m < 20, j1h < 40, rsi15m < 35, bid_pct >= 55]
+    gate_short = [j15m > 80, j1h > 60, rsi15m > 65, ask_pct >= 55]
+    score_long  = sum(gate_long)
+    score_short = sum(gate_short)
+    confluence_long  = j15m < 20 and j1h < 40
+    confluence_short = j15m > 80 and j1h > 60
+
+    # Active alert for this symbol (first match)
+    alert = next((a for a in app_state.alerts if a.get("symbol") == symbol), None)
+
+    # Alert staleness
+    alert_state_val = None
+    alert_age_sec   = None
+    if alert:
+        fired_at      = alert.get("fired_at", int(time.time()))
+        alert_age_sec = int(time.time()) - fired_at
+        entry_p       = alert.get("entry_price", price) or price or 1
+        alert_j15m    = alert.get("j15m", j15m)
+        j_drift       = abs(j15m - alert_j15m)
+        p_drift       = abs(price - entry_p) / entry_p * 100 if entry_p else 0
+        if   alert_age_sec > 480 or j_drift > 30 or p_drift > 1.5:
+            alert_state_val = "STALE"
+        elif alert_age_sec > 180 or j_drift > 15 or p_drift > 0.5:
+            alert_state_val = "AGING"
+        else:
+            alert_state_val = "FRESH"
+
+    # Open trades for this symbol
+    in_trade_long  = None
+    in_trade_short = None
+    for k, t in app_state.open_trades.items():
+        if t.get("symbol") != symbol:
+            continue
+        cur   = app_state.prices.get(symbol, t["entry_price"])
+        entry = t["entry_price"]
+        dir_  = t["direction"]
+        size  = t.get("size",   0)
+        mg    = t.get("margin", 0)
+        lev   = t.get("leverage", 1)
+        sl_d  = t.get("sl_dist", 0) or 0
+        pnl   = (cur - entry) * size if dir_ == "LONG" else (entry - cur) * size
+        dr    = mg * lev * (sl_d / entry) if entry else 0
+        r_val = round(pnl / dr, 2) if dr else 0
+        out   = {**t,
+                 "current_price":  cur,
+                 "unrealized_pnl": round(pnl, 2),
+                 "r":              r_val,
+                 "elapsed_s":      int(time.time()) - t.get("opened_at", int(time.time()))}
+        if dir_ == "LONG":
+            in_trade_long  = out
+        else:
+            in_trade_short = out
+
+    # Last 5 closed trades for this symbol
+    recent_alerts = [row for row in reversed(app_state.trade_log)
+                     if row.get("symbol") == symbol][:5]
+
+    return {
+        "symbol":              symbol,
+        "price":               price,
+        "change_24h":          chg,
+        "j15m":                j15m,
+        "j1h":                 j1h,
+        "rsi15m":              rsi15m,
+        "adx":                 adx,
+        "atr":                 atr,
+        "bid_pct":             bid_pct,
+        "ask_pct":             ask_pct,
+        "gate_long":           gate_long,
+        "gate_short":          gate_short,
+        "score_long":          score_long,
+        "score_short":         score_short,
+        "alert":               alert,
+        "alert_state":         alert_state_val,
+        "alert_age_seconds":   alert_age_sec,
+        "in_trade_long":       in_trade_long,
+        "in_trade_short":      in_trade_short,
+        "last_scan_summaries": app_state.scan_snapshots.get(symbol, []),
+        "recent_alerts":       recent_alerts,
+        "confluence_long":     confluence_long,
+        "confluence_short":    confluence_short,
     }
 
 
