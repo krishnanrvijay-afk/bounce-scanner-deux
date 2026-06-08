@@ -96,6 +96,7 @@ function render() {
   renderHeader();
   updateNavCounts();
   updateScanStatus();
+  renderBanner();
   if (activeTab === 'grid')   renderCards();
   if (activeTab === 'alerts') renderAlertsTab();
   if (activeTab === 'pos')    renderPositionsTab();
@@ -183,16 +184,14 @@ function buildCard(p, alerts, trades, changes) {
   const inTrade = p.in_trade;
   const chg    = changes[sym] ?? null;
 
-  // Price change display
   let chgHtml = '';
   if (chg !== null) {
     const chgColor = chg >= 0 ? '#00ff88' : '#ff4444';
     chgHtml = `<span class="card-chg" style="color:${chgColor}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`;
   }
 
-  // ADX value color: >= 50 green, 25-49 amber, < 25 white
   const adxFade  = adx1h > ADX_FADE_MAX;
-  const adxColor = adxFade   ? '#ff4444'
+  const adxColor = adxFade    ? '#ff4444'
                  : adx1h >= 50 ? '#00ff88'
                  : adx1h >= 25 ? '#ffaa00'
                  : '#ffffff';
@@ -212,9 +211,46 @@ function buildCard(p, alerts, trades, changes) {
   const nearTrig  = !shortFull && !longFull && leadCount === 3;
   const hasAlert  = alerts.some(a => a.symbol === sym);
 
+  // ── Glow border state ────────────────────────────────────────────────────────
+  let glowStyle;
+  if (inTrade) {
+    glowStyle = 'border:1px solid rgba(41,121,255,0.6);box-shadow:0 0 20px rgba(41,121,255,0.15),0 2px 8px rgba(0,0,0,0.6)';
+  } else if (hasAlert && shortFull) {
+    glowStyle = 'border:1px solid rgba(255,61,87,0.8);box-shadow:0 0 20px rgba(255,61,87,0.2),0 2px 8px rgba(0,0,0,0.6)';
+  } else if (hasAlert && longFull) {
+    glowStyle = 'border:1px solid rgba(0,230,118,0.8);box-shadow:0 0 20px rgba(0,230,118,0.2),0 2px 8px rgba(0,0,0,0.6)';
+  } else if (shortCount > longCount) {
+    glowStyle = 'border:1px solid rgba(255,61,87,0.35);box-shadow:0 0 12px rgba(255,61,87,0.08),0 2px 8px rgba(0,0,0,0.6)';
+  } else if (longCount > shortCount) {
+    glowStyle = 'border:1px solid rgba(0,230,118,0.35);box-shadow:0 0 12px rgba(0,230,118,0.08),0 2px 8px rgba(0,0,0,0.6)';
+  } else {
+    glowStyle = 'border:1px solid #1e1e1e;box-shadow:0 2px 8px rgba(0,0,0,0.4)';
+  }
+
+  // ── Inline direction row (symbol line: arrow + 4 gate dots) ─────────────────
+  function dotRow(dir, gateArr) {
+    const isL = dir === 'LONG';
+    const pfx = isL ? 'long' : 'short';
+    const arCls = isL ? 'arrow-long' : 'arrow-short';
+    const arrow = isL ? '▲' : '▼';
+    const dots = gateArr.map(g =>
+      `<span class="gc-dot ${pfx}-${g ? 'pass' : 'fail'}"></span>`).join('');
+    return `<div class="sym-dir-row"><span class="dir-arrow ${arCls}">${arrow}</span><div class="gate-cluster">${dots}</div></div>`;
+  }
+
+  let inlineDir = '';
+  if (diverge && shortCount > 0) {
+    inlineDir = `<div class="sym-dir-wrap">${dotRow('SHORT', shortGates)}${dotRow('LONG', longGates)}</div>`;
+  } else if (shortCount > longCount) {
+    inlineDir = `<div class="sym-dir-wrap">${dotRow('SHORT', shortGates)}</div>`;
+  } else if (longCount > shortCount) {
+    inlineDir = `<div class="sym-dir-wrap">${dotRow('LONG', longGates)}</div>`;
+  }
+
+  // ── Body rows (metrics only, no arrow/dots — those moved to symbol line) ─────
   let rows = '';
-  if (showShort) rows += dirRow('SHORT', j15m, j1h, rsi15m, askPct, shortGates);
-  if (showLong)  rows += dirRow('LONG',  j15m, j1h, rsi15m, bidPct, longGates);
+  if (showShort) rows += dirRow('SHORT', j15m, j1h, rsi15m, askPct);
+  if (showLong)  rows += dirRow('LONG',  j15m, j1h, rsi15m, bidPct);
 
   let pills = '';
   if (inTrade)   pills += `<span class="pill pill-intrade">IN TRADE</span>`;
@@ -226,9 +262,12 @@ function buildCard(p, alerts, trades, changes) {
   if (shortFull && hasAlert) pills += `<span class="pill pill-alert-s">▼ ALERT</span>`;
   if (longFull  && hasAlert) pills += `<span class="pill pill-alert">▲ ALERT</span>`;
 
-  return `<div class="pair-card">
+  return `<div class="pair-card" style="${glowStyle}">
     <div class="card-top">
-      <div class="card-sym">${sym}</div>
+      <div class="card-sym-block">
+        <span class="card-sym">${sym}</span>
+        ${inlineDir}
+      </div>
       <div class="card-right">
         <div class="card-price-line">
           <span class="card-price">${fmtPrice(price)}</span>${chgHtml}<span class="card-price-cd price-cd-val">${_priceCdSec}s</span>
@@ -244,28 +283,17 @@ function buildCard(p, alerts, trades, changes) {
   </div>`;
 }
 
-function dirRow(direction, j15m, j1h, rsi15m, depthPct, gates) {
+function dirRow(direction, j15m, j1h, rsi15m, depthPct) {
   const isLong     = direction === 'LONG';
   const rowCls     = isLong ? 'long-row' : 'short-row';
-  const arrow      = isLong ? '▲' : '▼';
-  const arCls      = isLong ? 'arrow-long' : 'arrow-short';
   const depthLabel = isLong ? 'BID%' : 'ASK%';
-  const dotPfx     = isLong ? 'long' : 'short';
 
-  // Dot cluster: 4 dots, green for LONG, red for SHORT
-  const dotCluster = `<div class="gate-cluster">${gates.map(g =>
-    `<span class="gc-dot ${dotPfx}-${g ? 'pass' : 'fail'}"></span>`
-  ).join('')}</div>`;
-
-  // Value colors
   const j15mColor  = isLong ? (j15m  < 20 ? 'green' : 'grey') : (j15m  > 80 ? 'red' : 'grey');
   const j1hColor   = isLong ? (j1h   < 40 ? 'green' : 'grey') : (j1h   > 60 ? 'red' : 'grey');
   const rsiColor   = isLong ? (rsi15m < 35 ? 'green' : 'grey') : (rsi15m > 65 ? 'red' : 'grey');
   const depthColor = depthPct >= 55 ? (isLong ? 'green' : 'red') : 'grey';
 
   return `<div class="dir-row ${rowCls}">
-    <span class="dir-arrow ${arCls}">${arrow}</span>
-    ${dotCluster}
     <div class="dir-vals">
       <div class="dv-item">
         <span class="dv-label">J15M</span>
@@ -289,8 +317,7 @@ function dirRow(direction, j15m, j1h, rsi15m, depthPct, gates) {
 
 // ── Cockpit bar ───────────────────────────────────────────────────────────────
 function renderCockpit() {
-  const pairs   = STATE?.pair_states || [];
-  const changes = STATE?.price_changes || {};
+  const pairs = STATE?.pair_states || [];
 
   // Section 1: pair-name labels below the bar, stacked to avoid overlap
   const labelRow = document.getElementById('ck-label-row');
@@ -298,8 +325,7 @@ function renderCockpit() {
     .map(p => ({ sym: p.symbol, j: Math.min(99, Math.max(1, p.j15m || 50)) }))
     .sort((a, b) => a.j - b.j);
 
-  // Anti-overlap: track rightmost extent per row (label ~5% wide at this font size)
-  const rowEdge = [];   // rowEdge[rowIndex] = last placed right-edge percent
+  const rowEdge = [];
   const placed  = sorted.map(({ sym, j }) => {
     let row = 0;
     while (rowEdge[row] !== undefined && rowEdge[row] > j - 3) row++;
@@ -307,7 +333,7 @@ function renderCockpit() {
     return { sym, j, row };
   });
 
-  const rowH   = 14; // px — matches 10px label font-size
+  const rowH   = 14;
   const maxRow = placed.reduce((m, p) => Math.max(m, p.row), 0);
   labelRow.style.height = `${(maxRow + 1) * rowH}px`;
   labelRow.innerHTML = placed.map(({ sym, j, row }) => {
@@ -319,29 +345,7 @@ function renderCockpit() {
     return `<div class="ck-pair-label" style="left:${j}%;top:${row * rowH}px;color:${col};">${sym}</div>`;
   }).join('');
 
-  // Section 2: Oversold (J15M <= 35)
-  const osEl = document.getElementById('ck-os');
-  const osPairs = pairs.filter(p => p.j15m <= 35);
-  osEl.innerHTML = osPairs.length
-    ? osPairs.map(p => {
-        const col  = p.j15m <= 20 ? '#00ff88' : '#006633';
-        const bord = p.j15m <= 20 ? 'rgba(0,255,136,0.25)' : 'rgba(0,100,50,0.25)';
-        return `<span class="ck-chip" style="color:${col};border-color:${bord}">${p.symbol}</span>`;
-      }).join('')
-    : `<span style="color:#333;font-size:9px;">none</span>`;
-
-  // Section 3: Overbought (J15M >= 65)
-  const obEl = document.getElementById('ck-ob');
-  const obPairs = pairs.filter(p => p.j15m >= 65);
-  obEl.innerHTML = obPairs.length
-    ? obPairs.map(p => {
-        const col  = p.j15m >= 80 ? '#ff4444' : '#662200';
-        const bord = p.j15m >= 80 ? 'rgba(255,68,68,0.25)' : 'rgba(100,34,0,0.25)';
-        return `<span class="ck-chip" style="color:${col};border-color:${bord}">${p.symbol}</span>`;
-      }).join('')
-    : `<span style="color:#333;font-size:9px;">none</span>`;
-
-  // Section 4: Near trigger (exactly 3/4 gates on leading direction)
+  // Section 2: Near trigger (exactly 3/4 gates on leading direction)
   const nearList = [];
   for (const p of pairs) {
     const sg = [p.j15m > 80, p.j1h > 60, p.rsi15m > 65, p.ask_pct >= 55].filter(Boolean).length;
@@ -353,7 +357,50 @@ function renderCockpit() {
   nearEl.innerHTML = nearList.length
     ? nearList.join('<span style="color:#333"> · </span>')
     : `<span style="color:#333">none</span>`;
+}
 
+// ── J15M Opportunity Banner ───────────────────────────────────────────────────
+function renderBanner() {
+  const pairs  = STATE?.pair_states || [];
+  const pinRow = document.getElementById('jb-pin-row');
+  if (!pinRow) return;
+
+  if (!pairs.length) {
+    pinRow.style.height = '30px';
+    pinRow.innerHTML = '';
+    return;
+  }
+
+  const ROW_H = 30;
+  const sorted = [...pairs]
+    .map(p => ({ sym: p.symbol, j: Math.min(98, Math.max(2, +(p.j15m || 50))) }))
+    .sort((a, b) => a.j - b.j);
+
+  // Stack pairs within 5 J15M points into vertical rows
+  const rowEdge = [];
+  const placed = sorted.map(({ sym, j }) => {
+    let row = 0;
+    while (rowEdge[row] !== undefined && rowEdge[row] > j - 5) row++;
+    rowEdge[row] = j + 5;
+    return { sym, j, row };
+  });
+
+  const maxRow = placed.reduce((m, p) => Math.max(m, p.row), 0);
+  pinRow.style.height = `${(maxRow + 1) * ROW_H + 6}px`;
+
+  pinRow.innerHTML = placed.map(({ sym, j, row }) => {
+    const col = j < 20 ? '#00ff88'
+              : j < 35 ? '#4d8a4d'
+              : j < 65 ? '#ccc'
+              : j < 80 ? '#8a4d4d'
+              : '#ff4444';
+    const lineH = row * ROW_H + 6;
+    return `<div class="jb-pin" style="left:${j.toFixed(1)}%">
+      <div class="jb-pin-line" style="height:${lineH}px"></div>
+      <div class="jb-pin-name" style="top:${lineH}px;color:${col}">${sym}</div>
+      <div class="jb-pin-val"  style="top:${lineH + 13}px;color:${col}">${j.toFixed(0)}</div>
+    </div>`;
+  }).join('');
 }
 
 // ── Alerts tab ────────────────────────────────────────────────────────────────
