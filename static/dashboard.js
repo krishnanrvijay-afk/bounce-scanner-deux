@@ -4,6 +4,7 @@ let activeFilter = 'ALL';
 let activeTab    = 'grid';
 let lastScanAt   = null;
 let marketOpen   = false;
+let posTimers    = {};
 
 const ADX_FADE_MAX = 60;
 
@@ -519,90 +520,221 @@ function buildAlertCard(a, trades, pairMap) {
 
 // ── Positions tab ─────────────────────────────────────────────────────────────
 function renderPositionsTab() {
-  const trades = STATE.open_trades || {};
-  const prices = STATE.prices      || {};
-  const keys   = Object.keys(trades);
+  const trades     = STATE.open_trades || {};
+  const prices     = STATE.prices      || {};
+  const pairStates = STATE.pair_states || [];
+  const keys       = Object.keys(trades);
+
+  for (const id of Object.keys(posTimers)) { clearInterval(posTimers[id]); }
+  posTimers = {};
 
   if (!keys.length) {
     document.getElementById('pos-grid').innerHTML = '<div class="no-content">No open positions</div>';
     return;
   }
-  document.getElementById('pos-grid').innerHTML = keys.map(k => buildPosCard(trades[k], prices)).join('');
+  document.getElementById('pos-grid').innerHTML = keys.map(k => buildPosCard(trades[k], prices, pairStates)).join('');
+  setTimeout(startPosTimers, 0);
 }
 
-function buildPosCard(t, prices) {
+function startPosTimers() {
+  const trades = STATE?.open_trades || {};
+  for (const trade of Object.values(trades)) {
+    const tid = `pct-${trade.symbol}-${trade.direction}`;
+    const el  = document.getElementById(tid);
+    if (!el) continue;
+    const ts = trade.opened_at || 0;
+    function makeTick(element, openTs) {
+      return function() {
+        const sec = Math.max(0, Math.floor(Date.now() / 1000 - openTs));
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        element.textContent =
+          String(h).padStart(2,'0') + ':' +
+          String(m).padStart(2,'0') + ':' +
+          String(s).padStart(2,'0');
+      };
+    }
+    const tick = makeTick(el, ts);
+    tick();
+    posTimers[tid] = setInterval(tick, 1000);
+  }
+}
+
+function buildPosCard(t, prices, pairStates) {
+  const sym      = t.symbol;
   const isLong   = t.direction === 'LONG';
-  const cls      = isLong ? 'long-card' : 'short-card';
-  const dirBadge = isLong ? 'pb-long' : 'pb-short';
-  const tierCls  = t.tier === 'HIGH_PROB' ? 'tp-high' : t.tier === 'STRONG' ? 'tp-strong' : 'tp-regular';
-  const current  = t.current_price || prices[t.symbol] || t.entry_price;
-  const sl       = t.sl_price   || 0;
-  const tp1      = t.tp1_price  || 0;
-  const entry    = t.entry_price || 0;
+  const current  = t.current_price || prices[sym] || t.entry_price || 0;
+  const entry    = t.entry_price   || 0;
+  const sl       = t.sl_price      || 0;
+  const tp1      = t.tp1_price     || 0;
+  const tp2      = t.tp2_price     || 0;
+  const be       = t.be_price      || (isLong ? entry * 1.001 : entry * 0.999);
+  const tp1Hit   = !!t.tp1_hit;
   const pnl      = t.unrealized_pnl || 0;
-  const r        = t.r || 0;
-  const pnlCls   = pnl >= 0 ? 'pos' : 'neg';
-  const liveColor= isLong ? (current >= entry ? '#00ff88' : '#ff4444')
-                          : (current <= entry ? '#00ff88' : '#ff4444');
+  const r        = t.r              || 0;
+  const score    = t.score          || 0;
+  const margin   = t.margin         || 0;
+  const lev      = t.leverage       || 5;
+  const paper    = !!t.paper;
+  const exch     = t.exchange       || 'HL';
+  const openedAt = t.opened_at      || 0;
+  const size     = t.size           || 0;
 
-  let pct = 0;
-  if (isLong  && tp1 > sl) pct = Math.min(100, Math.max(0, (current - sl) / (tp1 - sl) * 100));
-  if (!isLong && sl > tp1) pct = Math.min(100, Math.max(0, (sl - current) / (sl - tp1) * 100));
+  const ps = (pairStates || []).find(p => p.symbol === sym) || {};
 
-  const elapsed    = t.elapsed_s || 0;
-  const elapsedStr = elapsed < 3600
-    ? `${Math.floor(elapsed/60)}m ${elapsed%60}s`
-    : `${Math.floor(elapsed/3600)}h ${Math.floor((elapsed%3600)/60)}m`;
+  // Colors
+  const dirCol = isLong ? '#00ff88' : '#ff4444';
+  const pnlCol = pnl >= 0 ? '#00ff88' : '#ff4444';
+  const rCol   = r   >= 0 ? '#00ff88' : '#ff4444';
+  const winning = isLong ? current >= entry : current <= entry;
+  const arrow   = winning ? '▲' : '▼';
+  const arrCol  = winning ? '#00ff88' : '#ff4444';
+  const delta   = current - entry;
+  const dltCol  = isLong ? (delta >= 0 ? '#00ff88' : '#ff4444') : (delta <= 0 ? '#00ff88' : '#ff4444');
+  const absDlt  = Math.abs(delta);
+  const dltStr  = (delta >= 0 ? '+' : '-') + (absDlt >= 1000
+    ? absDlt.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})
+    : absDlt >= 1 ? absDlt.toFixed(4) : absDlt.toFixed(6));
 
-  return `<div class="pos-card ${cls}">
-    <div class="pos-card-hdr">
-      <span class="pos-sym">${t.symbol}</span>
-      <div class="pos-badges">
-        <span class="pos-badge ${dirBadge}">${t.direction}</span>
-        <span class="tier-pill ${tierCls}">${t.tier||'REGULAR'}</span>
-        <span class="pos-badge pb-exch">${t.leverage||5}x · ${t.exchange||'HL'}</span>
-        ${t.paper ? '<span class="pos-badge pb-paper">PAPER</span>' : ''}
-      </div>
+  // Price ruler: spans SL (0%) → 2R (100%)
+  // Works for both LONG and SHORT: pct = (price−sl)/(2R−sl)×100
+  // For SHORT sl>entry>2R so denominator is negative — ratios still correct
+  const oneR     = Math.abs(entry - sl);
+  const twoR     = isLong ? entry + 2 * oneR : entry - 2 * oneR;
+  const barRange = twoR - sl;
+
+  function bp(price) {
+    if (!barRange || !sl) return 50;
+    return Math.min(100, Math.max(0, (price - sl) / barRange * 100));
+  }
+
+  const pSl  = bp(sl);
+  const pEn  = bp(entry);
+  const pBe  = bp(be);
+  const pTp1 = bp(tp1);
+  const pTp2 = bp(tp2);
+  const p2R  = bp(twoR);
+  const pCur = bp(current);
+
+  // Zone widths (loss zone: 0%→entry%, gain zone: entry%→100%)
+  const gainLeft = Math.min(pEn, p2R).toFixed(1);
+  const gainW    = Math.abs(p2R - pEn).toFixed(1);
+  const tp1SL    = Math.min(pTp1, pCur).toFixed(1);
+  const tp1SW    = Math.abs(pCur - pTp1).toFixed(1);
+
+  // Dollar P&L at levels (full original size)
+  const dollarAt = tgt => isLong ? (tgt - entry) * size : (entry - tgt) * size;
+  const pnlSl    = dollarAt(sl);
+  const pnlTp1   = dollarAt(tp1);
+  const pnlTp2   = dollarAt(tp2);
+
+  // Subheader
+  const openFmt   = openedAt ? new Date(openedAt*1000).toISOString().replace('T',' ').slice(0,19) : '—';
+  const marginFmt = margin >= 1000 ? `$${(margin/1000).toFixed(1)}k` : `$${Math.round(margin)}`;
+
+  // Metrics (live from pair state, fallback to trade snapshot)
+  const adx   = ps.adx1h  ?? t.adx1h  ?? 0;
+  const rsi   = ps.rsi15m ?? t.rsi15m ?? 0;
+  const j15m  = ps.j15m   ?? t.j15m   ?? 0;
+  const bidPc = ps.bid_pct ?? t.bid_pct ?? 0;
+  const askPc = ps.ask_pct ?? t.ask_pct ?? 0;
+  const dPct  = isLong ? bidPc : askPc;
+  const dLbl  = isLong ? 'BID%' : 'ASK%';
+
+  const adxCl = v => v >= 50 ? '#00ff88' : v >= 25 ? '#ffaa00' : '#aaa';
+  const rsiCl = v => v > 65  ? '#ff4444' : v < 35  ? '#00ff88' : '#aaa';
+  const jCl   = v => v > 80  ? '#ff4444' : v < 20  ? '#00ff88' : '#aaa';
+  const dCol  = isLong ? (bidPc >= 60 ? '#00ff88' : '#ff4444') : (askPc >= 60 ? '#00ff88' : '#ff4444');
+
+  // Scan narrative
+  const jTr  = j15m > 60 ? 'rising' : j15m < 40 ? 'falling' : 'flat';
+  const narr = ps.symbol
+    ? `SCAN  J ${(+j15m).toFixed(1)}  ${dLbl} ${(+dPct).toFixed(1)}%  ADX ${(+adx).toFixed(1)}  RSI ${(+rsi).toFixed(1)}  J ${jTr}`
+    : 'SCAN  awaiting next scan…';
+
+  const tid      = `pct-${sym}-${t.direction}`;
+  const closeLbl = `${paper ? 'PAPER ' : ''}CLOSE ${exch}`;
+  const closeCls = exch === 'MEXC' ? 'pcv2-btn-mexc' : 'pcv2-btn-hl';
+  const cond     = isLong ? 'Bullish' : 'Bearish';
+
+  return `<div class="pcv2" style="border-left:3px solid ${dirCol}">
+
+  <div class="pcv2-hdr">
+    <div class="pcv2-hdr-l">
+      <span class="pcv2-sym">${sym}</span>
+      <span class="pcv2-dir" style="color:${dirCol};border-color:${dirCol}">${t.direction}</span>
+      <span style="color:#ffaa00;font-size:13px;line-height:1">★</span>
+      <span class="pcv2-sig">Bounce</span>
+      <span style="font-size:11px;font-weight:700;color:${dirCol}">${cond}</span>
+      ${score ? `<span class="pcv2-sc">${score}pts</span>` : ''}
     </div>
-    <div class="pos-bar-wrap">
-      <div class="pos-bar-labels">
-        <div class="pos-sl-block">
-          <div class="pos-px-label">SL</div>
-          <div class="pos-sl-val">${fmtPrice(sl)}</div>
-        </div>
-        <div class="pos-tp1-block">
-          <div class="pos-px-label" style="text-align:right">TP1</div>
-          <div class="pos-tp1-val">${fmtPrice(tp1)}</div>
-        </div>
+    <span class="pcv2-timer" id="${tid}">00:00:00</span>
+  </div>
+
+  <div class="pcv2-sub">${lev}x · ${marginFmt} · ${openFmt}</div>
+
+  <div class="pcv2-live">
+    <span style="font-size:20px;color:${arrCol};line-height:1">${arrow}</span>
+    <span class="pcv2-price">${fmtPrice(current)}</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${dltCol}">${dltStr}</span>
+    <span class="pcv2-pnl" style="color:${pnlCol};margin-left:auto">${pnl>=0?'+':''}$${pnl.toFixed(2)}</span>
+    <span class="pcv2-r" style="color:${rCol}">${r>=0?'+':''}${r.toFixed(2)}R</span>
+  </div>
+
+  <div class="pcv2-ruler-wrap">
+    <div class="pcv2-ruler-bar">
+      <div class="pcv2-z pcv2-zr" style="left:0%;width:${pEn.toFixed(1)}%"></div>
+      <div class="pcv2-z pcv2-zg" style="left:${gainLeft}%;width:${gainW}%"></div>
+      ${tp1Hit ? `<div class="pcv2-z pcv2-ztp1" style="left:${tp1SL}%;width:${tp1SW}%"></div>` : ''}
+      <div class="pcv2-mk" style="left:${pSl.toFixed(1)}%">
+        <span class="pcv2-mkt" style="color:#ff4444">SL<br>${fmtPrice(sl)}</span>
+        <span class="pcv2-mck" style="background:#ff4444"></span>
+        <span class="pcv2-mkb" style="color:#ff4444">−$${Math.abs(pnlSl).toFixed(0)}</span>
       </div>
-      <div class="pos-bar-track">
-        <div class="pos-bar-fill ${isLong?'fill-long':'fill-short'}" style="width:${pct.toFixed(1)}%"></div>
+      <div class="pcv2-mk" style="left:${pEn.toFixed(1)}%">
+        <span class="pcv2-mkt" style="color:#ccc">ENTRY<br>${fmtPrice(entry)}</span>
+        <span class="pcv2-mck" style="background:#888"></span>
+        <span class="pcv2-mkb"></span>
       </div>
-      <div class="pos-bar-prices">
-        <div class="pos-entry-block">
-          <div class="pos-px-label">ENTRY</div>
-          <div class="pos-entry-val">${fmtPrice(entry)}</div>
-        </div>
-        <div class="pos-live-block">
-          <div class="pos-px-label" style="text-align:center">LIVE</div>
-          <div class="pos-live-val" style="color:${liveColor}">${fmtPrice(current)}</div>
-        </div>
-        <div class="pos-tp2-block">
-          <div class="pos-px-label" style="text-align:right">TP2</div>
-          <div class="pos-tp2-val">${fmtPrice(t.tp2_price)}</div>
-        </div>
+      <div class="pcv2-mk" style="left:${pBe.toFixed(1)}%">
+        <span class="pcv2-mkt pcv2-mkt-be" style="color:#ffaa00">BE<br>${fmtPrice(be)}</span>
+        <span class="pcv2-mck" style="background:#ffaa00"></span>
+        <span class="pcv2-mkb" style="color:#ffaa00">≈$0</span>
       </div>
+      ${tp1 ? `<div class="pcv2-mk" style="left:${pTp1.toFixed(1)}%">
+        <span class="pcv2-mkt" style="color:#4488ff">TP1<br>${fmtPrice(tp1)}</span>
+        <span class="pcv2-mck" style="background:#4488ff"></span>
+        <span class="pcv2-mkb" style="color:#4488ff">+$${pnlTp1.toFixed(0)}</span>
+      </div>` : ''}
+      ${tp2 ? `<div class="pcv2-mk" style="left:${pTp2.toFixed(1)}%">
+        <span class="pcv2-mkt" style="color:#00ff88">TP2 1.5R<br>${fmtPrice(tp2)}</span>
+        <span class="pcv2-mck" style="background:#00ff88"></span>
+        <span class="pcv2-mkb" style="color:#00ff88">+$${pnlTp2.toFixed(0)}</span>
+      </div>` : ''}
+      <div class="pcv2-mk" style="left:${p2R.toFixed(1)}%">
+        <span class="pcv2-mkt" style="color:#3a6644">2.0R<br>${fmtPrice(twoR)}</span>
+        <span class="pcv2-mck" style="background:#3a6644"></span>
+        <span class="pcv2-mkb"></span>
+      </div>
+      <div class="pcv2-dot" style="left:${pCur.toFixed(1)}%;background:${pnlCol}"></div>
     </div>
-    <div class="pos-pnl-row">
-      <span class="pos-pnl ${pnlCls}">${pnl>=0?'+':''}$${pnl.toFixed(2)}</span>
-      <span class="pos-r" style="color:${r>=0?'#555':'#ff4444'}">${r>=0?'+':''}${r.toFixed(2)}R</span>
-    </div>
-    <div class="pos-meta-row">
-      <div class="pos-meta-item"><span class="pos-meta-label">AGE </span><span class="pos-meta-val">${elapsedStr}</span></div>
-      <div class="pos-meta-item"><span class="pos-meta-label">ADX </span><span class="pos-meta-val">${(t.adx1h||0).toFixed(1)}</span></div>
-    </div>
-    <button class="pos-close-btn" onclick="closeTrade('${t.symbol}','${t.direction}')">FORCE CLOSE</button>
-  </div>`;
+  </div>
+
+  <div class="pcv2-metrics">
+    <div class="pcv2-metric"><span class="pcv2-ml">ADX</span><span class="pcv2-mv" style="color:${adxCl(adx)}">${(+adx).toFixed(1)}</span></div>
+    <div class="pcv2-metric"><span class="pcv2-ml">RSI15M</span><span class="pcv2-mv" style="color:${rsiCl(rsi)}">${(+rsi).toFixed(1)}</span></div>
+    <div class="pcv2-metric"><span class="pcv2-ml">J15M</span><span class="pcv2-mv" style="color:${jCl(j15m)}">${(+j15m).toFixed(1)}</span></div>
+    <div class="pcv2-metric"><span class="pcv2-ml">${dLbl}</span><span class="pcv2-mv" style="color:${dCol}">${(+dPct).toFixed(1)}%</span></div>
+  </div>
+
+  <div class="pcv2-narr">${narr}</div>
+
+  <div class="pcv2-actions">
+    <button class="pcv2-btn ${closeCls}" onclick="closeTrade('${sym}','${t.direction}')">${closeLbl}</button>
+    <button class="pcv2-btn pcv2-btn-force" onclick="closeTrade('${sym}','${t.direction}')">FORCE CLOSE</button>
+  </div>
+</div>`;
 }
 
 // ── Log tab ───────────────────────────────────────────────────────────────────
