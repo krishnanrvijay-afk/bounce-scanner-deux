@@ -7,7 +7,7 @@ HL_API_URL = "https://api.hyperliquid.xyz/info"
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-PAIRS = ["DOGE", "SUI", "BTC", "LINK", "ETH", "NEAR", "XRP", "SOL", "WIF", "AVAX", "HYPE", "INJ"]
+PAIRS = ["DOGE", "SUI", "BTC", "LINK", "ETH", "NEAR", "XRP", "SOL", "WIF", "AVAX", "HYPE", "INJ", "ZEC"]
 
 SCAN_INTERVAL_SECONDS  = 30
 PRICE_INTERVAL_SECONDS = 8
@@ -71,5 +71,6 @@ MIN_SL_PCT: dict = {
     "NEAR": 0.010,
     "LINK": 0.008,
     "ARB":  0.012,
+    "ZEC":  0.030,
 }
 MIN_SL_PCT_DEFAULT = 0.010
