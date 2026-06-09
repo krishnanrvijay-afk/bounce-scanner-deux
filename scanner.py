@@ -462,15 +462,6 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     "partial_price": partial_price,
                     "session":       get_session_name(),
                 }
-                # ── Market HALT gate ──────────────────────────────────────
-                _mh = market_health or {}
-                if direction == "SHORT" and _mh.get("short_status") == "HALT":
-                    log.info(f"[BLOCKED] {symbol} SHORT — MARKET HALT")
-                    continue
-                if direction == "LONG" and _mh.get("long_status") == "HALT":
-                    log.info(f"[BLOCKED] {symbol} LONG — MARKET HALT")
-                    continue
-
                 new_alerts.append(alert)
                 _pending.pop(key, None)
                 log.info(f"[ALERT] {symbol} {direction} tier={tier} lev={lev}x entry={price} "
