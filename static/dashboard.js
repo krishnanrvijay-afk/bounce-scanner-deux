@@ -593,7 +593,7 @@ function buildAlertCard(a, trades, pairMap) {
 
   const mkMetric = (lbl, val, clr, dec) =>
     `<div class="ac2-metric">
-      <div class="ac2-metric-label">${lbl}</div>
+      <div class="ac2-metric-label" style="color:#fff;font-weight:700">${lbl}</div>
       <div class="ac2-metric-val" style="color:${clr(val)}">${val.toFixed(dec)}</div>
     </div>`;
 
@@ -612,7 +612,6 @@ function buildAlertCard(a, trades, pairMap) {
   const btnsHtml = isStale
     ? `<button class="ac-btn ac-btn-dismiss" onclick="dismissAlert('${sym}','${a.direction}')">DISMISS</button>`
     : `<button class="ac-btn btn-hl"   ${dis} onclick="openTrade('${sym}','${a.direction}','HL',${a.leverage})">OPEN HL</button>
-       <button class="ac-btn btn-mexc" ${dis} onclick="openTrade('${sym}','${a.direction}','MEXC',${a.leverage})">OPEN MEXC</button>
        <button class="ac-btn ac-btn-dismiss" onclick="dismissAlert('${sym}','${a.direction}')">DISMISS</button>`;
 
   return `<div class="alert-card ${dirClass}" style="${isStale ? 'opacity:0.6;' : ''}">
@@ -629,15 +628,15 @@ function buildAlertCard(a, trades, pairMap) {
     </div>
 
     <div class="ac2-prices">
-      <div class="ac2-px"><div class="ac2-px-label">ENTRY</div><div class="ac2-px-val white">${fmtPrice(a.entry_price)}</div></div>
-      <div class="ac2-px"><div class="ac2-px-label">SL</div><div class="ac2-px-val red">${fmtPrice(a.sl_price)}</div></div>
-      <div class="ac2-px"><div class="ac2-px-label">TP1</div><div class="ac2-px-val green">${fmtPrice(a.tp1_price)}</div></div>
-      <div class="ac2-px"><div class="ac2-px-label">TP2</div><div class="ac2-px-val" style="color:rgba(0,255,136,0.6)">${fmtPrice(a.tp2_price)}</div></div>
+      <div class="ac2-px"><div class="ac2-px-label" style="color:#fff;font-weight:700">ENTRY</div><div class="ac2-px-val white" style="font-weight:700">${fmtPrice(a.entry_price)}</div></div>
+      <div class="ac2-px"><div class="ac2-px-label" style="color:#fff;font-weight:700">SL</div><div class="ac2-px-val red" style="font-weight:700">${fmtPrice(a.sl_price)}</div></div>
+      <div class="ac2-px"><div class="ac2-px-label" style="color:#fff;font-weight:700">TP1</div><div class="ac2-px-val green" style="font-weight:700">${fmtPrice(a.tp1_price)}</div></div>
+      <div class="ac2-px"><div class="ac2-px-label" style="color:#fff;font-weight:700">TP2</div><div class="ac2-px-val" style="color:#00ff88;font-weight:700">${fmtPrice(a.tp2_price)}</div></div>
     </div>
 
     <div class="ac2-live-row">
-      <span class="ac2-live-label">LIVE</span>
-      <span class="ac2-live-val">${fmtPrice(livePrice)}</span>
+      <span class="ac2-live-label" style="color:#fff;font-weight:700">LIVE</span>
+      <span class="ac2-live-val" style="color:#fff;font-weight:700">${fmtPrice(livePrice)}</span>
       ${chgHtml}${warnHtml}
     </div>
 
@@ -801,8 +800,8 @@ function buildPosCard(t, prices, pairStates) {
     : 'SCAN  awaiting next scan…';
 
   const tid      = `pct-${sym}-${t.direction}`;
-  const closeLbl = `${paper ? 'PAPER ' : ''}CLOSE ${exch}`;
-  const closeCls = exch === 'MEXC' ? 'pcv2-btn-mexc' : 'pcv2-btn-hl';
+  const closeLbl = `${paper ? 'PAPER ' : ''}CLOSE HL`;
+  const closeCls = 'pcv2-btn-hl';
   const cond     = isLong ? 'Bullish' : 'Bearish';
 
   return `<div class="pcv2" style="border-left:3px solid ${dirCol}">
@@ -840,7 +839,7 @@ function buildPosCard(t, prices, pairStates) {
         <span class="pcv2-mkb" style="color:#ff4444">−$${Math.abs(pnlSl).toFixed(0)}</span>
       </div>
       <div class="pcv2-mk" style="left:${pEn.toFixed(1)}%">
-        <span class="pcv2-mkt" style="color:#ccc">ENTRY<br>${fmtPrice(entry)}</span>
+        <span class="pcv2-mkt" style="color:#fff;font-weight:700">ENTRY<br>${fmtPrice(entry)}</span>
         <span class="pcv2-mck" style="background:#888"></span>
         <span class="pcv2-mkb"></span>
       </div>
@@ -850,9 +849,9 @@ function buildPosCard(t, prices, pairStates) {
         <span class="pcv2-mkb" style="color:#ffaa00">≈$0</span>
       </div>
       ${tp1 ? `<div class="pcv2-mk" style="left:${pTp1.toFixed(1)}%">
-        <span class="pcv2-mkt" style="color:#4488ff">TP1<br>${fmtPrice(tp1)}</span>
-        <span class="pcv2-mck" style="background:#4488ff"></span>
-        <span class="pcv2-mkb" style="color:#4488ff">+$${pnlTp1.toFixed(0)}</span>
+        <span class="pcv2-mkt" style="color:#00ff88">TP1<br>${fmtPrice(tp1)}</span>
+        <span class="pcv2-mck" style="background:#00ff88"></span>
+        <span class="pcv2-mkb" style="color:#00ff88">+$${pnlTp1.toFixed(0)}</span>
       </div>` : ''}
       ${tp2 ? `<div class="pcv2-mk" style="left:${pTp2.toFixed(1)}%">
         <span class="pcv2-mkt" style="color:#00ff88">TP2 1.5R<br>${fmtPrice(tp2)}</span>
@@ -869,13 +868,13 @@ function buildPosCard(t, prices, pairStates) {
   </div>
 
   <div class="pcv2-metrics">
-    <div class="pcv2-metric"><span class="pcv2-ml">ADX</span><span class="pcv2-mv" style="color:${adxCl(adx)}">${(+adx).toFixed(1)}</span></div>
-    <div class="pcv2-metric"><span class="pcv2-ml">RSI15M</span><span class="pcv2-mv" style="color:${rsiCl(rsi)}">${(+rsi).toFixed(1)}</span></div>
-    <div class="pcv2-metric"><span class="pcv2-ml">J15M</span><span class="pcv2-mv" style="color:${jCl(j15m)}">${(+j15m).toFixed(1)}</span></div>
-    <div class="pcv2-metric"><span class="pcv2-ml">${dLbl}</span><span class="pcv2-mv" style="color:${dCol}">${(+dPct).toFixed(1)}%</span></div>
+    <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">ADX</span><span class="pcv2-mv" style="color:${adxCl(adx)}">${(+adx).toFixed(1)}</span></div>
+    <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">RSI15M</span><span class="pcv2-mv" style="color:${rsiCl(rsi)}">${(+rsi).toFixed(1)}</span></div>
+    <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">J15M</span><span class="pcv2-mv" style="color:${jCl(j15m)}">${(+j15m).toFixed(1)}</span></div>
+    <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">${dLbl}</span><span class="pcv2-mv" style="color:${dCol}">${(+dPct).toFixed(1)}%</span></div>
   </div>
 
-  <div class="pcv2-narr">${narr}</div>
+  <div class="pcv2-narr" style="color:#fff;font-weight:700">${narr}</div>
 
   <div class="pcv2-actions">
     <button class="pcv2-btn ${closeCls}" onclick="closeTrade('${sym}','${t.direction}')">${closeLbl}</button>
