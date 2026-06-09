@@ -1483,7 +1483,8 @@ function _ovActionsHtml(d, state, dir, trade) {
     const lev = d.alert.leverage || 5;
     return `<button class="pov-btn pov-btn-hl" onclick="_ovOpen('${d.symbol}','${dir}','HL',${lev})">OPEN HL ${lev}x</button>`;
   }
-  return `<button class="pov-btn pov-btn-watch" disabled>WATCHING HL</button>`;
+  const wCol = d.confluence_long ? '#00e676' : d.confluence_short ? '#ff3d57' : '#ffaa00';
+  return `<button class="pov-btn pov-btn-watch" disabled style="color:${wCol};border-color:${wCol};font-weight:700">WATCHING HL</button>`;
 }
 
 function _ovStaleHtml(d) {
