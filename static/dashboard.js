@@ -1476,17 +1476,14 @@ function _ovRulerHtml(d, dir) {
 
 function _ovActionsHtml(d, state, dir, trade) {
   if (state === 'IN_TRADE' && trade) {
-    const exch = trade.exchange || 'HL';
-    return `<button class="pov-btn pov-btn-close" onclick="_ovCloseTrade('${d.symbol}','${trade.direction}')">CLOSE ${exch}</button>
+    return `<button class="pov-btn pov-btn-close" onclick="_ovCloseTrade('${d.symbol}','${trade.direction}')">CLOSE HL</button>
             <button class="pov-btn pov-btn-force" onclick="_ovCloseTrade('${d.symbol}','${trade.direction}')">FORCE CLOSE</button>`;
   }
   if (state === 'READY' && d.alert && d.alert_state !== 'STALE') {
     const lev = d.alert.leverage || 5;
-    return `<button class="pov-btn pov-btn-hl"   onclick="_ovOpen('${d.symbol}','${dir}','HL',${lev})">OPEN HL ${lev}x</button>
-            <button class="pov-btn pov-btn-mexc" onclick="_ovOpen('${d.symbol}','${dir}','MEXC',${lev})">OPEN MEXC ${lev}x</button>`;
+    return `<button class="pov-btn pov-btn-hl" onclick="_ovOpen('${d.symbol}','${dir}','HL',${lev})">OPEN HL ${lev}x</button>`;
   }
-  return `<button class="pov-btn pov-btn-watch" disabled>WATCHING HL</button>
-          <button class="pov-btn pov-btn-watch" disabled>WATCHING MEXC</button>`;
+  return `<button class="pov-btn pov-btn-watch" disabled>WATCHING HL</button>`;
 }
 
 function _ovStaleHtml(d) {
@@ -1581,7 +1578,9 @@ function _ovRender(pn, d) {
     const pnl = trade.unrealized_pnl || 0;
     const r   = trade.r || 0;
     const pc  = pnl >= 0 ? '#00e676' : '#ff3d57';
-    pnlHtml = `<div class="pov-pnl"><div class="pov-pnl-usd" style="color:${pc}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</div><div class="pov-pnl-r">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</div></div>`;
+    const el  = trade.elapsed_s || 0;
+    const age = el < 3600 ? `${Math.floor(el/60)}m${el%60}s` : `${Math.floor(el/3600)}h${Math.floor((el%3600)/60)}m`;
+    pnlHtml = `<div class="pov-pnl"><div class="pov-pnl-usd" style="color:${pc}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</div><div class="pov-pnl-r">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</div><div class="pov-pnl-age" id="pov-age">${age}</div></div>`;
   }
 
   const showRuler = (state === 'READY' || state === 'IN_TRADE') && (alert || trade);
@@ -1668,27 +1667,45 @@ function _ovUpdate(pn, d) {
     d.j1h    < 40 ? '#00e676' : d.j1h    > 60 ? '#ff3d57' : '#fff',
     d.rsi15m < 35 ? '#00e676' : d.rsi15m > 65 ? '#ff3d57' : '#fff',
   ];
+  const isL = dir !== 'SHORT';
+  const dotPassCls = (pass) => pass ? (isL ? 'pov-gd pov-gd-pass-l' : 'pov-gd pov-gd-pass-s') : 'pov-gd pov-gd-fail';
   [0, 1, 2].forEach(i => {
     const cur = document.getElementById(`pov-gc-${i}`);
     if (cur) { cur.style.left = `${Math.min(99, vals[i]).toFixed(1)}%`; cur.style.background = cols[i]; }
     const val = document.getElementById(`pov-gv-${i}`);
     if (val) { val.textContent = vals[i].toFixed(0); val.style.color = cols[i]; }
     const dot = document.getElementById(`pov-gd-${i}`);
-    if (dot && _ovPrevGates && _ovPrevGates[i] !== curGates[i]) {
-      dot.classList.remove('pov-gd-flash');
-      void dot.offsetWidth;
-      dot.classList.add('pov-gd-flash');
-      setTimeout(() => dot.classList.remove('pov-gd-flash'), 350);
+    if (dot) {
+      dot.className = dotPassCls(curGates[i]);
+      if (_ovPrevGates && _ovPrevGates[i] !== curGates[i]) {
+        dot.classList.add('pov-gd-flash');
+        setTimeout(() => dot.classList.remove('pov-gd-flash'), 350);
+      }
     }
   });
+  // Gate dot 3 — DEPTH (add to same update pass)
+  const dot3 = document.getElementById('pov-gd-3');
+  if (dot3) {
+    dot3.className = dotPassCls(curGates[3]);
+    if (_ovPrevGates && _ovPrevGates[3] !== curGates[3]) {
+      dot3.classList.add('pov-gd-flash');
+      setTimeout(() => dot3.classList.remove('pov-gd-flash'), 350);
+    }
+  }
   // Depth fills
-  const isL = dir !== 'SHORT';
   const dbid = document.getElementById('pov-dbid');
   const dask = document.getElementById('pov-dask');
   if (dbid) { dbid.style.width = `${Math.min(100,d.bid_pct||0).toFixed(0)}%`; dbid.style.opacity = isL && (d.bid_pct||0) >= 55 ? '0.75' : '0.2'; }
   if (dask) { dask.style.width = `${Math.min(100,d.ask_pct||0).toFixed(0)}%`; dask.style.opacity = !isL && (d.ask_pct||0) >= 55 ? '0.75' : '0.2'; }
   const gv3 = document.getElementById('pov-gv-3');
   if (gv3) { gv3.textContent = `${(isL ? d.bid_pct : d.ask_pct || 0).toFixed(0)}%`; }
+
+  // Trade age timer
+  const ageEl = document.getElementById('pov-age');
+  if (ageEl && state === 'IN_TRADE' && trade) {
+    const el = trade.elapsed_s || 0;
+    ageEl.textContent = el < 3600 ? `${Math.floor(el/60)}m${el%60}s` : `${Math.floor(el/3600)}h${Math.floor((el%3600)/60)}m`;
+  }
 
   // Ruler price dot
   const rdot = document.getElementById('pov-rdot');
