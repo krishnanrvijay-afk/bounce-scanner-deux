@@ -120,7 +120,7 @@ def _compute_ma(candles: list[dict], period: int) -> Optional[float]:
 
 
 def _trend_from_ma(price: float, candles_5m: list, candles_15m: list, candles_1h: list, adx_1h: float = 0.0) -> str:
-    """Multi-timeframe MA consensus: 5M, 15M, 1H each vote BULL/BEAR/NEUTRAL."""
+    """1H-anchored trend: 1H is primary anchor; 15M/5M add conviction but cannot override."""
     def _vote(candles: list, p: float) -> str:
         ma5  = _compute_ma(candles, 5)
         ma10 = _compute_ma(candles, 10)
@@ -131,17 +131,25 @@ def _trend_from_ma(price: float, candles_5m: list, candles_15m: list, candles_1h
             if ma5 < ma10 < ma30 and p < ma10:
                 return "BEAR"
         return "NEUTRAL"
-    votes   = [_vote(candles_5m, price), _vote(candles_15m, price), _vote(candles_1h, price)]
-    bull_tf = votes.count("BULL")
-    bear_tf = votes.count("BEAR")
-    if bull_tf == 3 and adx_1h >= 25:
-        return "Strong Bull"
-    if bull_tf >= 2:
-        return "Bullish"
-    if bear_tf == 3 and adx_1h >= 25:
+    v5m  = _vote(candles_5m,  price)
+    v15m = _vote(candles_15m, price)
+    v1h  = _vote(candles_1h,  price)
+    if v1h == "BEAR" and v15m == "BEAR" and v5m == "BEAR" and adx_1h >= 25:
         return "Strong Bear"
-    if bear_tf >= 2:
+    if v1h == "BEAR" and v15m == "BEAR":
+        return "Strong Bear"
+    if v1h == "BEAR":
         return "Bearish"
+    if v1h == "BULL" and v15m == "BULL" and v5m == "BULL" and adx_1h >= 25:
+        return "Strong Bull"
+    if v1h == "BULL" and v15m == "BULL":
+        return "Strong Bull"
+    if v1h == "BULL":
+        return "Bullish"
+    if v15m == "BEAR" and v5m == "BEAR":
+        return "Bearish"
+    if v15m == "BULL" and v5m == "BULL":
+        return "Bullish"
     return "Neutral"
 
 

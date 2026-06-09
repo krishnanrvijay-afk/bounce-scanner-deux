@@ -293,27 +293,35 @@ function buildCard(p, alerts, trades, changes) {
   const isConf     = longConf || shortConf;
   const confIsLong = longConf;
 
-  // ── Card class + glow ─────────────────────────────────────────────────────────
+  // ── Card class + glow (trend-based — BID%/count gates not used for colour) ────
   let cardCls = 'pair-card';
   let glowStyle;
+  const trend = p.trend || 'Neutral';
   if (inTrade) {
+    // Blue glow — open position always wins
     glowStyle = 'border:1px solid rgba(41,121,255,0.6);box-shadow:0 0 20px rgba(41,121,255,0.15),0 2px 8px rgba(0,0,0,0.6)';
   } else if (longConf) {
+    // J-confluence confirmed LONG — animated green class
     cardCls  += ' card-conf-long';
     glowStyle = '';
   } else if (shortConf) {
+    // J-confluence confirmed SHORT — animated red class
     cardCls  += ' card-conf-short';
     glowStyle = '';
-  } else if (hasAlert && shortFull) {
-    glowStyle = 'border:1px solid rgba(255,61,87,0.8);box-shadow:0 0 20px rgba(255,61,87,0.2),0 2px 8px rgba(0,0,0,0.6)';
-  } else if (hasAlert && longFull) {
-    glowStyle = 'border:1px solid rgba(0,230,118,0.8);box-shadow:0 0 20px rgba(0,230,118,0.2),0 2px 8px rgba(0,0,0,0.6)';
-  } else if (shortCount > longCount) {
-    glowStyle = 'border:1px solid rgba(255,61,87,0.35);box-shadow:0 0 12px rgba(255,61,87,0.08),0 2px 8px rgba(0,0,0,0.6)';
-  } else if (longCount > shortCount) {
-    glowStyle = 'border:1px solid rgba(0,230,118,0.35);box-shadow:0 0 12px rgba(0,230,118,0.08),0 2px 8px rgba(0,0,0,0.6)';
+  } else if (diverge) {
+    // DIVERGENCE badge: trend conflicts with momentum/depth → amber warning
+    glowStyle = 'border:1px solid rgba(245,158,11,0.3);box-shadow:0 0 8px 2px rgba(245,158,11,0.5),0 2px 8px rgba(0,0,0,0.6)';
+  } else if (trend === 'Strong Bear') {
+    glowStyle = 'border:1px solid rgba(239,68,68,0.5);box-shadow:0 0 12px 3px rgba(239,68,68,0.7),0 2px 8px rgba(0,0,0,0.6)';
+  } else if (trend === 'Bearish') {
+    glowStyle = 'border:1px solid rgba(239,68,68,0.3);box-shadow:0 0 8px 2px rgba(239,68,68,0.4),0 2px 8px rgba(0,0,0,0.6)';
+  } else if (trend === 'Strong Bull') {
+    glowStyle = 'border:1px solid rgba(34,197,94,0.5);box-shadow:0 0 12px 3px rgba(34,197,94,0.7),0 2px 8px rgba(0,0,0,0.6)';
+  } else if (trend === 'Bullish') {
+    glowStyle = 'border:1px solid rgba(34,197,94,0.3);box-shadow:0 0 8px 2px rgba(34,197,94,0.4),0 2px 8px rgba(0,0,0,0.6)';
   } else {
-    glowStyle = 'border:1px solid #1e1e1e;box-shadow:0 2px 8px rgba(0,0,0,0.4)';
+    // Neutral or unknown — no glow
+    glowStyle = 'border:1px solid rgba(255,255,255,0.1);box-shadow:none';
   }
 
   // ── Symbol class for confluence name glow ────────────────────────────────────
