@@ -165,13 +165,13 @@
   /* Card footer pills */
   .card-footer { display: flex; gap: 5px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
   .pill { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 7px; border-radius: 3px; letter-spacing: 0.5px; }
-  .pill-scanning  { background: #111; color: #333; border: 1px solid #1a1a1a; }
+  .pill-scanning  { background: #111; color: #777; border: 1px solid #1a1a1a; }
   .pill-near      { background: transparent; color: #fff; border: 1px solid #444; }
   .pill-diverge   { background: rgba(255,170,0,0.1); color: #ffaa00; border: 1px solid rgba(255,170,0,0.3); }
   .pill-alert     { background: rgba(0,255,136,0.12); color: #00ff88; border: 1px solid rgba(0,255,136,0.3); }
   .pill-alert-s   { background: rgba(255,68,68,0.12);  color: #ff4444; border: 1px solid rgba(255,68,68,0.3); }
   .pill-intrade   { background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); }
-  .pill-cd        { background: #111; color: #555; border: 1px solid #1a1a1a; }
+  .pill-cd        { background: #111; color: #aaa; border: 1px solid #1a1a1a; }
   .pill-adxmax    { background: rgba(255,68,68,0.07); color: #ff4444; border: 1px solid rgba(255,68,68,0.2); }
   .pill-ready-long  { background: rgba(0,230,118,0.15); color: #00e676; border: 1px solid rgba(0,230,118,0.45); animation: jb-conf-pulse 2s ease-in-out infinite; }
   .pill-ready-short { background: rgba(255,61,87,0.15);  color: #ff3d57; border: 1px solid rgba(255,61,87,0.45);  animation: jb-conf-pulse 2s ease-in-out infinite; }
@@ -205,7 +205,7 @@
   .pov-chg { font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;margin-left:8px; }
   .pov-pnl { text-align:right; }
   .pov-pnl-usd { font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800; }
-  .pov-pnl-r   { font-family:'JetBrains Mono',monospace;font-size:10px;color:#555;margin-top:2px; }
+  .pov-pnl-r   { font-family:'JetBrains Mono',monospace;font-size:10px;color:#aaa;margin-top:2px; }
   /* Price ruler */
   .pov-ruler-wrap { margin-top:10px; }
   .pov-ruler-hdr  { display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:800;margin-bottom:4px; }
@@ -241,11 +241,11 @@
   /* ADX row */
   .pov-adx-row { display:flex;gap:14px;align-items:flex-start;margin-top:12px;padding:10px 0;border-top:1px solid #0f0f0f; }
   .pov-adx-val { font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:800;line-height:1; }
-  .pov-adx-lbl { font-size:8px;font-weight:800;color:#333;letter-spacing:1px;margin-top:2px; }
+  .pov-adx-lbl { font-size:8px;font-weight:800;color:#aaa;letter-spacing:1px;margin-top:2px; }
   .pov-scans { flex:1;font-family:'JetBrains Mono',monospace;font-size:9px; }
-  .pov-scan-r { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:3px;padding:3px 6px;background:#0d0d0d;border-radius:3px;color:#333; }
+  .pov-scan-r { display:flex;gap:8px;flex-wrap:wrap;margin-bottom:3px;padding:3px 6px;background:#0d0d0d;border-radius:3px;color:#aaa; }
   .pov-scan-fresh { color:#666 !important; }
-  .pov-scan-fresh > span { color:#555 !important; }
+  .pov-scan-fresh > span { color:#ccc !important; }
   /* Stale bar */
   .pov-stale { margin-top:10px;padding:8px 0;border-top:1px solid #0f0f0f; }
   .pov-stale-hdr { display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;margin-bottom:4px; }
@@ -253,7 +253,7 @@
   .pov-sfill { height:100%;border-radius:2px;transition:width 0.5s,background 0.3s; }
   /* History */
   .pov-hist-sec { margin-top:10px;border-top:1px solid #0f0f0f;padding-top:8px; }
-  .pov-hist-lbl { font-size:8px;font-weight:800;color:#333;letter-spacing:1.5px;margin-bottom:6px; }
+  .pov-hist-lbl { font-size:8px;font-weight:800;color:#aaa;letter-spacing:1.5px;margin-bottom:6px; }
   .pov-hr { display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:9px;padding:4px 0;border-bottom:1px solid #0d0d0d;flex-wrap:wrap; }
   /* Action buttons */
   .pov-actions { display:flex;gap:8px;padding:12px 16px 14px;border-top:1px solid #141414; }
@@ -317,7 +317,7 @@
   .ac2-warn { color: #ffaa00; font-size: 12px; margin-left: 2px; }
   .ac2-metric-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
   .ac2-row-pill { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800; padding: 2px 6px; border-radius: 3px; letter-spacing: 1px; flex-shrink: 0; }
-  .ac2-pill-snap { background: rgba(255,255,255,0.06); color: #888; border: 1px solid #2a2a2a; }
+  .ac2-pill-snap { background: rgba(255,255,255,0.06); color: #fff; border: 1px solid #2a2a2a; }
   .ac2-pill-now  { background: rgba(255,170,0,0.1); color: #ffaa00; border: 1px solid rgba(255,170,0,0.3); }
   .ac2-metrics { display: flex; gap: 0; flex: 1; }
   .ac2-metric { display: flex; flex-direction: column; align-items: center; flex: 1; }
@@ -384,7 +384,7 @@
   .pcv2-hdr-l { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
   .pcv2-sym { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; line-height: 1; }
   .pcv2-dir { font-size: 9px; font-weight: 800; padding: 2px 7px; border-radius: 3px; border: 1px solid; letter-spacing: 1px; }
-  .pcv2-sig { font-size: 10px; font-weight: 700; color: #555; letter-spacing: 0.5px; text-transform: uppercase; }
+  .pcv2-sig { font-size: 10px; font-weight: 700; color: #fff; letter-spacing: 0.5px; text-transform: uppercase; }
   .pcv2-sc  { font-size: 9px; font-weight: 700; color: #444; }
   .pcv2-timer { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; color: #777; letter-spacing: 1px; flex-shrink: 0; }
   .pcv2-sub { padding: 0 16px 10px; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #444; }
@@ -465,25 +465,29 @@
   .amber { color: #ffaa00; }
   .red   { color: #ff4444; }
   .blue  { color: #66aaff; }
-  .grey  { color: #555; }
+  .grey  { color: #fff; }
   .white { color: #fff; }
 
   /* ── MARKET HEALTH STRIP ── */
   #mh-strip { display:flex; align-items:center; gap:12px; padding:8px 24px; background:#0a0a0a; border-bottom:1px solid #1a1a1a; flex-wrap:wrap; }
-  .mh-heading { font-family:'Bebas Neue',sans-serif; font-size:11px; letter-spacing:2px; color:#555; white-space:nowrap; }
+  .mh-heading { font-family:'Bebas Neue',sans-serif; font-size:11px; letter-spacing:2px; color:#fff; white-space:nowrap; }
   .mh-cols { display:flex; align-items:center; gap:8px; flex:1; flex-wrap:wrap; }
-  .mh-side-label { font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:800; letter-spacing:1px; color:#666; white-space:nowrap; }
-  .mh-col { display:flex; align-items:center; gap:8px; padding:4px 10px; border-radius:4px; border:1px solid #1a1a1a; flex:1; min-width:180px; }
-  .mh-col-run     { background:rgba(0,230,118,0.06);  border-color:rgba(0,230,118,0.25); }
-  .mh-col-caution { background:rgba(255,170,0,0.06);  border-color:rgba(255,170,0,0.25); }
-  .mh-col-halt    { background:rgba(255,68,68,0.08);  border-color:rgba(255,68,68,0.35); }
-  .mh-badge { font-family:'Bebas Neue',sans-serif; font-size:13px; letter-spacing:2px; white-space:nowrap; }
-  .mh-col-run     .mh-badge { color:#00e676; }
-  .mh-col-caution .mh-badge { color:#ffaa00; }
-  .mh-col-halt    .mh-badge { color:#ff4444; }
-  .mh-rec { font-size:10px; color:#888; flex:1; }
-  .mh-metrics { font-family:'JetBrains Mono',monospace; font-size:9px; color:#444; white-space:nowrap; }
-  .mh-divider { width:1px; height:28px; background:#1a1a1a; }
+  /* Change 5: SHORT/LONG as bold white pills */
+  .mh-side-label { font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; letter-spacing:1px; color:#fff; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.3); border-radius:4px; padding:2px 8px; white-space:nowrap; }
+  /* Change 2: compact column layout, max 80px total height */
+  .mh-col { display:flex; flex-direction:column; gap:3px; padding:6px 12px; border-radius:6px; border:1px solid #1a1a1a; flex:1; min-width:180px; max-height:80px; overflow:hidden; }
+  /* Change 3: static glow only — no keyframes, no animation */
+  .mh-col-run     { background:rgba(0,50,20,0.95);  border-color:rgba(22,163,74,0.4);  box-shadow:0 0 10px 2px rgba(22,163,74,0.7); }
+  .mh-col-caution { background:rgba(60,35,0,0.95);  border-color:rgba(217,119,6,0.4);  box-shadow:0 0 10px 2px rgba(217,119,6,0.7); }
+  .mh-col-halt    { background:rgba(50,0,0,0.95);   border-color:rgba(220,38,38,0.5);  box-shadow:0 0 12px 3px rgba(220,38,38,0.8); }
+  /* Change 2: 13px bold white state label */
+  .mh-badge { font-family:'Bebas Neue',sans-serif; font-size:13px; font-weight:700; letter-spacing:2px; color:#fff; white-space:nowrap; }
+  /* Change 1: context lines 10px white */
+  .mh-ctx { font-size:10px; color:#fff; line-height:1.4; overflow:hidden; }
+  .mh-ctx-line { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mh-rec { display:none; }
+  .mh-metrics { display:none; }
+  .mh-divider { width:1px; height:40px; background:#222; }
 </style>
 </head>
 <body>

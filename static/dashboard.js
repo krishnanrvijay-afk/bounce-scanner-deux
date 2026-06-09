@@ -98,32 +98,61 @@ function updateScanStatus() {
 function renderMarketHealth() {
   const mh = STATE?.market_health;
   const colCls = st => 'mh-col mh-col-' + (st || 'caution').toLowerCase();
-  const rec = (st, side) => {
-    if (st === 'RUN')     return side === 'SHORT' ? 'TC and Bounce SHORTs clear' : 'TC and Bounce LONGs clear';
-    if (st === 'CAUTION') return side === 'SHORT' ? 'Avoid new SHORTs — reversal risk' : 'Avoid new LONGs — momentum weak';
-    if (st === 'HALT')    return 'No new entries — protect open positions';
-    return 'Initialising…';
+
+  // Change 1: dynamic context lines derived from live market_health data
+  const context = (status, side, mh) => {
+    if (!mh) return '<div class="mh-ctx-line">Initialising…</div>';
+    const isBear = side === 'SHORT';
+    const ratio  = isBear ? (mh.bear_ratio ?? 0) : (mh.bull_ratio ?? 0);
+    const total  = mh.total || 10;
+    const pCount = Math.round(ratio * total);
+    const lbl    = isBear ? 'Bear' : 'Bull';
+    const adx    = mh.avg_adx || 0;
+    const j5     = mh.avg_j5  || 50;
+    const slN    = Math.round((mh.sl_rate || 0) * 6);
+    if (status === 'RUN') {
+      return '<div class="mh-ctx-line">✓ All conditions met — ready to fire</div>';
+    }
+    if (status === 'HALT') {
+      const lines = [];
+      if (ratio < 0.3)
+        lines.push(`${lbl} pairs: ${pCount}/${total} → need ${Math.ceil(total * 0.3)}+`);
+      if ((mh.sl_rate || 0) >= 0.6)
+        lines.push(`SL rate: ${slN}/6 → too high (≥4)`);
+      if (isBear  && j5 >= 85 && ratio < 0.5)
+        lines.push(`Avg J5: ${j5.toFixed(1)} → overbought + bears < 50%`);
+      if (!isBear && j5 <= 15 && ratio < 0.5)
+        lines.push(`Avg J5: ${j5.toFixed(1)} → oversold + bulls < 50%`);
+      if (!lines.length) lines.push('Market conditions unsafe');
+      return lines.map(l => `<div class="mh-ctx-line">${l}</div>`).join('');
+    }
+    // CAUTION — show what is missing for RUN
+    const lines = [];
+    if (ratio < 0.6)
+      lines.push(`${lbl} pairs: ${pCount}/${total} → need ${Math.ceil(total * 0.6)}+`);
+    if (adx < 35)
+      lines.push(`Avg ADX: ${adx.toFixed(1)} → need 35`);
+    if (isBear && j5 > 70)
+      lines.push(`Avg J5: ${j5.toFixed(1)} → need ≤70`);
+    if (!isBear && j5 < 30)
+      lines.push(`Avg J5: ${j5.toFixed(1)} → need ≥30`);
+    if ((mh.sl_rate || 0) >= 0.4)
+      lines.push(`SL rate: ${slN}/6 → need <3`);
+    if (!lines.length) lines.push('Near RUN threshold');
+    return lines.map(l => `<div class="mh-ctx-line">${l}</div>`).join('');
   };
-  const metStr = (isBear) => {
-    if (!mh) return '';
-    const n   = isBear ? (mh.bear_count ?? 0) : (mh.bull_count ?? 0);
-    const lbl = isBear ? 'Bearish' : 'Bullish';
-    const slN = Math.round((mh.sl_rate || 0) * 6);
-    return `${lbl} ${n}/${mh.total || '?'} pairs • ADX avg ${(mh.avg_adx||0).toFixed(1)} • J5 avg ${(mh.avg_j5||0).toFixed(1)} • SL rate ${slN}/6`;
-  };
+
   const renderSide = (elId, status, side, isBear) => {
     const el = document.getElementById(elId);
     if (!el) return;
     el.className = colCls(status);
     el.innerHTML =
       `<div class="mh-badge">${status || 'CAUTION'}</div>` +
-      `<div class="mh-rec">${rec(status, side)}</div>` +
-      `<div class="mh-metrics">${metStr(isBear)}</div>`;
+      `<div class="mh-ctx">${context(status, side, mh)}</div>`;
   };
   renderSide('mh-short', mh?.short_status || 'CAUTION', 'SHORT', true);
   renderSide('mh-long',  mh?.long_status  || 'CAUTION', 'LONG',  false);
 }
-
 function render() {
   renderHeader();
   updateNavCounts();
@@ -763,9 +792,9 @@ function buildPosCard(t, prices, pairStates) {
   const dPct  = isLong ? bidPc : askPc;
   const dLbl  = isLong ? 'BID%' : 'ASK%';
 
-  const adxCl = v => v >= 50 ? '#00ff88' : v >= 25 ? '#ffaa00' : '#aaa';
-  const rsiCl = v => v > 65  ? '#ff4444' : v < 35  ? '#00ff88' : '#aaa';
-  const jCl   = v => v > 80  ? '#ff4444' : v < 20  ? '#00ff88' : '#aaa';
+  const adxCl = v => v >= 50 ? '#00ff88' : v >= 25 ? '#ffaa00' : '#fff';
+  const rsiCl = v => v > 65  ? '#ff4444' : v < 35  ? '#00ff88' : '#fff';
+  const jCl   = v => v > 80  ? '#ff4444' : v < 20  ? '#00ff88' : '#fff';
   const dCol  = isLong ? (bidPc >= 60 ? '#00ff88' : '#ff4444') : (askPc >= 60 ? '#00ff88' : '#ff4444');
 
   // Scan narrative
@@ -983,7 +1012,7 @@ function renderStatsPanel(log) {
 
   var pairRows = s.byPair.map(function(p) {
     return '<div class="srow">' +
-      '<span class="srow-label" style="color:#aaa">' + p.sym.replace("USDT","") + '</span>' +
+      '<span class="srow-label" style="color:#fff">' + p.sym.replace("USDT","") + '</span>' +
       '<span class="srow-count">' + p.trades + '</span>' +
       '<span class="srow-wr" style="color:' + wrColor(p.winRate) + '">' + pct(p.winRate) + '</span>' +
       '<span class="srow-pnl" style="color:' + pnlC(p.netPnl) + '">' + dollar(p.netPnl) + '</span>' +
@@ -1076,8 +1105,8 @@ function renderLogTab() {
     return `<tr>
       <td style="font-weight:700;font-size:12px;">${r.symbol}</td>
       <td style="color:${isLong?'#00ff88':'#ff4444'};font-weight:700;">${r.direction}</td>
-      <td style="color:#888;">${r.tier||'—'}</td>
-      <td style="color:#aaa;">${r.leverage||'—'}x</td>
+      <td style="color:#fff;">${r.tier||'—'}</td>
+      <td style="color:#fff;">${r.leverage||'—'}x</td>
       <td>${fmtPrice(r.entry_price)}</td>
       <td>${fmtPrice(r.exit_price)}</td>
       <td style="color:#ff4444;">${fmtPrice(r.sl_price)}</td>
@@ -1245,11 +1274,11 @@ function _ovGateBarsHtml(d, dir) {
   const dotCls  = (pass) => pass
     ? (isL ? 'pov-gd pov-gd-pass-l' : 'pov-gd pov-gd-pass-s')
     : 'pov-gd pov-gd-fail';
-  const j15Col  = j15m < 20 ? '#00e676' : j15m > 80 ? '#ff3d57' : '#666';
-  const j1hCol  = j1h  < 40 ? '#00e676' : j1h  > 60 ? '#ff3d57' : '#666';
-  const rsiCol  = rsi  < 35 ? '#00e676' : rsi  > 65 ? '#ff3d57' : '#666';
+  const j15Col  = j15m < 20 ? '#00e676' : j15m > 80 ? '#ff3d57' : '#fff';
+  const j1hCol  = j1h  < 40 ? '#00e676' : j1h  > 60 ? '#ff3d57' : '#fff';
+  const rsiCol  = rsi  < 35 ? '#00e676' : rsi  > 65 ? '#ff3d57' : '#fff';
   const depPct  = isL ? bid : ask;
-  const depCol  = gArr[3] ? (isL ? '#00e676' : '#ff3d57') : '#444';
+  const depCol  = gArr[3] ? (isL ? '#00e676' : '#ff3d57') : '#aaa';
   const bidW    = Math.min(100, Math.max(0, bid));
   const askW    = Math.min(100, Math.max(0, ask));
   return `
@@ -1369,13 +1398,13 @@ function _ovStaleHtml(d) {
 function _ovScanRowsHtml(snaps) {
   if (!snaps || !snaps.length) return `<div style="color:#2a2a2a;font-size:9px">no scan data yet</div>`;
   return snaps.map((s, i) => {
-    const lc = (s.score_long  || 0) === 4 ? '#00e676' : '#444';
-    const sc = (s.score_short || 0) === 4 ? '#ff3d57' : '#444';
-    const jc = (s.j15m || 50) < 20 ? '#00e676' : (s.j15m || 50) > 80 ? '#ff3d57' : '#666';
+    const lc = (s.score_long  || 0) === 4 ? '#00e676' : '#555';
+    const sc = (s.score_short || 0) === 4 ? '#ff3d57' : '#555';
+    const jc = (s.j15m || 50) < 20 ? '#00e676' : (s.j15m || 50) > 80 ? '#ff3d57' : '#fff';
     return `<div class="pov-scan-r ${i === 0 ? 'pov-scan-fresh' : ''}">
-      <span style="color:#333">#${s.n}</span>
+      <span style="color:#aaa">#${s.n}</span>
       <span>J:<span style="color:${jc}">${(s.j15m||0).toFixed(0)}</span></span>
-      <span>RSI:<span style="color:#666">${(s.rsi15m||0).toFixed(0)}</span></span>
+      <span>RSI:<span style="color:#fff">${(s.rsi15m||0).toFixed(0)}</span></span>
       <span>B:<span style="color:${(s.bid_pct||0)>=55?'#00e676':'#555'}">${(s.bid_pct||0).toFixed(0)}%</span></span>
       <span>A:<span style="color:${(s.ask_pct||0)>=55?'#ff3d57':'#555'}">${(s.ask_pct||0).toFixed(0)}%</span></span>
       <span>ADX:<span style="color:${(s.adx1h||0)>=50?'#00e676':'#555'}">${(s.adx1h||0).toFixed(0)}</span></span>
@@ -1525,9 +1554,9 @@ function _ovUpdate(pn, d) {
   const curGates = _ovGates(d, dir);
   const vals     = [d.j15m||0, d.j1h||0, d.rsi15m||0];
   const cols     = [
-    d.j15m   < 20 ? '#00e676' : d.j15m   > 80 ? '#ff3d57' : '#666',
-    d.j1h    < 40 ? '#00e676' : d.j1h    > 60 ? '#ff3d57' : '#666',
-    d.rsi15m < 35 ? '#00e676' : d.rsi15m > 65 ? '#ff3d57' : '#666',
+    d.j15m   < 20 ? '#00e676' : d.j15m   > 80 ? '#ff3d57' : '#fff',
+    d.j1h    < 40 ? '#00e676' : d.j1h    > 60 ? '#ff3d57' : '#fff',
+    d.rsi15m < 35 ? '#00e676' : d.rsi15m > 65 ? '#ff3d57' : '#fff',
   ];
   [0, 1, 2].forEach(i => {
     const cur = document.getElementById(`pov-gc-${i}`);
