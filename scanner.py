@@ -21,6 +21,7 @@ _last_scores: dict[str, int]   = {}   # keyed "BTCSHORT" / "BTCLONG"
 _cooldowns:   dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" → expiry ts
 _scan_count:  int              = 0
 _pending:     dict[str, dict]  = {}   # first-scan confirmed, awaiting 2nd
+_stale_prices: set[str]        = set()  # symbols with 2 consecutive missing prices
 
 
 # ── Indicator helpers ─────────────────────────────────────────────────────────
@@ -317,8 +318,16 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             candles_5m, candles_15m, candles_1h, book, price = await _fetch_pair_data(hl_client, symbol)
 
             if not price or price == 0:
-                log.warning(f"[SCAN] {symbol} — no price, skipping")
-                continue
+                log.warning(f"[SCAN] {symbol} — no price, retrying in 2s...")
+                await asyncio.sleep(2)
+                price = await hl_client.get_price(symbol)
+                if not price or price == 0:
+                    log.warning(f"[PRICE STALE] {symbol} — two consecutive no price responses")
+                    _stale_prices.add(symbol)
+                    continue
+                _stale_prices.discard(symbol)
+            else:
+                _stale_prices.discard(symbol)
 
             # ── Indicators ────────────────────────────────────────────────────
             _, _, j5m  = _compute_kdj(candles_5m)

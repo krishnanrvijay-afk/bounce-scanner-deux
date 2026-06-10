@@ -52,6 +52,7 @@ TELEGRAM_BOT_TOKEN  = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID    = int(os.environ.get("TELEGRAM_CHAT_ID", "0") or "0")
 TELEGRAM_ENABLED    = os.environ.get("TELEGRAM_ENABLED", "true").lower() == "true"
 _pending_reminders: dict = {}
+_stale_tg_sent: set[str] = set()  # symbols for which stale-price TG alert was already sent
 
 # ── Global safety state ────────────────────────────────────────────────────────
 consecutive_losses:     int   = 0
@@ -76,6 +77,7 @@ class AppState:
         self.last_scan_at:         Optional[int]     = None
         self.scan_snapshots:       dict              = {}  # symbol -> last 3 scan snapshots
         self.market_health:        dict              = {}
+        self.price_stale:          dict[str, bool]   = {}  # symbols with stale price feed
 
     @property
     def slots_used(self) -> int:
@@ -735,6 +737,7 @@ async def _scan_loop():
     while True:
         try:
             new_alerts = await run_full_scan(hl_client, market_health=app_state.market_health)
+            _check_stale_prices()
             app_state.last_scan_at = int(time.time())
             app_state.pair_states  = await scan_pair_state(hl_client)
             app_state.market_health = compute_market_health(
@@ -852,6 +855,30 @@ async def _price_loop():
         await asyncio.sleep(PRICE_INTERVAL_SECONDS)
 
 
+def _check_stale_prices() -> None:
+    """Send a one-shot Telegram alert when a pair with an open trade loses price data."""
+    global _stale_tg_sent
+    stale: set[str] = set(_scanner_mod._stale_prices)
+
+    for sym in stale:
+        app_state.price_stale[sym] = True
+        has_trade = any(t.get("symbol") == sym for t in app_state.open_trades.values())
+        if has_trade and sym not in _stale_tg_sent:
+            _stale_tg_sent.add(sym)
+            msg = (
+                f"⚠️ PRICE STALE — {sym} — "
+                f"no price for 2 consecutive scans. "
+                f"Open trade at risk. Check manually."
+            )
+            print(f"[PRICE STALE] {sym} — Telegram alert sent")
+            if TELEGRAM_ENABLED:
+                threading.Thread(target=lambda m=msg: _tg_post(m), daemon=True).start()
+
+    for sym in list(_stale_tg_sent):
+        if sym not in stale:
+            _stale_tg_sent.discard(sym)
+            app_state.price_stale.pop(sym, None)
+
 # ── Exit monitor helpers ───────────────────────────────────────────────────────
 
 def _compute_r(pnl: float, trade: dict) -> float:
@@ -865,6 +892,9 @@ def _compute_r(pnl: float, trade: dict) -> float:
 
 def _do_hc_partial_close(key: str, trade: dict, exit_price: float):
     """HC Score-10: close 1/3 at 1.5R, move SL to entry (breakeven)."""
+    if not exit_price or exit_price <= 0:
+        print(f"[EXIT GUARD] {trade.get('symbol')} {trade.get('direction')} — refused HC partial close: exit_price={exit_price!r} is null/zero — skipping")
+        return
     sym, direction = trade["symbol"], trade["direction"]
     full_size = trade.get("remaining_size", trade["size"])
     close_sz  = full_size / 3
@@ -888,6 +918,9 @@ def _do_hc_partial_close(key: str, trade: dict, exit_price: float):
 
 def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
     """Synchronous internal close — no exchange call, price already known."""
+    if not exit_price or exit_price <= 0:
+        print(f"[EXIT GUARD] {trade.get('symbol')} {trade.get('direction')} — refused close (reason={reason}): exit_price={exit_price!r} is null/zero — skipping")
+        return
     sym       = trade["symbol"]
     direction = trade["direction"]
     remaining = trade.get("remaining_size", trade["size"])
@@ -925,6 +958,9 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
 
 def _do_partial_close_tp1(key: str, trade: dict, exit_price: float):
     """Close half the position at TP1, keep remainder open watching for TP2."""
+    if not exit_price or exit_price <= 0:
+        print(f"[EXIT GUARD] {trade.get('symbol')} {trade.get('direction')} — refused TP1 close: exit_price={exit_price!r} is null/zero — skipping")
+        return
     sym       = trade["symbol"]
     direction = trade["direction"]
     full_size = trade.get("remaining_size", trade["size"])
@@ -974,7 +1010,7 @@ async def _exit_monitor_loop():
                 tp1_hit   = trade.get("tp1_hit", False)
                 is_short  = direction == "SHORT"
 
-                if current is None or not sl_price:
+                if not current or current <= 0 or not sl_price:
                     print(f"[EXIT CHECK] {sym} {direction} skipped — "
                           f"no price ({current}) or no sl ({sl_price})")
                     continue
