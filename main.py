@@ -53,6 +53,10 @@ TELEGRAM_CHAT_ID    = int(os.environ.get("TELEGRAM_CHAT_ID", "0") or "0")
 TELEGRAM_ENABLED    = os.environ.get("TELEGRAM_ENABLED", "true").lower() == "true"
 _pending_reminders: dict = {}
 _stale_tg_sent: set[str] = set()  # symbols for which stale-price TG alert was already sent
+_session_sl_counts: dict[str, int]   = {}    # "SYMBOL_DIRECTION_SESSION" -> SL count
+_session_halted:    set[str]         = set() # "SYMBOL_DIRECTION_SESSION" halted for session
+_large_sl_cooldowns: dict[str, float] = {}   # "SYMBOLDIR" -> expiry ts for 90-min cooldowns
+_prev_session:      str              = ""
 
 # ── Global safety state ────────────────────────────────────────────────────────
 consecutive_losses:     int   = 0
@@ -143,13 +147,18 @@ class AppState:
             cd_l = get_cooldown_remaining(sym, "LONG")
             pair_states_out[i] = {
                 **ps,
-                "in_trade":      in_trade,
-                "cooldown_short": cd_s,
-                "cooldown_long":  cd_l,
+                "in_trade":           in_trade,
+                "cooldown_short":     cd_s,
+                "cooldown_long":      cd_l,
+                "session_halted_long":  f"{sym}_LONG_{get_session_name()}"  in _session_halted,
+                "session_halted_short": f"{sym}_SHORT_{get_session_name()}" in _session_halted,
+                "large_sl_cd_long":     (lambda v: v or None)(max(0, int(_large_sl_cooldowns.get(f"{sym}LONG",  0) - time.time()))),
+                "large_sl_cd_short":    (lambda v: v or None)(max(0, int(_large_sl_cooldowns.get(f"{sym}SHORT", 0) - time.time()))),
             }
 
         return {
             "pair_states":    pair_states_out,
+            "session":        get_session_name(),
             "alerts":         self.alerts,
             "pending_alerts": get_pending(),
             "prices":         self.prices,
@@ -738,6 +747,16 @@ async def _scan_loop():
         try:
             new_alerts = await run_full_scan(hl_client, market_health=app_state.market_health)
             _check_stale_prices()
+            # Session change detection — reset per-pair session halts when session rolls
+            global _prev_session
+            _curr_sess = get_session_name()
+            if _prev_session and _curr_sess != _prev_session:
+                _gone = [k for k in list(_session_sl_counts) if k.endswith(f"_{_prev_session}")]
+                for _k in _gone:
+                    _session_sl_counts.pop(_k, None)
+                    _session_halted.discard(_k)
+                print(f"[SESSION RESET] {_prev_session} session ended — clearing all session halts.")
+            _prev_session = _curr_sess
             app_state.last_scan_at = int(time.time())
             app_state.pair_states  = await scan_pair_state(hl_client)
             app_state.market_health = compute_market_health(
@@ -764,6 +783,12 @@ async def _scan_loop():
 
             for alert in new_alerts:
                 sym, dir_ = alert["symbol"], alert["direction"]
+
+                # Session halt gate
+                _sg = f"{sym}_{dir_}_{get_session_name()}"
+                if _sg in _session_halted:
+                    print(f"[GATE] SESSION HALT — {sym} {dir_} halted for {get_session_name()} session (2 SL hits)")
+                    continue
 
                 # Issue 2 fix: set cooldown immediately when alert fires so scanner
                 # stops re-confirming the same signal on subsequent scans
@@ -1029,6 +1054,21 @@ async def _exit_monitor_loop():
                     print(f"[EXIT CHECK] {sym} {direction} price={current} "
                           f"sl={sl_price} tp1={tp1_price} → SL BREACHED → closing")
                     _do_close_trade(key, trade, current, "SL")
+                    # Per-pair direction session SL count
+                    _skey = f"{sym}_{direction}_{get_session_name()}"
+                    _session_sl_counts[_skey] = _session_sl_counts.get(_skey, 0) + 1
+                    if _session_sl_counts[_skey] >= 2 and _skey not in _session_halted:
+                        _session_halted.add(_skey)
+                        print(f"[SESSION HALT] {sym} {direction} — 2 SL hits in {get_session_name()} session. Halted for remainder of session.")
+                    # $100 SL cooldown — override with 90-min directional cooldown
+                    _rem_sz = trade.get("remaining_size", trade.get("size", 0))
+                    _sl_pnl = (current - trade["entry_price"]) * _rem_sz if not is_short \
+                              else (trade["entry_price"] - current) * _rem_sz
+                    if abs(_sl_pnl) >= 100:
+                        _exp = time.time() + 90 * 60
+                        _scanner_mod._cooldowns[f"{sym}{direction}"] = _exp
+                        _large_sl_cooldowns[f"{sym}{direction}"]     = _exp
+                        print(f"[LARGE SL COOLDOWN] {sym} {direction} — SL ${abs(_sl_pnl):.2f} >= $100 threshold. 90 min cooldown applied.")
                     continue
 
                 # ── HC early partial close at 1.5R → SL to breakeven ────────────
@@ -1246,6 +1286,14 @@ async def get_pair(symbol: str):
         "confluence_long":     confluence_long,
         "confluence_short":    confluence_short,
         "trend":               ps.get("trend"),
+        "session_halted_long":  f"{symbol}_LONG_{get_session_name()}"  in _session_halted,
+        "session_halted_short": f"{symbol}_SHORT_{get_session_name()}" in _session_halted,
+        "large_sl_cooldown_long_remaining":  (lambda v: v or None)(max(0, int(_large_sl_cooldowns.get(f"{symbol}LONG",  0) - time.time()))),
+        "large_sl_cooldown_short_remaining": (lambda v: v or None)(max(0, int(_large_sl_cooldowns.get(f"{symbol}SHORT", 0) - time.time()))),
+        "session_halt_reason":  "2 SL hits this session — resumes at next session open" if (
+            f"{symbol}_LONG_{get_session_name()}"  in _session_halted or
+            f"{symbol}_SHORT_{get_session_name()}" in _session_halted
+        ) else None,
     }
 
 
@@ -1262,6 +1310,18 @@ class OpenTradeRequest(BaseModel):
 
 @app.post("/api/trade/open")
 async def open_trade(req: OpenTradeRequest):
+    # Session halt gate (also applies to manual overlay entry)
+    _s_gate = f"{req.symbol}_{req.direction}_{get_session_name()}"
+    if _s_gate in _session_halted:
+        raise HTTPException(status_code=400,
+            detail=f"{req.symbol} {req.direction} halted for {get_session_name()} session — 2 SL hits. Resumes at next session open.")
+    # Large SL cooldown gate
+    _lcd_k = f"{req.symbol}{req.direction}"
+    if _lcd_k in _large_sl_cooldowns and _large_sl_cooldowns[_lcd_k] > time.time():
+        _lcd_rem = max(0, int(_large_sl_cooldowns[_lcd_k] - time.time()))
+        _lcd_m, _lcd_s = divmod(_lcd_rem, 60)
+        raise HTTPException(status_code=400,
+            detail=f"{req.symbol} {req.direction} — 90 min cooldown active, {_lcd_m}m{_lcd_s}s remaining. Large SL hit.")
     # Manual entry via overlay — always permitted regardless of LIVE_MANUAL_ENTRY_ONLY setting.
     alert_data = None
     for a in app_state.alerts:
@@ -1281,7 +1341,18 @@ async def open_trade(req: OpenTradeRequest):
     )
     if err:
         code = 400 if err in ("cap_reached", "already_open", "circuit_breaker", "daily_limit") else 500
-        raise HTTPException(status_code=code, detail=err)
+        if err == "daily_limit":
+            detail = (f"Daily loss limit reached — ${daily_pnl:.2f} of ${DAILY_LOSS_LIMIT:.0f}."
+                      " Tap Reset Session to resume trading.")
+        elif err == "circuit_breaker":
+            detail = (f"Circuit breaker active — {consecutive_losses} consecutive losses."
+                      " Tap Reset Session to resume.")
+        elif err == "cap_reached":
+            detail = (f"Margin cap reached — ${app_state.margin_deployed:.0f} of ${MARGIN_HARD_CAP:.0f} deployed."
+                      " Close a position to continue.")
+        else:
+            detail = err
+        raise HTTPException(status_code=code, detail=detail)
     return {"status": "ok", "trade": trade}
 
 
@@ -1341,6 +1412,21 @@ async def reset_circuit_breaker():
     consecutive_losses     = 0
     print("[CIRCUIT BREAKER RESET] manual reset")
     return {"status": "ok", "circuit_breaker_active": False, "consecutive_losses": 0}
+
+
+@app.post("/api/reset-session")
+async def reset_session():
+    global daily_pnl, trading_halted_today, consecutive_losses, circuit_breaker_active
+    daily_pnl              = 0.0
+    trading_halted_today   = False
+    consecutive_losses     = 0
+    circuit_breaker_active = False
+    _session_sl_counts.clear()
+    _session_halted.clear()
+    _large_sl_cooldowns.clear()
+    clear_all_scanner_state()
+    print("[SESSION RESET] manual reset — daily P&L, cooldowns, circuit breaker cleared")
+    return {"reset": True, "message": "Session reset — daily P&L, cooldowns and circuit breaker cleared"}
 
 
 # ── Daily reset ───────────────────────────────────────────────────────────────

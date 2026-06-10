@@ -206,6 +206,7 @@ function renderHeader() {
     }
   }
   document.getElementById('cb-badge').style.display    = circuit_breaker?.active ? 'block' : 'none';
+  renderResetSessionBtn();
 }
 
 // ── Market popover ────────────────────────────────────────────────────────────
@@ -403,6 +404,16 @@ function buildCard(p, alerts, trades, changes) {
     if (diverge)   pills += `<span class="pill pill-diverge">DIVERGENCE</span>`;
     if (nearTrig)  pills += `<span class="pill pill-near">NEAR TRIGGER</span>`;
     if (adxFade)   pills += `<span class="pill pill-adxmax">ADX ${adx1h.toFixed(0)} FADE MAX</span>`;
+    // Session halt + large SL CD pills
+    const _sess      = STATE.session || '';
+    const _sHaltL    = p.session_halted_long;
+    const _sHaltS    = p.session_halted_short;
+    const _lgCDL     = p.large_sl_cd_long  || 0;
+    const _lgCDS     = p.large_sl_cd_short || 0;
+    if (_sHaltL) pills += `<span class="pill pill-halted">LONG HALTED — ${_sess}</span>`;
+    if (_sHaltS) pills += `<span class="pill pill-halted">SHORT HALTED — ${_sess}</span>`;
+    if (!_sHaltL && _lgCDL > 0) pills += `<span class="pill pill-cd-large">COOLDOWN ${fmtCd(_lgCDL)}</span>`;
+    if (!_sHaltS && _lgCDS > 0) pills += `<span class="pill pill-cd-large">COOLDOWN ${fmtCd(_lgCDS)}</span>`;
     if (shortFull && hasAlert) pills += `<span class="pill pill-alert-s">▼ ALERT</span>`;
     if (longFull  && hasAlert) pills += `<span class="pill pill-alert">▲ ALERT</span>`;
   }
@@ -1476,7 +1487,17 @@ function _ovActionsHtml(d, state, dir, trade) {
   const wCol = (d.trend === 'Strong Bull' || d.trend === 'Bullish') ? '#00e676'
              : (d.trend === 'Strong Bear' || d.trend === 'Bearish') ? '#ff3d57'
              :                                                         '#aaa';
-  return `<button class="pov-btn pov-btn-watch" disabled style="color:${wCol};border-color:${wCol};font-weight:700">WATCHING HL</button>`;
+  // Session halt / large SL CD status above WATCHING button
+  const _ovSessHalt = (dir === 'LONG' ? d.session_halted_long : d.session_halted_short) || false;
+  const _ovLgCDRem  = (dir === 'LONG' ? d.large_sl_cooldown_long_remaining : d.large_sl_cooldown_short_remaining) || 0;
+  let _ovStatusHtml = '';
+  if (_ovSessHalt) {
+    _ovStatusHtml = `<div id="pov-halt-info" style="font-size:9px;color:#ff4444;font-family:'JetBrains Mono',monospace;font-weight:700;margin-bottom:6px;text-align:center">🚫 2 SL hits this session — resumes at next session open</div>`;
+  } else if (_ovLgCDRem > 0) {
+    const _m = Math.floor(_ovLgCDRem / 60), _s = _ovLgCDRem % 60;
+    _ovStatusHtml = `<div id="pov-cd-rem" style="font-size:9px;color:#ffaa00;font-family:'JetBrains Mono',monospace;font-weight:700;margin-bottom:6px;text-align:center">⏳ 90 min cooldown: ${_m}m${_s}s remaining</div>`;
+  }
+  return `${_ovStatusHtml}<button class="pov-btn pov-btn-watch" disabled style="color:${wCol};border-color:${wCol};font-weight:700">WATCHING HL</button>`;
 }
 
 function _ovStaleHtml(d) {
@@ -1744,6 +1765,18 @@ function _ovUpdate(pn, d) {
   const actEl = document.getElementById('pov-actions');
   if (actEl) actEl.innerHTML = _ovActionsHtml(d, state, dir, trade);
 
+  // Session halt / large SL CD live refresh
+  const _ovHaltEl = document.getElementById('pov-halt-info');
+  const _ovCdEl   = document.getElementById('pov-cd-rem');
+  if (_ovCdEl) {
+    const _rem = (dir === 'LONG' ? d.large_sl_cooldown_long_remaining : d.large_sl_cooldown_short_remaining) || 0;
+    if (_rem > 0) {
+      const _m = Math.floor(_rem / 60), _s = _rem % 60;
+      _ovCdEl.textContent = `⏳ 90 min cooldown: ${_m}m${_s}s remaining`;
+    } else {
+      _ovCdEl.textContent = '';
+    }
+  }
   _ovPrevGates = curGates;
 }
 
@@ -1787,6 +1820,69 @@ async function _ovCloseTrade(sym, dir) {
     _ovFetch(sym, true);
   } catch (e) { alert('Request failed'); }
 }
+
+// ── Reset Session ──────────────────────────────────────────────────────────────────────
+function renderResetSessionBtn() {
+  if (document.getElementById('reset-session-btn')) return;
+  const mb = document.getElementById('mode-badge');
+  if (!mb || !mb.parentNode) return;
+  const btn = document.createElement('button');
+  btn.id        = 'reset-session-btn';
+  btn.className = 'reset-session-btn';
+  btn.textContent = 'RESET SESSION';
+  btn.onclick   = showResetSessionModal;
+  mb.parentNode.insertBefore(btn, mb.nextSibling);
+}
+
+function showResetSessionModal() {
+  if (document.getElementById('reset-session-modal')) return;
+  const modal = document.createElement('div');
+  modal.id = 'reset-session-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999';
+  modal.innerHTML = [
+    '<div style="background:#111;border:1px solid rgba(255,170,0,0.4);border-radius:10px;padding:24px 28px;max-width:340px;width:90%;font-family:\'JetBrains Mono\',monospace">',
+    '<div style="color:#ffaa00;font-size:11px;font-weight:700;margin-bottom:12px;letter-spacing:0.08em">RESET SESSION</div>',
+    '<div style="color:#ccc;font-size:10px;line-height:1.6;margin-bottom:18px">This will reset daily P&amp;L, consecutive losses, circuit breaker, and all cooldowns. Trade log will NOT be cleared. Confirm?</div>',
+    '<div style="display:flex;gap:10px">',
+    '<button onclick="confirmResetSession()" style="flex:1;padding:8px 0;background:transparent;border:1px solid #ffaa00;border-radius:6px;color:#ffaa00;font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:700;cursor:pointer">CONFIRM</button>',
+    '<button onclick="cancelResetSession()" style="flex:1;padding:8px 0;background:transparent;border:1px solid #555;border-radius:6px;color:#888;font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:700;cursor:pointer">CANCEL</button>',
+    '</div></div>',
+  ].join('');
+  document.body.appendChild(modal);
+}
+
+function cancelResetSession() {
+  const m = document.getElementById('reset-session-modal');
+  if (m) m.remove();
+}
+
+async function confirmResetSession() {
+  try {
+    const r = await fetch('/api/reset-session', { method: 'POST' });
+    if (!r.ok) {
+      const d = await r.json();
+      alert('Reset failed: ' + (d.detail || 'error'));
+      return;
+    }
+    cancelResetSession();
+    fetchState();
+  } catch (e) { alert('Request failed'); }
+}
+
+// Injected styles for session halt + large SL CD pills and RESET SESSION button
+(function _injectStyles() {
+  const id = 'bounce-extra-styles';
+  if (document.getElementById(id)) return;
+  const s = document.createElement('style');
+  s.id = id;
+  s.textContent = [
+    '.pill-halted{background:rgba(255,68,68,0.12);color:#ff4444;border:1px solid rgba(255,68,68,0.4);border-radius:4px;font-size:8px;padding:2px 6px;font-family:\'JetBrains Mono\',monospace;font-weight:700}',
+    '.pill-cd-large{background:rgba(255,170,0,0.12);color:#ffaa00;border:1px solid rgba(255,170,0,0.4);border-radius:4px;font-size:8px;padding:2px 6px;font-family:\'JetBrains Mono\',monospace;font-weight:700}',
+    '.reset-session-btn{background:transparent;border:1px solid #ffaa00;border-radius:5px;color:#ffaa00;font-family:\'JetBrains Mono\',monospace;font-size:9px;font-weight:700;padding:3px 8px;cursor:pointer;letter-spacing:0.06em;margin-left:6px;vertical-align:middle}',
+    '.reset-session-btn:hover{background:rgba(255,170,0,0.1)}',
+  ].join('');
+  document.head.appendChild(s);
+})();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmtPrice(p) {
