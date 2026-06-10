@@ -204,7 +204,7 @@ def score_bounce_short(j15m, j1h, rsi15m, ask_pct, adx,
                        stoch_k: float = 50.0, stoch_d: float = 50.0,
                        stoch_k_prev: float = 50.0, stoch_d_prev: float = 50.0) -> tuple[int, str, int]:
     tier, lev = _leverage_tier(adx)
-    stoch_gate = stoch_k > 75 and stoch_k_prev >= stoch_d_prev and stoch_k < stoch_d
+    stoch_gate = stoch_k > 75 and stoch_k < stoch_d
     if not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN
             and stoch_gate and ask_pct >= DEPTH_GATE_PCT):
         return 0, tier, lev
@@ -222,7 +222,7 @@ def score_bounce_long(j15m, j1h, rsi15m, bid_pct, adx,
                       stoch_k: float = 50.0, stoch_d: float = 50.0,
                       stoch_k_prev: float = 50.0, stoch_d_prev: float = 50.0) -> tuple[int, str, int]:
     tier, lev = _leverage_tier(adx)
-    stoch_gate = stoch_k < 25 and stoch_k_prev <= stoch_d_prev and stoch_k > stoch_d
+    stoch_gate = stoch_k < 25 and stoch_k > stoch_d
     if not (j15m < J15M_LONG_GATE and j1h < J1H_LONG_MAX
             and stoch_gate and bid_pct >= DEPTH_GATE_PCT):
         return 0, tier, lev
@@ -410,8 +410,8 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                 if direction == "SHORT":
                     g_j15m  = j15m > J15M_SHORT_GATE
                     g_j1h   = j1h  > J1H_SHORT_MIN
-                    g_stoch = (stoch_k > 75 and stoch_k_prev >= stoch_d_prev
-                               and stoch_k < stoch_d)
+                    g_stoch = stoch_k > 75 and stoch_k < stoch_d
+
                     g_depth = ask_pct >= DEPTH_GATE_PCT
                     score, tier, lev = score_bounce_short(
                         j15m, j1h, rsi15m, ask_pct, adx1h, j5m=j5m, trend=trend,
@@ -419,13 +419,13 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                         stoch_k_prev=stoch_k_prev, stoch_d_prev=stoch_d_prev)
                     log_gates = (f"j15m={j15m:.1f}(need>{J15M_SHORT_GATE}) "
                                  f"j1h={j1h:.1f}(need>{J1H_SHORT_MIN}) "
-                                 f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need>75,cross) "
+                                 f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need>75,k<d) "
                                  f"ask={ask_pct:.1f}%(need>={DEPTH_GATE_PCT}%)")
                 else:
                     g_j15m  = j15m < J15M_LONG_GATE
                     g_j1h   = j1h  < J1H_LONG_MAX
-                    g_stoch = (stoch_k < 25 and stoch_k_prev <= stoch_d_prev
-                               and stoch_k > stoch_d)
+                    g_stoch = stoch_k < 25 and stoch_k > stoch_d
+
                     g_depth = bid_pct >= DEPTH_GATE_PCT
                     score, tier, lev = score_bounce_long(
                         j15m, j1h, rsi15m, bid_pct, adx1h, j5m=j5m, trend=trend,
@@ -433,7 +433,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                         stoch_k_prev=stoch_k_prev, stoch_d_prev=stoch_d_prev)
                     log_gates = (f"j15m={j15m:.1f}(need<{J15M_LONG_GATE}) "
                                  f"j1h={j1h:.1f}(need<{J1H_LONG_MAX}) "
-                                 f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need<25,cross) "
+                                 f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need<25,k>d) "
                                  f"bid={bid_pct:.1f}%(need>={DEPTH_GATE_PCT}%)")
 
                 # ── GATE3 log — every scan when >= 3 of 4 gates pass ────────────

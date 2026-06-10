@@ -284,8 +284,8 @@ function buildCard(p, alerts, trades, changes) {
                  : '#ffffff';
 
   // Gate counts
-  const shortGates = [j15m > 80, j1h > 60, stochK > 75 && stochKPrev >= stochDPrev && stochK < stochD, askPct >= 55];
-  const longGates  = [j15m < 20, j1h < 40, stochK < 25 && stochKPrev <= stochDPrev && stochK > stochD, bidPct >= 55];
+  const shortGates = [j15m > 80, j1h > 60, stochK > 75 && stochK < stochD, askPct >= 55];
+  const longGates  = [j15m < 20, j1h < 40, stochK < 25 && stochK > stochD, bidPct >= 55];
   const shortCount = shortGates.filter(Boolean).length;
   const longCount  = longGates.filter(Boolean).length;
   const shortFull  = shortCount === 4;
