@@ -816,20 +816,23 @@ function buildPosCard(t, prices, pairStates) {
   const adx   = ps.adx1h  ?? t.adx1h  ?? 0;
   const rsi   = ps.rsi15m ?? t.rsi15m ?? 0;
   const j15m  = ps.j15m   ?? t.j15m   ?? 0;
+  const sK    = ps.stoch_k ?? t.stoch_k ?? 0;
+  const sD    = ps.stoch_d ?? t.stoch_d ?? 0;
   const bidPc = ps.bid_pct ?? t.bid_pct ?? 0;
   const askPc = ps.ask_pct ?? t.ask_pct ?? 0;
   const dPct  = isLong ? bidPc : askPc;
   const dLbl  = isLong ? 'BID%' : 'ASK%';
 
-  const adxCl = v => v >= 50 ? '#00ff88' : v >= 25 ? '#ffaa00' : '#fff';
-  const rsiCl = v => v > 65  ? '#ff4444' : v < 35  ? '#00ff88' : '#fff';
-  const jCl   = v => v > 80  ? '#ff4444' : v < 20  ? '#00ff88' : '#fff';
-  const dCol  = isLong ? (bidPc >= 60 ? '#00ff88' : '#ff4444') : (askPc >= 60 ? '#00ff88' : '#ff4444');
+  const adxCl   = v => v >= 50 ? '#00ff88' : v >= 25 ? '#ffaa00' : '#fff';
+  const rsiCl   = v => v > 65  ? '#ff4444' : v < 35  ? '#00ff88' : '#fff';
+  const jCl     = v => v > 80  ? '#ff4444' : v < 20  ? '#00ff88' : '#fff';
+  const stochCl = v => v > 75  ? '#ff4444' : v < 25  ? '#00ff88' : '#fff';
+  const dCol    = isLong ? (bidPc >= 60 ? '#00ff88' : '#ff4444') : (askPc >= 60 ? '#00ff88' : '#ff4444');
 
   // Scan narrative
   const jTr  = j15m > 60 ? 'rising' : j15m < 40 ? 'falling' : 'flat';
   const narr = ps.symbol
-    ? `SCAN  J ${(+j15m).toFixed(1)}  ${dLbl} ${(+dPct).toFixed(1)}%  ADX ${(+adx).toFixed(1)}  RSI ${(+rsi).toFixed(1)}  J ${jTr}`
+    ? `SCAN  J ${(+j15m).toFixed(1)}  ${dLbl} ${(+dPct).toFixed(1)}%  ADX ${(+adx).toFixed(1)}  RSI ${(+rsi).toFixed(1)}  K/D ${(+sK).toFixed(0)}/${(+sD).toFixed(0)}  J ${jTr}`
     : 'SCAN  awaiting next scan…';
 
   const tid      = `pct-${sym}-${t.direction}`;
@@ -912,7 +915,7 @@ function buildPosCard(t, prices, pairStates) {
 
   <div class="pcv2-metrics">
     <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">ADX</span><span class="pcv2-mv" style="color:${adxCl(adx)}">${(+adx).toFixed(1)}</span></div>
-    <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">RSI15M</span><span class="pcv2-mv" style="color:${rsiCl(rsi)}">${(+rsi).toFixed(1)}</span></div>
+    <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">STOCH</span><span class="pcv2-mv" style="color:${stochCl(sK)}">${(+sK).toFixed(0)}/${(+sD).toFixed(0)}</span><span style="color:#555;font-size:9px;margin-left:3px">RSI${(+rsi).toFixed(0)}</span></div>
     <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">J15M</span><span class="pcv2-mv" style="color:${jCl(j15m)}">${(+j15m).toFixed(1)}</span></div>
     <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">${dLbl}</span><span class="pcv2-mv" style="color:${dCol}">${(+dPct).toFixed(1)}%</span></div>
   </div>
@@ -1475,6 +1478,9 @@ function _ovGateBarsHtml(d, dir) {
   const j15Col  = j15m < 20 ? '#00e676' : j15m > 80 ? '#ff3d57' : '#fff';
   const j1hCol  = j1h  < 40 ? '#00e676' : j1h  > 60 ? '#ff3d57' : '#fff';
   const rsiCol  = rsi  < 35 ? '#00e676' : rsi  > 65 ? '#ff3d57' : '#fff';
+  const stochK  = d.stoch_k || 0;
+  const stochD  = d.stoch_d || 0;
+  const stochKC = stochK < 25 ? '#00e676' : stochK > 75 ? '#ff3d57' : '#fff';
   const depPct  = isL ? bid : ask;
   const depCol  = gArr[3] ? (isL ? '#00e676' : '#ff3d57') : '#fff';
   const bidW    = Math.min(100, Math.max(0, bid));
@@ -1504,14 +1510,26 @@ function _ovGateBarsHtml(d, dir) {
     </div>
     <div class="pov-gr" data-gi="2">
       <div class="${dotCls(gArr[2])}" id="pov-gd-2"></div>
-      <span class="pov-gn">RSI</span>
+      <span class="pov-gn">STOCH</span>
+      <div class="pov-gt" style="position:relative">
+        <div class="pov-gzg" style="width:25%"></div>
+        <div class="pov-gzr" style="left:75%;width:25%"></div>
+        <div class="pov-gth" style="left:25%"></div><div class="pov-gth" style="left:75%"></div>
+        <div class="pov-gcur" id="pov-gc-2k" style="left:${Math.min(99,stochK).toFixed(1)}%;background:${stochKC}"></div>
+        <div id="pov-gc-2d" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${Math.min(99,stochD).toFixed(1)}%;width:7px;height:7px;border-radius:50%;border:2px solid #888;background:transparent;pointer-events:none"></div>
+      </div>
+      <span class="pov-gv" id="pov-gv-2" style="color:${stochKC}">${stochK.toFixed(0)}/${stochD.toFixed(0)}</span>
+    </div>
+    <div class="pov-gr" data-gi="rsi">
+      <div class="pov-gd pov-gd-fail" id="pov-gd-rsi" style="opacity:0.25"></div>
+      <span class="pov-gn" style="color:#555">RSI</span>
       <div class="pov-gt">
         <div class="pov-gzg" style="width:35%"></div>
         <div class="pov-gzr" style="left:65%;width:35%"></div>
         <div class="pov-gth" style="left:35%"></div><div class="pov-gth" style="left:65%"></div>
-        <div class="pov-gcur" id="pov-gc-2" style="left:${Math.min(99,rsi).toFixed(1)}%;background:${rsiCol}"></div>
+        <div class="pov-gcur" id="pov-gc-rsi" style="left:${Math.min(99,rsi).toFixed(1)}%;background:${rsiCol}"></div>
       </div>
-      <span class="pov-gv" id="pov-gv-2" style="color:${rsiCol}">${rsi.toFixed(0)}</span>
+      <span class="pov-gv" id="pov-gv-rsi" style="color:${rsiCol}">${rsi.toFixed(0)}</span>
     </div>
     <div class="pov-gr" data-gi="3">
       <div class="${dotCls(gArr[3])}" id="pov-gd-3"></div>
@@ -1765,20 +1783,24 @@ function _ovUpdate(pn, d) {
   }
 
   // Gate cursors + dot flash on pass/fail change
-  const curGates = _ovGates(d, dir);
-  const vals     = [d.j15m||0, d.j1h||0, d.rsi15m||0];
-  const cols     = [
-    d.j15m   < 20 ? '#00e676' : d.j15m   > 80 ? '#ff3d57' : '#fff',
-    d.j1h    < 40 ? '#00e676' : d.j1h    > 60 ? '#ff3d57' : '#fff',
-    d.rsi15m < 35 ? '#00e676' : d.rsi15m > 65 ? '#ff3d57' : '#fff',
-  ];
+  const curGates  = _ovGates(d, dir);
+  const j15mV    = d.j15m    || 0;
+  const j1hV     = d.j1h     || 0;
+  const stochKV  = d.stoch_k || 0;
+  const stochDV  = d.stoch_d || 0;
+  const rsiV     = d.rsi15m  || 0;
+  const j15mC    = j15mV < 20 ? '#00e676' : j15mV > 80 ? '#ff3d57' : '#fff';
+  const j1hC     = j1hV  < 40 ? '#00e676' : j1hV  > 60 ? '#ff3d57' : '#fff';
+  const stochKC  = stochKV < 25 ? '#00e676' : stochKV > 75 ? '#ff3d57' : '#fff';
+  const rsiC     = rsiV   < 35 ? '#00e676' : rsiV   > 65 ? '#ff3d57' : '#fff';
   const isL = dir !== 'SHORT';
   const dotPassCls = (pass) => pass ? (isL ? 'pov-gd pov-gd-pass-l' : 'pov-gd pov-gd-pass-s') : 'pov-gd pov-gd-fail';
-  [0, 1, 2].forEach(i => {
+  // J15M (0) and J1H (1)
+  [[0, j15mV, j15mC], [1, j1hV, j1hC]].forEach(([i, v, c]) => {
     const cur = document.getElementById(`pov-gc-${i}`);
-    if (cur) { cur.style.left = `${Math.min(99, vals[i]).toFixed(1)}%`; cur.style.background = cols[i]; }
+    if (cur) { cur.style.left = `${Math.min(99, v).toFixed(1)}%`; cur.style.background = c; }
     const val = document.getElementById(`pov-gv-${i}`);
-    if (val) { val.textContent = vals[i].toFixed(0); val.style.color = cols[i]; }
+    if (val) { val.textContent = v.toFixed(0); val.style.color = c; }
     const dot = document.getElementById(`pov-gd-${i}`);
     if (dot) {
       dot.className = dotPassCls(curGates[i]);
@@ -1788,6 +1810,26 @@ function _ovUpdate(pn, d) {
       }
     }
   });
+  // STOCH row (index 2): solid %K + hollow %D
+  const gc2k = document.getElementById('pov-gc-2k');
+  if (gc2k) { gc2k.style.left = `${Math.min(99, stochKV).toFixed(1)}%`; gc2k.style.background = stochKC; }
+  const gc2d = document.getElementById('pov-gc-2d');
+  if (gc2d) gc2d.style.left = `${Math.min(99, stochDV).toFixed(1)}%`;
+  const gv2 = document.getElementById('pov-gv-2');
+  if (gv2) { gv2.textContent = `${stochKV.toFixed(0)}/${stochDV.toFixed(0)}`; gv2.style.color = stochKC; }
+  const gd2 = document.getElementById('pov-gd-2');
+  if (gd2) {
+    gd2.className = dotPassCls(curGates[2]);
+    if (_ovPrevGates && _ovPrevGates[2] !== curGates[2]) {
+      gd2.classList.add('pov-gd-flash');
+      setTimeout(() => gd2.classList.remove('pov-gd-flash'), 350);
+    }
+  }
+  // RSI reference row — cursor and value update only, dot stays grey
+  const gcRsi = document.getElementById('pov-gc-rsi');
+  if (gcRsi) { gcRsi.style.left = `${Math.min(99, rsiV).toFixed(1)}%`; gcRsi.style.background = rsiC; }
+  const gvRsi = document.getElementById('pov-gv-rsi');
+  if (gvRsi) { gvRsi.textContent = rsiV.toFixed(0); gvRsi.style.color = rsiC; }
   // Gate dot 3 — DEPTH (add to same update pass)
   const dot3 = document.getElementById('pov-gd-3');
   if (dot3) {

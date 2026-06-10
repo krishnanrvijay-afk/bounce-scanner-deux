@@ -1277,8 +1277,14 @@ async def get_pair(symbol: str):
     price   = app_state.prices.get(symbol, ps.get("price", 0))
     chg     = app_state.price_changes.get(symbol)
 
-    gate_long  = [j15m < 20, j1h < 40, rsi15m < 35, bid_pct >= 55]
-    gate_short = [j15m > 80, j1h > 60, rsi15m > 65, ask_pct >= 55]
+    stoch_k      = ps.get("stoch_k",      50)
+    stoch_d      = ps.get("stoch_d",      50)
+    stoch_k_prev = ps.get("stoch_k_prev", stoch_k)
+    stoch_d_prev = ps.get("stoch_d_prev", stoch_d)
+    stoch_gate_long  = stoch_k < 25 and stoch_k_prev <= stoch_d_prev and stoch_k > stoch_d
+    stoch_gate_short = stoch_k > 75 and stoch_k_prev >= stoch_d_prev and stoch_k < stoch_d
+    gate_long  = [j15m < 20, j1h < 40, stoch_gate_long,  bid_pct >= 55]
+    gate_short = [j15m > 80, j1h > 60, stoch_gate_short, ask_pct >= 55]
     score_long  = sum(gate_long)
     score_short = sum(gate_short)
     confluence_long  = j15m < 20 and j1h < 40
@@ -1345,6 +1351,10 @@ async def get_pair(symbol: str):
         "atr":                 atr,
         "bid_pct":             bid_pct,
         "ask_pct":             ask_pct,
+        "stoch_k":             stoch_k,
+        "stoch_d":             stoch_d,
+        "stoch_k_prev":        stoch_k_prev,
+        "stoch_d_prev":        stoch_d_prev,
         "gate_long":           gate_long,
         "gate_short":          gate_short,
         "score_long":          score_long,
