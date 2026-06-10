@@ -35,8 +35,10 @@ DEPTH_GATE_PCT   = 55
 
 ATR_SL_MULTIPLIER = 1.0
 
-TP1_R = 1.0
-TP2_R = 1.5
+TP1_R                = 1.0
+TP1_CLOSE_PCT        = 0.70        # Trailblazer: close 70% at TP1 (runner 30% stays open)
+TP2_R                = 1.5         # still used for tp2_price alert calc; exit replaced by Trailblazer
+TRAIL_ATR_MULTIPLIER = 0.5         # trail_stop = trail_best ± (atr15m × TRAIL_ATR_MULTIPLIER)
 
 LEVERAGE_HIGH = 10
 LEVERAGE_MID  = 7

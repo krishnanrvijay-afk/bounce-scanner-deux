@@ -185,7 +185,12 @@ function renderHeader() {
   pnlEl.textContent = `$${(daily?.pnl || 0).toFixed(2)}`;
   pnlEl.className   = 'hstat-value ' + ((daily?.pnl || 0) >= 0 ? 'green' : 'red');
 
-  document.getElementById('h-margin').textContent    = `$${Math.round(account?.margin_deployed || 0).toLocaleString()}`;
+  const _upnl   = STATE?.unrealized_pnl || 0;
+  const _upnlEl = document.getElementById('h-unrealized');
+  if (_upnlEl) {
+    _upnlEl.textContent = (_upnl > 0 ? '+' : _upnl < 0 ? '-' : '') + '$' + Math.abs(_upnl).toFixed(2);
+    _upnlEl.className   = 'hstat-value ' + (_upnl > 0 ? 'green' : _upnl < 0 ? 'red' : '');
+  }
   document.getElementById('h-positions').textContent = account?.slots_used || 0;
   document.getElementById('h-scans').textContent     = scan_count || 0;
 
@@ -725,7 +730,9 @@ function buildPosCard(t, prices, pairStates) {
   const entry    = t.entry_price   || 0;
   const sl       = t.sl_price      || 0;
   const tp1      = t.tp1_price     || 0;
-  const tp2      = t.tp2_price     || 0;
+  const tp2       = t.tp2_price     || 0;
+  const trailBest = t.trail_best_price || 0;
+  const trailStop = t.trail_stop_price || 0;
   const be       = t.be_price      || (isLong ? entry * 1.001 : entry * 0.999);
   const tp1Hit   = !!t.tp1_hit;
   const pnl      = t.unrealized_pnl || 0;
@@ -770,7 +777,9 @@ function buildPosCard(t, prices, pairStates) {
   const pEn  = bp(entry);
   const pBe  = bp(be);
   const pTp1 = bp(tp1);
-  const pTp2 = bp(tp2);
+  const pTp2       = bp(tp2);
+  const pTrailBest = bp(trailBest);
+  const pTrailStop = bp(trailStop);
   const p2R  = bp(twoR);
   const pCur = bp(current);
 
@@ -784,7 +793,8 @@ function buildPosCard(t, prices, pairStates) {
   const dollarAt = tgt => isLong ? (tgt - entry) * size : (entry - tgt) * size;
   const pnlSl    = dollarAt(sl);
   const pnlTp1   = dollarAt(tp1);
-  const pnlTp2   = dollarAt(tp2);
+  const pnlTp2      = dollarAt(tp2);
+  const pnlTrailStop = trailStop ? dollarAt(trailStop) : 0;
 
   // Subheader
   const openFmt   = openedAt ? new Date(openedAt*1000).toISOString().replace('T',' ').slice(0,19) : '—';
@@ -864,10 +874,20 @@ function buildPosCard(t, prices, pairStates) {
         <span class="pcv2-mck" style="background:#00ff88"></span>
         <span class="pcv2-mkb" style="color:#00ff88">+$${pnlTp1.toFixed(0)}</span>
       </div>` : ''}
-      ${tp2 ? `<div class="pcv2-mk" style="left:${pTp2.toFixed(1)}%">
+      ${!tp1Hit && tp2 ? `<div class="pcv2-mk" style="left:${pTp2.toFixed(1)}%">
         <span class="pcv2-mkt" style="color:#00ff88">TP2 1.5R<br>${fmtPrice(tp2)}</span>
         <span class="pcv2-mck" style="background:#00ff88"></span>
         <span class="pcv2-mkb" style="color:#00ff88">+$${pnlTp2.toFixed(0)}</span>
+      </div>` : ''}
+      ${tp1Hit && trailBest ? `<div class="pcv2-mk" style="left:${pTrailBest.toFixed(1)}%">
+        <span class="pcv2-mkt" style="color:#ffaa00;text-decoration:underline dotted">BEST<br>${fmtPrice(trailBest)}</span>
+        <span class="pcv2-mck" style="background:#ffaa00;opacity:0.6"></span>
+        <span class="pcv2-mkb" style="color:#ffaa00"></span>
+      </div>` : ''}
+      ${tp1Hit && trailStop ? `<div class="pcv2-mk" style="left:${pTrailStop.toFixed(1)}%">
+        <span class="pcv2-mkt" style="color:#ff8800">TRAIL<br>${fmtPrice(trailStop)}</span>
+        <span class="pcv2-mck" style="background:#ff8800"></span>
+        <span class="pcv2-mkb" style="color:#ff8800">${pnlTrailStop>=0?'+':'-'}$${Math.abs(pnlTrailStop).toFixed(0)}</span>
       </div>` : ''}
       <div class="pcv2-mk" style="left:${p2R.toFixed(1)}%">
         <span class="pcv2-mkt" style="color:#3a6644">2.0R<br>${fmtPrice(twoR)}</span>
@@ -1240,9 +1260,11 @@ function renderLogTab() {
   }
 
   const rows = [...filtered].reverse().map(r => {
-    const reasonCls = r.exit_reason === 'TP1'  ? 'reason-tp1'
-                    : r.exit_reason === 'TP2'  ? 'reason-tp2'
-                    : r.exit_reason === 'SL'   ? 'reason-sl' : 'reason-manual';
+    const reasonCls = r.exit_reason === 'TP1'         ? 'reason-tp1'
+                    : r.exit_reason === 'TP2'         ? 'reason-tp2'
+                    : r.exit_reason === 'TRAILBLAZER' ? 'reason-tp2'
+                    : r.exit_reason === 'SL'          ? 'reason-sl' : 'reason-manual';
+    const reasonLbl = r.exit_reason === 'TRAILBLAZER' ? '🏃 TRAILBLAZER' : (r.exit_reason || '—');
     const pnlColor = (r.pnl_usd||0) >= 0 ? '#00ff88' : '#ff4444';
     const rColor   = (r.r_value||0) >= 0 ? '#555'    : '#ff4444';
     const dur      = r.duration_seconds || 0;
@@ -1259,7 +1281,7 @@ function renderLogTab() {
       <td>${fmtPrice(r.exit_price)}</td>
       <td style="color:#ff4444;">${fmtPrice(r.sl_price)}</td>
       <td style="color:#00ff88;">${fmtPrice(r.tp1_price)}</td>
-      <td class="${reasonCls}">${r.exit_reason||'—'}</td>
+      <td class="${reasonCls}">${reasonLbl}</td>
       <td style="color:${pnlColor};font-weight:700;">${(r.pnl_usd||0)>=0?'+':''}${(r.pnl_usd||0).toFixed(2)}</td>
       <td style="color:${rColor};font-weight:700;">${(r.r_value||0)>=0?'+':''}${(r.r_value||0).toFixed(2)}R</td>
       <td style="color:#555;">${openTime}</td>

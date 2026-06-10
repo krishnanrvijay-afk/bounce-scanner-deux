@@ -33,7 +33,7 @@ from pydantic import BaseModel
 from config import (
     PAIRS, SCAN_INTERVAL_SECONDS, PRICE_INTERVAL_SECONDS,
     MARGIN_PER_TRADE, MARGIN_HARD_CAP, PAPER_MODE, LIVE_MANUAL_ENTRY_ONLY,
-    CONSECUTIVE_LOSS_STOP, DAILY_LOSS_LIMIT, TP1_R, TP2_R,
+    CONSECUTIVE_LOSS_STOP, DAILY_LOSS_LIMIT, TP1_R, TP2_R, TP1_CLOSE_PCT, TRAIL_ATR_MULTIPLIER,
     SUPABASE_URL, SUPABASE_KEY,
 )
 from supabase import create_client, Client
@@ -164,8 +164,8 @@ class AppState:
             "prices":         self.prices,
             "open_trades":    trades_out,
             "trade_log":      self.trade_log,
+            "unrealized_pnl": round(sum(t.get("unrealized_pnl", 0) for t in trades_out.values()), 2),
             "account": {
-                "margin_deployed": round(self.margin_deployed, 2),
                 "cap":             MARGIN_HARD_CAP,
                 "cap_pct":         round(self.margin_deployed / MARGIN_HARD_CAP * 100, 1),
                 "cap_reached":     self.cap_reached,
@@ -982,36 +982,40 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
 
 
 def _do_partial_close_tp1(key: str, trade: dict, exit_price: float):
-    """Close half the position at TP1, keep remainder open watching for TP2."""
+    """Close 70% of position at TP1, keep 30% runner open for Trailblazer ATR trailing stop."""
     if not exit_price or exit_price <= 0:
         print(f"[EXIT GUARD] {trade.get('symbol')} {trade.get('direction')} — refused TP1 close: exit_price={exit_price!r} is null/zero — skipping")
         return
-    sym       = trade["symbol"]
-    direction = trade["direction"]
-    full_size = trade.get("remaining_size", trade["size"])
-    half_size = full_size / 2
-    entry     = trade["entry_price"]
+    sym        = trade["symbol"]
+    direction  = trade["direction"]
+    full_size  = trade.get("remaining_size", trade["size"])
+    close_size = full_size * TP1_CLOSE_PCT
+    rem_size   = full_size - close_size
+    entry      = trade["entry_price"]
 
-    pnl = (exit_price - entry) * half_size if direction == "LONG" \
-          else (entry - exit_price) * half_size
+    pnl = (exit_price - entry) * close_size if direction == "LONG" \
+          else (entry - exit_price) * close_size
     r   = _compute_r(pnl, trade)
 
     # Log the TP1 partial close BEFORE modifying trade dict (so size/metadata is correct)
     _append_trade_log(trade, exit_price, "TP1", pnl, r)
     _update_daily_pnl(pnl)
 
-    # Update trade in-place — keep it open for TP2 watch
-    trade["remaining_size"] = half_size
-    trade["tp1_hit"]        = True
-    trade["extreme_price"]  = exit_price
-    # Halve the deployed margin to reflect the partial close
+    # Update trade in-place — keep 30% runner open for Trailblazer
+    trade["remaining_size"]   = rem_size
+    trade["tp1_hit"]          = True
+    trade["extreme_price"]    = exit_price
+    trade["trail_best_price"] = exit_price
+    trade["trail_anchor"]     = exit_price
+    trade["tp1_pnl"]          = pnl
+    # Reduce deployed margin proportionally (TP1_CLOSE_PCT closed)
     old_margin = trade.get("margin", MARGIN_PER_TRADE)
-    trade["margin"] = old_margin / 2
+    trade["margin"] = old_margin * (1.0 - TP1_CLOSE_PCT)
     app_state.open_trades[key]     = trade
-    app_state.margin_deployed      = max(0.0, app_state.margin_deployed - old_margin / 2)
+    app_state.margin_deployed      = max(0.0, app_state.margin_deployed - old_margin * TP1_CLOSE_PCT)
 
-    print(f"[EXIT] {sym} {direction} TP1 partial close at {exit_price} "
-          f"half_pnl=${pnl:.2f} r={r:+.2f}R — remainder open watching TP2")
+    print(f"[EXIT] {sym} {direction} TP1 partial close ({int(TP1_CLOSE_PCT*100)}%) at {exit_price} "
+          f"pnl=${pnl:.2f} r={r:+.2f}R — 30% runner open watching Trailblazer ATR trail")
     if TELEGRAM_ENABLED:
         def _tp1_tg(s=sym, d=direction, ep=exit_price, p=pnl):
             _tg_post("✅ TP1 HIT — " + s + " " + d + " — partial close at " + _fmt_p(ep) + ". P&L so far: $" + f"{p:.2f}")
@@ -1019,7 +1023,55 @@ def _do_partial_close_tp1(key: str, trade: dict, exit_price: float):
     _save_state()
 
 
-# ── Exit monitor loop ──────────────────────────────────────────────────────────
+def _do_trailblazer_close(key: str, trade: dict, exit_price: float,
+                           trail_best: float, trail_stop: float):
+    """Close remaining 30% runner at Trailblazer ATR trailing stop trigger."""
+    if not exit_price or exit_price <= 0:
+        print(f"[EXIT GUARD] {trade.get('symbol')} {trade.get('direction')} — refused TRAILBLAZER close: exit_price={exit_price!r} is null/zero — skipping")
+        return
+    sym       = trade["symbol"]
+    direction = trade["direction"]
+    remaining = trade.get("remaining_size", trade["size"])
+    entry     = trade["entry_price"]
+
+    pnl       = (exit_price - entry) * remaining if direction == "LONG" \
+                else (entry - exit_price) * remaining
+    r         = _compute_r(pnl, trade)
+    tp1_pnl   = trade.get("tp1_pnl") or 0
+    total_pnl = round(tp1_pnl + pnl, 2)
+
+    _append_trade_log(trade, exit_price, "TRAILBLAZER", pnl, r)
+    _update_daily_pnl(pnl)
+    _on_trade_close("TRAILBLAZER")
+
+    app_state.margin_deployed = max(0.0, app_state.margin_deployed - trade["margin"])
+    if key in app_state.open_trades:
+        del app_state.open_trades[key]
+    _retire_alert(sym, direction)
+    set_close_cooldown(sym, direction)
+
+    print(f"[TRAILBLAZER] {sym} {direction} — runner closed at {exit_price}, "
+          f"best price was {trail_best}, trail stop triggered at {trail_stop}")
+    if TELEGRAM_ENABLED:
+        import datetime as _dt
+        _ts = _dt.datetime.now(_dt.timezone(
+            _dt.timedelta(hours=-5))).strftime("%Y-%m-%d %H:%M EST")
+        def _trail_tg(s=sym, d=direction, ep=exit_price, p=pnl, rv=r,
+                      tb=trail_best, ts_=trail_stop, tp=total_pnl, ts_str=_ts):
+            _tg_post(
+                "🏃 TRAILBLAZER EXIT — " + s + " " + d + "\n"
+                + "Runner 30% closed at " + _fmt_p(ep) + "\n"
+                + "Best price reached: " + _fmt_p(tb) + "\n"
+                + "Trail stop triggered: " + _fmt_p(ts_) + "\n"
+                + "Runner P&L: $" + f"{p:.2f}" + " (" + f"{rv:+.2f}" + "R)\n"
+                + "Total trade P&L: $" + f"{tp:.2f}" + "\n"
+                + "⏱ " + ts_str
+            )
+        threading.Thread(target=_trail_tg, daemon=True).start()
+    _save_state()
+
+
+# ── Exit monitor loop ─────────────────────────────────────────────────────────────
 
 async def _exit_monitor_loop():
     """Runs every PRICE_INTERVAL_SECONDS. Checks every open trade against SL/TP."""
@@ -1091,16 +1143,29 @@ async def _exit_monitor_loop():
                         _do_partial_close_tp1(key, trade, current)
                         continue
 
-                # ── TP2 (only after tp1_hit=True — closes remainder) ──────────
-                if tp1_hit and tp2_price:
-                    tp2_reached = (is_short and current <= tp2_price) or \
-                                  (not is_short and current >= tp2_price)
-                    print(f"[EXIT CHECK] {sym} {direction} price={current} "
-                          f"tp2={tp2_price} tp1_hit={tp1_hit} → "
-                          f"{'TP2 TRIGGERED → full close remainder' if tp2_reached else 'watching tp2'}")
-                    if tp2_reached:
-                        _do_close_trade(key, trade, current, "TP2")
-                        continue
+                # ── TRAILBLAZER: ATR trailing stop after tp1_hit ──────────────
+                if tp1_hit:
+                    _ps   = next((p for p in app_state.pair_states if p.get("symbol") == sym), None)
+                    _atr  = (_ps.get("atr15m") or 0) if _ps else 0
+                    if _atr > 0:
+                        _best = trade.get("trail_best_price") or current
+                        if not is_short:
+                            _best       = max(_best, current)
+                            _trail_stop = _best - _atr * TRAIL_ATR_MULTIPLIER
+                            if current <= _trail_stop:
+                                _do_trailblazer_close(key, trade, current, _best, _trail_stop)
+                                continue
+                        else:
+                            _best       = min(_best, current)
+                            _trail_stop = _best + _atr * TRAIL_ATR_MULTIPLIER
+                            if current >= _trail_stop:
+                                _do_trailblazer_close(key, trade, current, _best, _trail_stop)
+                                continue
+                        trade["trail_best_price"] = _best
+                        trade["trail_stop_price"] = round(_trail_stop, 6)
+                        app_state.open_trades[key]["trail_best_price"] = _best
+                        app_state.open_trades[key]["trail_stop_price"] = round(_trail_stop, 6)
+                        print(f"[TRAIL] {sym} {direction} best={_best} stop={round(_trail_stop,6)} current={current}")
 
                 # HC trailing SL after tp1_hit: lock 1.5R minimum profit
                 if trade.get("is_score10") and tp1_hit:
@@ -1117,8 +1182,10 @@ async def _exit_monitor_loop():
                             app_state.open_trades[key]["sl_price"] = round(_nsl, 6)
 
                 # No exit this cycle
+                _trail_info = (f" trail_best={trade.get('trail_best_price')} trail_stop={trade.get('trail_stop_price')}"
+                               if tp1_hit else "")
                 print(f"[EXIT CHECK] {sym} {direction} price={current} "
-                      f"sl={sl_price} tp1={tp1_price} tp2={tp2_price} → no exit")
+                      f"sl={sl_price} tp1={tp1_price}{_trail_info} → no exit")
 
         except Exception as e:
             print(f"[EXIT MONITOR] error: {e}")
