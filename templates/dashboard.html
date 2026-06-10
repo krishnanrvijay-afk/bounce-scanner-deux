@@ -9,7 +9,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #080808; color: #fff; font-family: 'Inter', sans-serif; font-size: 13px; overflow-x: hidden; }
 
-  /* ── HEADER ── */
+  /* ââ HEADER ââ */
   .header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 52px; border-bottom: 1px solid #1a1a1a; background: #0a0a0a; position: sticky; top: 0; z-index: 200; }
   .logo { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 3px; }
   .logo span { color: #00ff88; }
@@ -37,7 +37,7 @@
   .mkt-chips { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
   .mkt-chip { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 9px; padding: 1px 5px; border-radius: 3px; background: #111; border: 1px solid #1a1a1a; }
 
-  /* ── NAV BAR ── */
+  /* ââ NAV BAR ââ */
   .nav-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; border-bottom: 1px solid #111; background: #0a0a0a; gap: 12px; flex-wrap: wrap; }
   .nav-pills { display: flex; gap: 5px; flex-wrap: wrap; }
   .fp { padding: 8px 16px; border-radius: 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; letter-spacing: 1px; cursor: pointer; background: #111; color: #aaa; border: 1px solid #1a1a1a; transition: all 0.15s; }
@@ -59,7 +59,7 @@
   .scan-status .ts  { color: #00ff88; }
   .scan-status .cd  { color: #ffaa00; }
 
-  /* ── J BOUNCE MAP BANNER ── */
+  /* ââ J BOUNCE MAP BANNER ââ */
   @keyframes jb-conf-pulse   { 0%,100% { text-shadow: 0 0 4px currentColor; } 50% { text-shadow: 0 0 14px currentColor; } }
   @keyframes jb-dot-pulse    { 0%,100% { box-shadow: 0 0 3px rgba(255,170,0,0.5); } 50% { box-shadow: 0 0 7px rgba(255,170,0,0.9); } }
   @keyframes conf-long-glow  { 0%,100% { box-shadow: 0 0 18px rgba(0,230,118,0.15),0 2px 8px rgba(0,0,0,0.6); } 50% { box-shadow: 0 0 32px rgba(0,230,118,0.3),0 2px 8px rgba(0,0,0,0.6); } }
@@ -94,7 +94,7 @@
   .cb-tick { width: 1px; height: 4px; background: currentColor; opacity: 0.55; flex-shrink: 0; }
   .cb-conf { animation: jb-conf-pulse 2.2s ease-in-out infinite; }
 
-  /* ── PAIR GRID ── */
+  /* ââ PAIR GRID ââ */
   .card-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px 12px 12px; background: #050505; }
   @media (max-width: 1100px) { .card-grid { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 800px)  { .card-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -178,7 +178,7 @@
   .pill-near-rdy  { background: transparent; color: #fff; border: 1px solid #555; }
   .pill-partial   { background: rgba(255,170,0,0.08); color: #ffaa00; border: 1px solid rgba(255,170,0,0.25); }
 
-  /* ── PAIR OVERLAY ── */
+  /* ââ PAIR OVERLAY ââ */
   #pair-ov-bd { position:fixed;inset:0;background:rgba(0,0,0,0.78);backdrop-filter:blur(5px);z-index:1000;display:flex;align-items:center;justify-content:center; }
   #pair-ov-pn { width:min(560px,95vw);max-height:90vh;overflow-y:auto;background:#080808;border-radius:10px;border:1px solid #222;box-shadow:0 24px 80px rgba(0,0,0,0.85);animation:pov-in 0.16s ease-out; }
   @keyframes pov-in { from { opacity:0;transform:scale(0.86) } to { opacity:1;transform:scale(1) } }
@@ -266,7 +266,7 @@
   .pov-btn-force { background:rgba(255,61,87,0.1);color:#ff3d57;border:1.5px solid rgba(255,61,87,0.4); }
   .pov-btn-watch { background:transparent;color:#222;border:1.5px solid #1a1a1a;cursor:default; }
 
-  /* ── ALERTS TAB ── */
+  /* ââ ALERTS TAB ââ */
   #tab-alerts { display: none; padding: 20px 24px; }
   .alert-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
   .alert-card { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 5px; padding: 12px 14px; position: relative; }
@@ -301,7 +301,7 @@
   .panel-btn { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 3px 10px; border-radius: 3px; cursor: pointer; letter-spacing: 0.5px; border: 1px solid #2a2a2a; background: #111; color: #555; transition: all 0.15s; }
   .panel-btn:hover { color: #ff4444; border-color: rgba(255,68,68,0.4); }
   .no-content { padding: 60px 24px; text-align: center; color: #333; font-size: 12px; }
-  /* ── ALERT CARD v2 ── */
+  /* ââ ALERT CARD v2 ââ */
   .ac-paper-badge { font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); white-space: nowrap; }
   .ac2-prices { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; margin-bottom: 8px; }
   .ac2-px { background: #111; border-radius: 3px; padding: 6px 8px; text-align: center; }
@@ -334,7 +334,7 @@
   .ac-btn-dismiss { background: #111; color: #555; border: 1px solid #2a2a2a; margin-left: auto; }
   .ac-btn-dismiss:hover { color: #ff4444 !important; border-color: rgba(255,68,68,0.4) !important; opacity: 1 !important; }
 
-  /* ── POSITIONS TAB ── */
+  /* ââ POSITIONS TAB ââ */
   #tab-positions { display: none; padding: 20px 24px; }
   .pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
   .pos-card { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 6px; overflow: hidden; }
@@ -378,7 +378,7 @@
   .pos-close-btn { display: block; width: calc(100% - 32px); margin: 0 16px 12px; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 700; padding: 7px; border-radius: 4px; cursor: pointer; letter-spacing: 1px; text-align: center; background: rgba(255,68,68,0.06); color: #ff4444; border: 1px solid rgba(255,68,68,0.2); transition: background 0.15s; }
   .pos-close-btn:hover { background: rgba(255,68,68,0.12); }
 
-  /* ── POSITIONS CARD V2 ── */
+  /* ââ POSITIONS CARD V2 ââ */
   .pcv2 { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 6px; overflow: hidden; }
   .pcv2-hdr { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 6px; gap: 8px; }
   .pcv2-hdr-l { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
@@ -418,7 +418,7 @@
   .pcv2-btn-force { background: rgba(255,68,68,0.10);  color: #ff4444; border-color: rgba(255,68,68,0.30); }
   .pcv2-btn-force:hover { background: rgba(255,68,68,0.18); }
 
-  /* ── LOG TAB ── */
+  /* ââ LOG TAB ââ */
   #tab-log { display: none; padding: 20px 24px; }
   .log-toolbar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
   .log-btn { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 5px 14px; border-radius: 4px; cursor: pointer; letter-spacing: 1px; border: 1px solid; transition: opacity 0.15s; }
@@ -437,7 +437,7 @@
   .reason-manual { color: #ffaa00; font-weight: 700; }
   .log-empty { padding: 50px; text-align: center; color: #333; font-size: 12px; }
 
-    /* ── STATS PANEL ── */
+    /* ââ STATS PANEL ââ */
     .stats-panel { border-bottom: 1px solid #1a1a1a; }
     .stats-header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px 0; cursor:pointer; user-select:none; }
     .stats-header-title { font-family:'JetBrains Mono',monospace; font-size:8px; font-weight:800; color:#555; text-transform:uppercase; letter-spacing:1.5px; }
@@ -468,7 +468,7 @@
   .grey  { color: #fff; }
   .white { color: #fff; }
 
-  /* ── MARKET HEALTH STRIP ── */
+  /* ââ MARKET HEALTH STRIP ââ */
   #mh-strip { display:flex; align-items:center; gap:12px; padding:0 24px; height:90px; background:#0a0a0a; border-bottom:1px solid #1a1a1a; flex-shrink:0; }
   .mh-heading { font-family:'Bebas Neue',sans-serif; font-size:11px; letter-spacing:2px; color:#fff; white-space:nowrap; flex-shrink:0; }
   .mh-cols { display:flex; align-items:stretch; gap:0; flex:1; height:100%; }
@@ -486,7 +486,7 @@
   .mh-ctx-line { font-size:11px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }
   .mh-vdivider { width:1px; background:#222; align-self:stretch; margin:12px 0; flex-shrink:0; }
 
-  /* ── TRADE LOG VISUAL ROW ── */
+  /* ââ TRADE LOG VISUAL ROW ââ */
   .tl-vis { display:flex; align-items:center; gap:10px; padding:3px 4px 5px; }
   .tl-badge { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:3px; color:#fff; letter-spacing:0.5px; }
   .tl-badge-win   { background:#166534; }
@@ -495,7 +495,7 @@
   .tl-rpill { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; padding:2px 8px; border-radius:3px; color:#fff; }
   .tl-pbar-wrap { position:relative; width:80px; height:6px; border-radius:3px; background:linear-gradient(to right,#991b1b,#555,#166534); flex-shrink:0; }
   .tl-pdot { position:absolute; top:50%; transform:translate(-50%,-50%); width:8px; height:8px; border-radius:50%; border:1.5px solid #0a0a0a; }
-  /* ── PERFORMANCE PANEL ── */
+  /* ââ PERFORMANCE PANEL ââ */
   .perf-panel { background:#0a0a0a; border-top:1px solid #1a1a1a; padding:10px 16px 14px; }
   .perf-row1 { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
   .perf-pill { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; padding:4px 12px; border-radius:4px; color:#fff; white-space:nowrap; }
@@ -511,7 +511,7 @@
 <body>
 
 <div class="header">
-  <div class="logo">BOUNCE SCANNER <span>II</span></div>
+  <div class="logo"><img src="https://hyperliquid.xyz/favicon.ico" style="width:20px;height:20px;vertical-align:middle;margin-right:6px;">BOUNCE SCANNER <span>II</span></div>
   <div class="header-right">
     <div class="hstat">
       <div class="hstat-label">DAILY P&L</div>
@@ -524,7 +524,7 @@
     </div>
     <div class="sep"></div>
     <div class="mkt-btn-wrap">
-      <div class="mkt-btn" id="mkt-btn" onclick="toggleMarket(event)">MARKET ▾</div>
+      <div class="mkt-btn" id="mkt-btn" onclick="toggleMarket(event)">MARKET â¾</div>
       <div class="mkt-popover" id="mkt-popover">
         <div class="mkt-title">MARKET SNAPSHOT</div>
         <div class="mkt-row"><span class="mkt-label">BULL TREND 1H</span><div class="mkt-chips" id="mkt-bull"></div></div>
@@ -545,7 +545,7 @@
     </div>
     <div class="sep"></div>
     <div id="mode-badge" class="mode-badge" style="display:none;"></div>
-    <div id="cb-badge" style="display:none; font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; padding:3px 8px; border-radius:4px; background:rgba(255,68,68,0.1); color:#ff4444; border:1px solid rgba(255,68,68,0.3);">⚡ CB ACTIVE</div>
+    <div id="cb-badge" style="display:none; font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; padding:3px 8px; border-radius:4px; background:rgba(255,68,68,0.1); color:#ff4444; border:1px solid rgba(255,68,68,0.3);">â¡ CB ACTIVE</div>
   </div>
 </div>
 
@@ -559,10 +559,10 @@
     <div class="fp"                data-tab="grid"    data-filter="COOLDOWN"     onclick="setNav(this)">COOLDOWN</div>
     <div class="fp tab-log"        data-tab="log"     data-filter=""             onclick="setNav(this)">LOG <span class="fp-count" id="nav-log-count">0</span></div>
   </div>
-  <div class="scan-status" id="scan-status">waiting for scan…</div>
+  <div class="scan-status" id="scan-status">waiting for scanâ¦</div>
 </div>
 
-<!-- ── MARKET HEALTH STRIP ── -->
+<!-- ââ MARKET HEALTH STRIP ââ -->
 <div id="mh-strip">
   <span class="mh-heading">&#x1F4CA; MARKET HEALTH</span>
   <div class="mh-cols">
@@ -588,15 +588,15 @@
   </div>
 </div>
 
-<!-- ── J15M OPPORTUNITY BANNER ── -->
+<!-- ââ J15M OPPORTUNITY BANNER ââ -->
 <div id="j15m-banner">
   <div class="jb-header">
-    <span class="jb-title">J — BOUNCE MAP</span>
+    <span class="jb-title">J â BOUNCE MAP</span>
     <div class="jb-header-right">
       <div class="jb-legend">
         <span class="jb-leg jb-leg-green"><span class="jb-ldot" style="background:#00e676"></span>OS</span>
         <span class="jb-leg jb-leg-red"><span class="jb-ldot" style="background:#ff3d57"></span>OB</span>
-        <span class="jb-leg jb-leg-amber"><span class="jb-ldot jb-ldot-pulse" style="background:#ffaa00"></span>✦ CONF</span>
+        <span class="jb-leg jb-leg-amber"><span class="jb-ldot jb-ldot-pulse" style="background:#ffaa00"></span>â¦ CONF</span>
       </div>
       <div class="jb-tf-pills">
         <button class="jb-tf-pill" id="jb-tf-15M" onclick="setBannerTF('15M')">15M</button>
@@ -639,12 +639,12 @@
   </div>
 </div>
 
-<!-- ── SCANNER GRID VIEW ── -->
+<!-- ââ SCANNER GRID VIEW ââ -->
 <div id="view-grid">
   <div class="card-grid" id="card-grid"></div>
 </div>
 
-<!-- ── ALERTS TAB ── -->
+<!-- ââ ALERTS TAB ââ -->
 <div id="tab-alerts">
   <div class="alerts-toolbar">
     <span class="alerts-title">ALERTS</span>
@@ -656,14 +656,14 @@
   </div>
 </div>
 
-<!-- ── POSITIONS TAB ── -->
+<!-- ââ POSITIONS TAB ââ -->
 <div id="tab-positions">
   <div class="pos-grid" id="pos-grid">
     <div class="no-content">No open positions</div>
   </div>
 </div>
 
-<!-- ── LOG TAB ── -->
+<!-- ââ LOG TAB ââ -->
 <div id="tab-log">
   <div class="log-toolbar">
     <button class="log-btn lb-csv"   onclick="exportCsv()">EXPORT CSV</button>
