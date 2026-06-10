@@ -247,7 +247,7 @@ def _load_state():
         return
     try:
         # ── Trade log → in-memory list ─────────────────────────────────────────
-        log_rows = sb.table("trade_log").select("*").order("created_at").execute()
+        log_rows = sb.table("trade_log").select("*").order("created_at").limit(1000).execute()
         if log_rows.data:
             for row in log_rows.data:
                 def _ts(iso):
