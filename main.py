@@ -370,6 +370,12 @@ def _on_trade_close(reason: str):
 
 
 def _append_trade_log(trade: dict, exit_price: float, reason: str, pnl: float, r: float):
+    if not exit_price or exit_price <= 0:
+        raise ValueError(
+            f"[ASSERT] _append_trade_log: exit_price={exit_price!r} "
+            f"symbol={trade.get('symbol')} direction={trade.get('direction')} reason={reason} "
+            f"-- refusing to write trade row with null/zero price"
+        )
     now_ts    = int(time.time())
     opened_at = trade.get("opened_at", now_ts)
 
@@ -1459,7 +1465,22 @@ async def close_trade(req: CloseTradeRequest):
     if result.get("status") != "ok":
         raise HTTPException(status_code=500, detail=result.get("msg", "close failed"))
 
-    close_price = result.get("close_price", app_state.prices.get(req.symbol, trade["entry_price"]))
+    close_price = result.get("close_price") or app_state.prices.get(req.symbol)
+    if not close_price or close_price <= 0:
+        print(f"[CLOSE GUARD] {req.symbol} -- price feed returned {close_price!r}, attempting fresh fetch")
+        try:
+            close_price = await mexc_client.get_price(req.symbol)
+            if not close_price or close_price <= 0:
+                await asyncio.sleep(2)
+                close_price = await mexc_client.get_price(req.symbol)
+        except Exception as _pe:
+            print(f"[CLOSE GUARD] {req.symbol} fresh price fetch failed: {_pe}")
+            close_price = None
+    if not close_price or close_price <= 0:
+        raise HTTPException(
+            status_code=503,
+            detail="Price unavailable -- try again in a few seconds"
+        )
     entry       = trade["entry_price"]
     remaining   = trade.get("remaining_size", trade["size"])
 
@@ -1610,11 +1631,22 @@ async def clear_tradelog(
     count = len(app_state.open_trades)
     for key, trade in list(app_state.open_trades.items()):
         sym   = trade["symbol"]
-        ep    = app_state.prices.get(sym, trade["entry_price"])
-        entry = trade["entry_price"]
-        rem   = trade.get("remaining_size", trade["size"])
-        pnl   = (ep - entry) * rem if trade["direction"] == "LONG" else (entry - ep) * rem
-        _append_trade_log(trade, ep, "FORCE_CLOSE", pnl, 0.0)
+        ep = app_state.prices.get(sym) or 0
+        if not ep or ep <= 0:
+            try:
+                ep = await mexc_client.get_price(sym)
+                if not ep or ep <= 0:
+                    await asyncio.sleep(2)
+                    ep = await mexc_client.get_price(sym)
+            except Exception:
+                ep = None
+        if not ep or ep <= 0:
+            print(f"[FORCE CLOSE] {sym} -- price unavailable, trade cleared without log entry")
+        else:
+            entry = trade["entry_price"]
+            rem   = trade.get("remaining_size", trade["size"])
+            pnl   = (ep - entry) * rem if trade["direction"] == "LONG" else (entry - ep) * rem
+            _append_trade_log(trade, ep, "FORCE_CLOSE", pnl, 0.0)
         app_state.margin_deployed = max(0.0, app_state.margin_deployed - trade["margin"])
 
     consecutive_losses     = 0
