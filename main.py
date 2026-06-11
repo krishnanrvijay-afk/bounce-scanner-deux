@@ -1547,7 +1547,8 @@ async def reset_session():
     _session_halted.clear()
     _large_sl_cooldowns.clear()
     clear_all_scanner_state()
-    print("[SESSION RESET] manual reset — daily P&L, cooldowns, circuit breaker cleared")
+    _save_state()
+    print("[SESSION RESET] manual reset — daily P&L, cooldowns, circuit breaker cleared — state persisted")
     return {"reset": True, "message": "Session reset — daily P&L, cooldowns and circuit breaker cleared"}
 
 
