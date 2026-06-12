@@ -397,7 +397,7 @@ function buildCard(p, alerts, trades, changes) {
     const depthPct   = confIsLong ? bidPct : askPct;
     const depthLabel = confIsLong ? 'BID' : 'ASK';
     const depthPass  = depthPct >= 55;
-    const stochPass   = confIsLong ? stochK < 25 : stochK > 75;
+    const stochPass   = confIsLong ? (stochK < 25 && stochK > stochD) : (stochK > 75 && stochK < stochD);
     const stochPct    = Math.min(100, Math.max(0, stochK));
     const stochCurCol = confIsLong ? (stochK < 25 ? '#00e676' : '#555') : (stochK > 75 ? '#ff3d57' : '#555');
     const stochDotCls = stochPass ? (confIsLong ? 'long-pass' : 'short-pass') : (confIsLong ? 'long-fail' : 'short-fail');
@@ -493,7 +493,7 @@ function dirRow(direction, stochK, stochD, rsi15m, depthPct) {
     <div class="dir-vals">
       <div class="dv-item">
         <span class="dv-label">STOCH</span>
-        <span class="dv-val ${stochColor}">${stochK.toFixed(0)}/${stochD.toFixed(0)}</span>
+        <span class="dv-val ${stochColor}">${stochK.toFixed(1)}/${stochD.toFixed(1)}</span>
         <span style="color:#555;font-size:9px;margin-left:3px">RSI${rsi15m.toFixed(0)}</span>
       </div>
       <div class="dv-item">
@@ -955,7 +955,7 @@ function buildPosCard(t, prices, pairStates) {
 
   <div class="pcv2-metrics">
     <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">ADX</span><span class="pcv2-mv" style="color:${adxCl(adx)}">${(+adx).toFixed(1)}</span></div>
-    <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">STOCH</span><span class="pcv2-mv" style="color:${stochCl(sK)}">${(+sK).toFixed(0)}/${(+sD).toFixed(0)}</span><span style="color:#555;font-size:9px;margin-left:3px">RSI${(+rsi).toFixed(0)}</span></div>
+    <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">STOCH</span><span class="pcv2-mv" style="color:${stochCl(sK)}">${(+sK).toFixed(1)}/${(+sD).toFixed(1)}</span><span style="color:#555;font-size:9px;margin-left:3px">RSI${(+rsi).toFixed(0)}</span></div>
     <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">J15M</span><span class="pcv2-mv" style="color:${jCl(j15m)}">${(+j15m).toFixed(1)}</span></div>
     <div class="pcv2-metric"><span class="pcv2-ml" style="color:#fff;font-weight:700">${dLbl}</span><span class="pcv2-mv" style="color:${dCol}">${(+dPct).toFixed(1)}%</span></div>
   </div>
@@ -1506,7 +1506,16 @@ function _ovStatePillHtml(state, dir) {
 
 function _ovGateBarsHtml(d, dir) {
   const isL     = dir !== 'SHORT';
-  const gArr    = isL ? d.gate_long : d.gate_short;
+  const snap   = (STATE?.pair_states||[]).find(p => p.symbol === d.symbol) || {};
+  const _sK    = +(snap.stoch_k != null ? snap.stoch_k : (d.stoch_k || 0));
+  const _sD    = +(snap.stoch_d != null ? snap.stoch_d : (d.stoch_d || 0));
+  const _sJ15  = +(snap.j15m    != null ? snap.j15m    : (d.j15m    || 0));
+  const _sJ1h  = +(snap.j1h     != null ? snap.j1h     : (d.j1h     || 0));
+  const _sBid  = +(snap.bid_pct != null ? snap.bid_pct : (d.bid_pct || 0));
+  const _sAsk  = +(snap.ask_pct != null ? snap.ask_pct : (d.ask_pct || 0));
+  const gArr   = isL
+    ? [_sJ15 < 20, _sJ1h < 40, _sK < 25 && _sK > _sD, _sBid >= 55]
+    : [_sJ15 > 80, _sJ1h > 60, _sK > 75 && _sK < _sD, _sAsk >= 55];
   const j15m    = d.j15m    || 0;
   const j1h     = d.j1h     || 0;
   const rsi     = d.rsi15m  || 0;
@@ -1558,7 +1567,7 @@ function _ovGateBarsHtml(d, dir) {
         <div class="pov-gcur" id="pov-gc-2k" style="left:${Math.min(99,stochK).toFixed(1)}%;background:${stochKC}"></div>
         <div id="pov-gc-2d" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${Math.min(99,stochD).toFixed(1)}%;width:10px;height:10px;border-radius:2px;border:1px solid ${Math.abs(stochK-stochD)<5?'#00ff88':'rgba(136,136,136,0.7)'};background:transparent;pointer-events:none;box-shadow:${Math.abs(stochK-stochD)<5?'0 0 5px rgba(0,255,136,0.4)':'none'}"></div>
       </div>
-      <span class="pov-gv" id="pov-gv-2" style="color:${stochKC}">${stochK.toFixed(0)}/${stochD.toFixed(0)}</span>
+      <span class="pov-gv" id="pov-gv-2" style="color:${stochKC}">${stochK.toFixed(1)}/${stochD.toFixed(1)}</span>
     </div>
     <div class="pov-gr" data-gi="rsi">
       <div class="pov-gd pov-gd-fail" id="pov-gd-rsi" style="opacity:0.25"></div>
@@ -1823,7 +1832,16 @@ function _ovUpdate(pn, d) {
   }
 
   // Gate cursors + dot flash on pass/fail change
-  const curGates  = _ovGates(d, dir);
+  const _snap   = (STATE?.pair_states||[]).find(p => p.symbol === pn.dataset.sym) || {};
+  const _snK    = +(_snap.stoch_k != null ? _snap.stoch_k : (d.stoch_k || 0));
+  const _snD    = +(_snap.stoch_d != null ? _snap.stoch_d : (d.stoch_d || 0));
+  const _snJ15  = +(_snap.j15m    != null ? _snap.j15m    : (d.j15m    || 0));
+  const _snJ1h  = +(_snap.j1h     != null ? _snap.j1h     : (d.j1h     || 0));
+  const _snBid  = +(_snap.bid_pct != null ? _snap.bid_pct : (d.bid_pct || 0));
+  const _snAsk  = +(_snap.ask_pct != null ? _snap.ask_pct : (d.ask_pct || 0));
+  const curGates = (dir !== 'SHORT')
+    ? [_snJ15 < 20, _snJ1h < 40, _snK < 25 && _snK > _snD, _snBid >= 55]
+    : [_snJ15 > 80, _snJ1h > 60, _snK > 75 && _snK < _snD, _snAsk >= 55];
   const j15mV    = d.j15m    || 0;
   const j1hV     = d.j1h     || 0;
   const stochKV  = d.stoch_k || 0;
@@ -1861,7 +1879,7 @@ function _ovUpdate(pn, d) {
       gc2d.style.boxShadow = stochEclipse ? '0 0 5px rgba(0,255,136,0.4)' : 'none';
     }
   const gv2 = document.getElementById('pov-gv-2');
-  if (gv2) { gv2.textContent = `${stochKV.toFixed(0)}/${stochDV.toFixed(0)}`; gv2.style.color = stochKC; }
+  if (gv2) { gv2.textContent = `${stochKV.toFixed(1)}/${stochDV.toFixed(1)}`; gv2.style.color = stochKC; }
   const gd2 = document.getElementById('pov-gd-2');
   if (gd2) {
     gd2.className = dotPassCls(curGates[2]);
