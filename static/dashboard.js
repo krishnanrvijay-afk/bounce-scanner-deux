@@ -1580,514 +1580,376 @@ async function _ovFetch(sym, isFirst) {
 }
 
 // ── State helpers ─────────────────────────────────────────────────────────────
-function _ovState(d) {
-  if (d.in_trade_long || d.in_trade_short) return 'IN_TRADE';
-  if (d.alert && d.alert_state !== 'STALE')  return 'READY';
-  return 'WATCHING';
-}
-function _ovDir(d) {
-  if (d.in_trade_long)    return 'LONG';
-  if (d.in_trade_short)   return 'SHORT';
-  if (d.alert)            return d.alert.direction;
-  if (d.confluence_long)  return 'LONG';
-  if (d.confluence_short) return 'SHORT';
-  if (d.score_long  > d.score_short) return 'LONG';
-  if (d.score_short > d.score_long)  return 'SHORT';
-  return null;
-}
-function _ovGates(d, dir) { return dir === 'SHORT' ? d.gate_short : d.gate_long; }
-function _ovBorderCol(state, trend) {
-  if (state === 'IN_TRADE')                                    return 'rgba(100,160,255,0.5)';
-  if (trend === 'Strong Bull' || trend === 'Bullish')          return 'rgba(0,230,118,0.5)';
-  if (trend === 'Strong Bear' || trend === 'Bearish')          return 'rgba(255,61,87,0.5)';
-  return 'rgba(255,255,255,0.15)';
-}
-function _ovSymCol(state, trend) {
-  if (state === 'IN_TRADE')                                    return '#66aaff';
-  if (trend === 'Strong Bull' || trend === 'Bullish')          return '#00e676';
-  if (trend === 'Strong Bear' || trend === 'Bearish')          return '#ff3d57';
-  return '#aaa';
-}
-
-// ── HTML builders ─────────────────────────────────────────────────────────────
-function _ovStatePillHtml(state, dir) {
-  if (state === 'IN_TRADE')                   return `<span class="pov-badge pov-st-trade">IN TRADE</span>`;
-  if (state === 'READY' && dir === 'LONG')    return `<span class="pov-badge pov-st-rdy-l">READY</span>`;
-  if (state === 'READY' && dir === 'SHORT')   return `<span class="pov-badge pov-st-rdy-s">READY</span>`;
-  return `<span class="pov-badge pov-st-watch">WATCHING</span>`;
-}
-
-function _ovGateBarsHtml(d, dir) {
-  const isL     = dir !== 'SHORT';
-  const snap   = (STATE?.pair_states||[]).find(p => p.symbol === d.symbol) || {};
-  const _sK    = +(snap.stoch_k != null ? snap.stoch_k : (d.stoch_k || 0));
-  const _sD    = +(snap.stoch_d != null ? snap.stoch_d : (d.stoch_d || 0));
-  const _sJ15  = +(snap.j15m    != null ? snap.j15m    : (d.j15m    || 0));
-  const _sJ1h  = +(snap.j1h     != null ? snap.j1h     : (d.j1h     || 0));
-  const _sBid  = +(snap.bid_pct != null ? snap.bid_pct : (d.bid_pct || 0));
-  const _sAsk  = +(snap.ask_pct != null ? snap.ask_pct : (d.ask_pct || 0));
-  const gArr   = isL
-    ? [_sJ15 < 20, _sJ1h < 40, _sK < 25 && _sK > _sD, _sBid >= 55]
-    : [_sJ15 > 80, _sJ1h > 60, _sK > 75 && _sK < _sD, _sAsk >= 55];
-  const j15m    = d.j15m    || 0;
-  const j1h     = d.j1h     || 0;
-  const rsi     = d.rsi15m  || 0;
-  const bid     = d.bid_pct || 0;
-  const ask     = d.ask_pct || 0;
-  const dotCls  = (pass) => pass
-    ? (isL ? 'pov-gd pov-gd-pass-l' : 'pov-gd pov-gd-pass-s')
-    : 'pov-gd pov-gd-fail';
-  const j15Col  = j15m < 20 ? '#00e676' : j15m > 80 ? '#ff3d57' : '#fff';
-  const j1hCol  = j1h  < 40 ? '#00e676' : j1h  > 60 ? '#ff3d57' : '#fff';
-  const rsiCol  = rsi  < 35 ? '#00e676' : rsi  > 65 ? '#ff3d57' : '#fff';
-  const stochK  = d.stoch_k || 0;
-  const stochD  = d.stoch_d || 0;
-  const stochKC = stochK < 25 ? '#00e676' : stochK > 75 ? '#ff3d57' : '#fff';
-  const depPct  = isL ? bid : ask;
-  const depCol  = gArr[3] ? (isL ? '#00e676' : '#ff3d57') : '#fff';
-  const bidW    = Math.min(100, Math.max(0, bid));
-  const askW    = Math.min(100, Math.max(0, ask));
-  return `
-    <div class="pov-gr" data-gi="0">
-      <div class="${dotCls(gArr[0])}" id="pov-gd-0"></div>
-      <span class="pov-gn">J15M</span>
-      <div class="pov-gt">
-        <div class="pov-gzg" style="width:20%"></div>
-        <div class="pov-gzr" style="left:80%;width:20%"></div>
-        <div class="pov-gth" style="left:20%"></div><div class="pov-gth" style="left:80%"></div>
-        <div class="pov-gcur" id="pov-gc-0" style="left:${Math.min(99,j15m).toFixed(1)}%;background:${j15Col}"></div>
-      </div>
-      <span class="pov-gv" id="pov-gv-0" style="color:${j15Col}">${j15m.toFixed(0)}</span>
-    </div>
-    <div class="pov-gr" data-gi="1">
-      <div class="${dotCls(gArr[1])}" id="pov-gd-1"></div>
-      <span class="pov-gn">J1H</span>
-      <div class="pov-gt">
-        <div class="pov-gzg" style="width:40%"></div>
-        <div class="pov-gzr" style="left:60%;width:40%"></div>
-        <div class="pov-gth" style="left:40%"></div><div class="pov-gth" style="left:60%"></div>
-        <div class="pov-gcur" id="pov-gc-1" style="left:${Math.min(99,j1h).toFixed(1)}%;background:${j1hCol}"></div>
-      </div>
-      <span class="pov-gv" id="pov-gv-1" style="color:${j1hCol}">${j1h.toFixed(0)}</span>
-    </div>
-    <div class="pov-gr" data-gi="2">
-      <div class="${dotCls(gArr[2])}" id="pov-gd-2"></div>
-      <span class="pov-gn">STOCH</span>
-      <div class="pov-gt" style="position:relative">
-        <div class="pov-gzg" style="width:25%"></div>
-        <div class="pov-gzr" style="left:75%;width:25%"></div>
-        <div class="pov-gth" style="left:25%"></div><div class="pov-gth" style="left:75%"></div>
-        <div class="pov-gcur" id="pov-gc-2k" style="left:${Math.min(99,stochK).toFixed(1)}%;background:${stochKC}"></div>
-        <div id="pov-gc-2d" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${Math.min(99,stochD).toFixed(1)}%;width:10px;height:10px;border-radius:2px;border:1px solid ${Math.abs(stochK-stochD)<5?'#00ff88':'rgba(136,136,136,0.7)'};background:transparent;pointer-events:none;box-shadow:${Math.abs(stochK-stochD)<5?'0 0 5px rgba(0,255,136,0.4)':'none'}"></div>
-      </div>
-      <span class="pov-gv" id="pov-gv-2" style="color:${stochKC}">${stochK.toFixed(1)}/${stochD.toFixed(1)}</span>
-    </div>
-    <div class="pov-gr" data-gi="rsi">
-      <div class="pov-gd pov-gd-fail" id="pov-gd-rsi" style="opacity:0.25"></div>
-      <span class="pov-gn" style="color:#555">RSI</span>
-      <div class="pov-gt">
-        <div class="pov-gzg" style="width:35%"></div>
-        <div class="pov-gzr" style="left:65%;width:35%"></div>
-        <div class="pov-gth" style="left:35%"></div><div class="pov-gth" style="left:65%"></div>
-        <div class="pov-gcur" id="pov-gc-rsi" style="left:${Math.min(99,rsi).toFixed(1)}%;background:${rsiCol}"></div>
-      </div>
-      <span class="pov-gv" id="pov-gv-rsi" style="color:${rsiCol}">${rsi.toFixed(0)}</span>
-    </div>
-    <div class="pov-gr" data-gi="3">
-      <div class="${dotCls(gArr[3])}" id="pov-gd-3"></div>
-      <span class="pov-gn">DEPTH</span>
-      <div class="pov-dt">
-        <div class="pov-dbid" id="pov-dbid" style="width:${bidW.toFixed(0)}%;opacity:${isL && bidW >= 55 ? '0.75' : '0.2'}"></div>
-        <div class="pov-dask" id="pov-dask" style="width:${askW.toFixed(0)}%;opacity:${!isL && askW >= 55 ? '0.75' : '0.2'}"></div>
-        <div class="pov-dgln" style="left:55%"></div>
-      </div>
-      <span class="pov-gv" id="pov-gv-3" style="color:${depCol}">${depPct.toFixed(0)}%</span>
-    </div>`;
-}
-
-function _ovRulerHtml(d, dir) {
-  const src = d.in_trade_long || d.in_trade_short || d.alert;
-  if (!src || !src.sl_price || !src.entry_price) return '';
-  const sl   = src.sl_price;
-  const ep   = src.entry_price;
-  const tp1  = src.tp1_price;
-  const tp2  = src.tp2_price;
-  const cur  = d.price || ep;
-  const slD  = Math.abs(ep - sl);
-  const tp2R = tp2 || (dir === 'LONG' ? ep + slD * 2 : ep - slD * 2);
-  const lo   = Math.min(sl, cur, tp2R) - slD * 0.05;
-  const hi   = Math.max(sl, cur, tp2R) + slD * 0.05;
-  const span = hi - lo || 1;
-  const pct  = (v) => Math.min(99, Math.max(1, ((v - lo) / span) * 100));
-  const curP = pct(cur);
-  const epP  = pct(ep);
-  const curCol = (dir === 'LONG' ? cur >= ep : cur <= ep) ? '#00e676' : '#ff3d57';
-  const slZL  = dir === 'LONG' ? pct(sl) : epP;
-  const slZW  = dir === 'LONG' ? epP - pct(sl) : pct(sl) - epP;
-  const pfL   = dir === 'LONG' ? epP : (tp2R ? pct(tp2R) : epP);
-  const pfW   = dir === 'LONG' ? (tp2R ? pct(tp2R) - epP : 0) : epP - (tp2R ? pct(tp2R) : epP);
-  let marks = `<div class="pov-rm pov-rm-ep" style="left:${epP.toFixed(1)}%"></div>`;
-  if (tp1)  marks += `<div class="pov-rm pov-rm-tp1" style="left:${pct(tp1).toFixed(1)}%"></div>`;
-  if (tp2R) marks += `<div class="pov-rm pov-rm-tp2" style="left:${pct(tp2R).toFixed(1)}%"></div>`;
-  return `<div class="pov-ruler-hdr">
-    <span style="color:#ff3d57">SL ${fmtPrice(sl)}</span>
-    ${tp1 ? `<span style="color:#66aaff">TP1 ${fmtPrice(tp1)}</span>` : ''}
-    ${tp2R ? `<span style="color:#00e676">TP2 ${fmtPrice(tp2R)}</span>` : ''}
-  </div>
-  <div class="pov-ruler-track">
-    <div class="pov-rzsl" style="left:${Math.min(slZL,slZL+slZW).toFixed(1)}%;width:${Math.abs(slZW).toFixed(1)}%"></div>
-    <div class="pov-rzpf" style="left:${Math.min(pfL,pfL+pfW).toFixed(1)}%;width:${Math.abs(pfW).toFixed(1)}%"></div>
-    ${marks}
-    <div class="pov-rdot" id="pov-rdot" style="left:${curP.toFixed(1)}%;background:${curCol}"></div>
-  </div>`;
-}
-
-function _ovActionsHtml(d, state, dir, trade) {
-  if (state === 'IN_TRADE' && trade) {
-    return `<button class="pov-btn pov-btn-close" onclick="_ovCloseTrade('${d.symbol}','${trade.direction}')">CLOSE HL</button>
-            <button class="pov-btn pov-btn-force" onclick="_ovCloseTrade('${d.symbol}','${trade.direction}')">FORCE CLOSE</button>`;
+  function _ovState(d) {
+    if (d.in_trade_long || d.in_trade_short) return 'IN_TRADE';
+    if (d.alert && d.alert_state !== 'STALE')  return 'READY';
+    const score = Math.max(d.score_long || 0, d.score_short || 0);
+    if (score === 3) return 'NEAR';
+    if (score >= 1)  return 'SCANNING';
+    return 'WATCHING';
   }
-  if (state === 'READY' && d.alert && d.alert_state !== 'STALE') {
-    const lev = d.alert.leverage || 5;
-    const rCol = (d.trend === 'Strong Bull' || d.trend === 'Bullish') ? '#00e676'
+  function _ovDir(d) {
+    if (d.in_trade_long)    return 'LONG';
+    if (d.in_trade_short)   return 'SHORT';
+    if (d.alert)            return d.alert.direction;
+    if (d.confluence_long)  return 'LONG';
+    if (d.confluence_short) return 'SHORT';
+    if ((d.score_long || 0)  > (d.score_short || 0)) return 'LONG';
+    if ((d.score_short || 0) > (d.score_long  || 0)) return 'SHORT';
+    return 'LONG';
+  }
+  function _ovGates(d, dir) { return dir === 'SHORT' ? d.gate_short : d.gate_long; }
+  function _ovBorderCol(state, trend) {
+    if (state === 'IN_TRADE')                                   return 'rgba(100,160,255,0.5)';
+    if (trend === 'Strong Bull' || trend === 'Bullish')         return 'rgba(0,230,118,0.5)';
+    if (trend === 'Strong Bear' || trend === 'Bearish')         return 'rgba(255,61,87,0.5)';
+    return '#222';
+  }
+  function _ovSymCol(state, trend) {
+    if (state === 'IN_TRADE')                                   return '#66aaff';
+    if (trend === 'Strong Bull' || trend === 'Bullish')         return '#00e676';
+    if (trend === 'Strong Bear' || trend === 'Bearish')         return '#ff3d57';
+    return '#aaa';
+  }
+
+  // ── HTML builders ─────────────────────────────────────────────────────────────
+  function _ovStatePillHtml(state, dir) {
+    const labels = { IN_TRADE:'IN TRADE', READY:'READY', NEAR:'NEAR', SCANNING:'SCANNING', WATCHING:'WATCHING' };
+    const styles = {
+      IN_TRADE: 'background:rgba(100,160,255,0.2);color:#66aaff;border:1px solid rgba(100,160,255,0.4)',
+      READY:    (dir === 'LONG'
+                  ? 'background:rgba(0,230,118,0.15);color:#00e676;border:1px solid rgba(0,230,118,0.4)'
+                  : 'background:rgba(255,61,61,0.15);color:#ff3d3d;border:1px solid rgba(255,61,61,0.4)'),
+      NEAR:     'background:rgba(255,179,0,0.15);color:#ffb300;border:1px solid rgba(255,179,0,0.4)',
+      SCANNING: 'background:rgba(136,136,136,0.1);color:#888;border:1px solid #333',
+      WATCHING: 'background:transparent;color:#555;border:1px solid #2a2a2a',
+    };
+    const label = labels[state] || state;
+    const style = styles[state] || styles.WATCHING;
+    return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;letter-spacing:0.06em;${style}">${label}</span>`;
+  }
+
+  // ── New gate builders ─────────────────────────────────────────────────────────
+  function _ovPassIcon(pass) {
+    return pass
+      ? '<span style="color:#00e676;font-size:14px;line-height:1">\u2705</span>'
+      : '<span style="color:#ff5252;font-size:14px;line-height:1">\u274c</span>';
+  }
+
+  function _ovGateLabelHtml(name) {
+    return `<span style="font-size:10px;font-weight:700;color:#888;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em">${name}</span>`;
+  }
+
+  function _ovVerdictHtml(d, dir) {
+    const isL   = dir !== 'SHORT';
+    const gates = (isL ? d.gate_long : d.gate_short) || [false, false, false, false];
+    const score = gates.filter(Boolean).length;
+    const names = ['J 15M', 'J 1H', 'STOCH K/D', isL ? 'BID DEPTH' : 'ASK DEPTH'];
+    const failing = names.filter((_, i) => !gates[i]);
+    const base = "padding:7px 16px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;text-align:center";
+    if (score === 4)
+      return `<div id="pov-verdict" style="${base};background:rgba(0,230,118,0.1);border-top:1px solid rgba(0,230,118,0.1);border-bottom:1px solid rgba(0,230,118,0.1);color:#00e676">\u2705 SIGNAL READY \u2014 all ${isL ? 'LONG' : 'SHORT'} gates passing</div>`;
+    if (score === 3)
+      return `<div id="pov-verdict" style="${base};background:rgba(255,179,0,0.08);border-top:1px solid rgba(255,179,0,0.1);border-bottom:1px solid rgba(255,179,0,0.1);color:#ffb300">\u23f3 ALMOST READY \u2014 waiting for ${failing[0]}</div>`;
+    return `<div id="pov-verdict" style="${base};background:rgba(255,82,82,0.07);border-top:1px solid rgba(255,82,82,0.1);border-bottom:1px solid rgba(255,82,82,0.1);color:#ff5252">\u274c NOT READY \u2014 ${failing.join(', ')}</div>`;
+  }
+
+  function _ovGateRowHtml(idPfx, name, passHtml, bodyHtml) {
+    return `<div style="padding:10px 16px;border-bottom:1px solid #1a1a1a">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        ${_ovGateLabelHtml(name)}
+        <span id="pov-${idPfx}-pass">${passHtml}</span>
+      </div>
+      ${bodyHtml}
+    </div>`;
+  }
+
+  function _ovJ15Html(d, dir) {
+    const isL  = dir !== 'SHORT';
+    const v    = d.j15m || 0;
+    const pass = isL ? v < 20 : v > 80;
+    const col  = pass ? '#00e676' : '#ff5252';
+    const body = `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#555">needs ${isL ? '&lt;20' : '&gt;80'} for ${isL ? 'LONG' : 'SHORT'}, currently <span id="pov-j15-val" style="color:${col};font-weight:700">${v.toFixed(0)}</span></div>`;
+    return _ovGateRowHtml('j15', 'J 15M', _ovPassIcon(pass), body);
+  }
+
+  function _ovJ1hHtml(d, dir) {
+    const isL  = dir !== 'SHORT';
+    const v    = d.j1h || 0;
+    const pass = isL ? v < 40 : v > 60;
+    const col  = pass ? '#00e676' : '#ff5252';
+    const body = `<div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#555">needs ${isL ? '&lt;40' : '&gt;60'} for ${isL ? 'LONG' : 'SHORT'}, currently <span id="pov-j1h-val" style="color:${col};font-weight:700">${v.toFixed(0)}</span></div>`;
+    return _ovGateRowHtml('j1h', 'J 1H', _ovPassIcon(pass), body);
+  }
+
+  function _ovStochHtml(d, dir) {
+    const isL    = dir !== 'SHORT';
+    const K      = d.stoch_k || 0;
+    const D      = d.stoch_d || 0;
+    const inZone = isL ? K < 25 : K > 75;
+    const pass   = isL ? (K < 25 && K > D) : (K > 75 && K < D);
+    const kCol   = inZone ? (isL ? '#00e676' : '#ff3d3d') : '#888';
+    const dZone  = isL ? D < 25 : D > 75;
+    const dCol   = dZone ? (isL ? '#00e676' : '#ff5252') : '#666';
+    const desc1  = isL
+      ? 'K needs to drop below 25 and cross above D'
+      : 'K needs to rise above 75 and cross below D';
+    let crossNote;
+    if (pass) {
+      crossNote = `K ${isL ? 'below' : 'above'} D in zone \u2014 ${isL ? 'LONG' : 'SHORT'} crossover confirmed \u2705`;
+    } else if (isL) {
+      crossNote = inZone
+        ? 'K is in zone but below D \u2014 needs to cross above D \u2191'
+        : 'K is above 25 and above zone \u2014 needs to fall and cross \u2193';
+    } else {
+      crossNote = inZone
+        ? 'K is in zone but above D \u2014 needs to cross below D \u2193'
+        : 'K is below 75 \u2014 needs to rise and cross \u2191';
+    }
+    const noteCol = pass ? '#00e676' : '#ff5252';
+    const kLeft = Math.min(99, Math.max(0.5, K)).toFixed(1);
+    const dLeft = Math.min(99, Math.max(0.5, D)).toFixed(1);
+    const kGlow = inZone ? `box-shadow:0 0 6px ${kCol};` : '';
+    const body = `
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#555">${desc1} for ${isL ? 'LONG' : 'SHORT'}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#666;margin-top:2px">Currently <span id="pov-sk-val" style="color:${kCol};font-weight:700">K=${K.toFixed(1)}</span> \u00b7 <span id="pov-sd-val" style="color:${dCol}">D=${D.toFixed(1)}</span></div>
+      <div style="position:relative;height:10px;background:#1a1a1a;border-radius:3px;margin:8px 0 0;overflow:visible">
+        <div style="position:absolute;left:0;width:25%;height:100%;background:#00ff6a;opacity:0.2;border-radius:3px 0 0 3px;pointer-events:none"></div>
+        <div style="position:absolute;left:75%;width:25%;height:100%;background:#ff3d3d;opacity:0.2;border-radius:0 3px 3px 0;pointer-events:none"></div>
+        <div id="pov-stoch-k" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${kLeft}%;width:14px;height:14px;border-radius:50%;background:${kCol};${kGlow}display:flex;align-items:center;justify-content:center;z-index:2">
+          <span style="font-size:7px;font-weight:700;color:#000;font-family:'JetBrains Mono',monospace;line-height:1">K</span>
+        </div>
+        <div id="pov-stoch-d" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${dLeft}%;width:12px;height:12px;border-radius:2px;border:1.5px solid ${dCol};background:transparent;display:flex;align-items:center;justify-content:center;z-index:1">
+          <span style="font-size:7px;font-weight:700;color:${dCol};font-family:'JetBrains Mono',monospace;line-height:1">D</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:#444;font-family:'JetBrains Mono',monospace;margin:3px 0 4px">
+        <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+      </div>
+      <div id="pov-stoch-note" style="font-size:9px;color:${noteCol};font-family:'JetBrains Mono',monospace">${crossNote}</div>`;
+    return _ovGateRowHtml('stoch', 'STOCH K/D', _ovPassIcon(pass), body);
+  }
+
+  function _ovDepthHtml(d, dir) {
+    const isL  = dir !== 'SHORT';
+    const v    = isL ? (d.bid_pct || 0) : (d.ask_pct || 0);
+    const pass = v >= 55;
+    const col  = isL ? '#00e676' : '#ff3d3d';
+    const label = isL ? 'Bid' : 'Ask';
+    const barCol = pass ? col : 'rgba(100,100,100,0.3)';
+    const body = `
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#555">${label} orders need at least 55% of the order book for ${isL ? 'LONG' : 'SHORT'}</div>
+      <div style="position:relative;height:8px;background:#1a1a1a;border-radius:3px;margin:6px 0 4px;overflow:hidden">
+        <div id="pov-depth-bar" style="position:absolute;left:0;height:100%;width:${Math.min(100, v).toFixed(0)}%;background:${barCol};border-radius:3px;transition:width 0.4s"></div>
+        <div style="position:absolute;left:55%;top:0;height:100%;width:1px;background:rgba(255,255,255,0.35)"></div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#555"><span id="pov-depth-val" style="color:${pass ? col : '#888'};font-weight:700">${v.toFixed(0)}%</span> \u00b7 threshold 55%</div>`;
+    return _ovGateRowHtml('depth', 'BID/ASK DEPTH', _ovPassIcon(pass), body);
+  }
+
+  function _ovScanConfHtml(d, dir, score) {
+    if (score < 3) return '';
+    const isL   = dir !== 'SHORT';
+    const scans = (d.last_scan_summaries || []).slice(0, 4);
+    const passed = scans.reduce((n, s) => n + ((isL ? (s.score_long || 0) : (s.score_short || 0)) === 4 ? 1 : 0), 0);
+    const dots = Array.from({ length: 4 }, (_, i) => {
+      const ok = i < scans.length && (isL ? (scans[i].score_long || 0) : (scans[i].score_short || 0)) === 4;
+      return `<div style="width:20px;height:8px;border-radius:2px;background:${ok ? '#00e676' : '#1e1e1e'};border:1px solid ${ok ? 'rgba(0,230,118,0.5)' : '#333'}"></div>`;
+    }).join('');
+    return `<div style="padding:10px 16px;border-bottom:1px solid #1a1a1a" id="pov-scan-conf">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        ${_ovGateLabelHtml('2-SCAN CONFIRMATION')}
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#555;margin-bottom:6px">${passed} of 4 consecutive scans passed \u2014 needs 4</div>
+      <div style="display:flex;gap:4px">${dots}</div>
+    </div>`;
+  }
+
+  function _ovScanHistHtml(d, dir) {
+    const scans = (d.last_scan_summaries || []).slice(0, 3);
+    const isL   = dir !== 'SHORT';
+    if (!scans.length)
+      return '<div style="color:#2a2a2a;font-family:\'JetBrains Mono\',monospace;font-size:9px;padding:0 16px 8px">no scan data yet</div>';
+    return scans.map(s => {
+      const sc    = isL ? (s.score_long || 0) : (s.score_short || 0);
+      const ready = sc === 4;
+      const jVal  = s.j15m || 0;
+      const jCol  = jVal < 20 || jVal > 80 ? '#ffb300' : '#555';
+      const bPct  = s.bid_pct || 0;
+      const kVal  = s.stoch_k || 0;
+      return `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:#555;padding:2px 16px">#${s.n} J:<span style="color:${jCol}">${jVal.toFixed(0)}</span> K:${kVal.toFixed(0)} B:<span style="color:${bPct >= 55 ? '#00e676' : '#555'}">${bPct.toFixed(0)}%</span> \u2014 <span style="color:${ready ? '#00e676' : '#555'}">${ready ? 'ready' : 'not ready'}</span></div>`;
+    }).join('');
+  }
+
+  // ── Actions (kept) ────────────────────────────────────────────────────────────
+  function _ovActionsHtml(d, state, dir, trade) {
+    if (state === 'IN_TRADE' && trade) {
+      return `<button class="pov-btn pov-btn-close" onclick="_ovCloseTrade('${d.symbol}','${trade.direction}')">CLOSE HL</button>
+              <button class="pov-btn pov-btn-force" onclick="_ovCloseTrade('${d.symbol}','${trade.direction}')">FORCE CLOSE</button>`;
+    }
+    if (state === 'READY' && d.alert && d.alert_state !== 'STALE') {
+      const lev  = d.alert.leverage || 5;
+      const rCol = (d.trend === 'Strong Bull' || d.trend === 'Bullish') ? '#00e676'
+                 : (d.trend === 'Strong Bear' || d.trend === 'Bearish') ? '#ff3d57'
+                 :                                                          '#aaa';
+      return `<button class="pov-btn pov-btn-hl" onclick="_ovOpen('${d.symbol}','${dir}','HL',${lev})" style="border-color:${rCol};color:${rCol};font-weight:700">OPEN HL ${lev}x</button>`;
+    }
+    const wCol = (d.trend === 'Strong Bull' || d.trend === 'Bullish') ? '#00e676'
                : (d.trend === 'Strong Bear' || d.trend === 'Bearish') ? '#ff3d57'
                :                                                          '#aaa';
-    return `<button class="pov-btn pov-btn-hl" onclick="_ovOpen('${d.symbol}','${dir}','HL',${lev})" style="border-color:${rCol};color:${rCol};font-weight:700">OPEN HL ${lev}x</button>`;
-  }
-  const wCol = (d.trend === 'Strong Bull' || d.trend === 'Bullish') ? '#00e676'
-             : (d.trend === 'Strong Bear' || d.trend === 'Bearish') ? '#ff3d57'
-             :                                                         '#aaa';
-  // Session halt / large SL CD status above WATCHING button
-  const _ovSessHalt = (dir === 'LONG' ? d.session_halted_long : d.session_halted_short) || false;
-  const _ovLgCDRem  = (dir === 'LONG' ? d.large_sl_cooldown_long_remaining : d.large_sl_cooldown_short_remaining) || 0;
-  let _ovStatusHtml = '';
-  if (_ovSessHalt) {
-    _ovStatusHtml = `<div id="pov-halt-info" style="font-size:9px;color:#ff4444;font-family:'JetBrains Mono',monospace;font-weight:700;margin-bottom:6px;text-align:center">🚫 2 SL hits this session — resumes at next session open</div>`;
-  } else if (_ovLgCDRem > 0) {
-    const _m = Math.floor(_ovLgCDRem / 60), _s = _ovLgCDRem % 60;
-    _ovStatusHtml = `<div id="pov-cd-rem" style="font-size:9px;color:#ffaa00;font-family:'JetBrains Mono',monospace;font-weight:700;margin-bottom:6px;text-align:center">⏳ 90 min cooldown: ${_m}m${_s}s remaining</div>`;
-  }
-  return `${_ovStatusHtml}<button class="pov-btn pov-btn-watch" disabled style="color:${wCol};border-color:${wCol};font-weight:700">WATCHING HL</button>`;
-}
-
-function _ovStaleHtml(d) {
-  const age = d.alert_age_seconds || 0;
-  const MAX = 600;
-  const pct = Math.max(0, Math.min(100, 100 - (age / MAX) * 100));
-  const col = d.alert_state === 'STALE' ? '#ff3d57' : d.alert_state === 'AGING' ? '#ffaa00' : '#00e676';
-  const rem = Math.max(0, MAX - age);
-  const rs  = rem >= 60 ? `${Math.floor(rem/60)}m${rem % 60}s` : `${rem}s`;
-  return `<div class="pov-stale-hdr">
-    <span style="color:${col};font-weight:800">${d.alert_state || 'FRESH'}</span>
-    <span style="color:#555">${rs} remaining</span>
-  </div>
-  <div class="pov-stale-track">
-    <div class="pov-sfill" id="pov-sfill" style="width:${pct.toFixed(1)}%;background:${col}"></div>
-  </div>`;
-}
-
-function _ovScanRowsHtml(snaps) {
-  if (!snaps || !snaps.length) return `<div style="color:#2a2a2a;font-size:9px">no scan data yet</div>`;
-  return snaps.map((s, i) => {
-    const lc = (s.score_long  || 0) === 4 ? '#00e676' : '#555';
-    const sc = (s.score_short || 0) === 4 ? '#ff3d57' : '#555';
-    const jc = (s.j15m || 50) < 20 ? '#00e676' : (s.j15m || 50) > 80 ? '#ff3d57' : '#fff';
-    return `<div class="pov-scan-r ${i === 0 ? 'pov-scan-fresh' : ''}">
-      <span style="color:#fff">#${s.n}</span>
-      <span>J:<span style="color:${jc}">${(s.j15m||0).toFixed(0)}</span></span>
-      <span>RSI:<span style="color:#fff">${(s.rsi15m||0).toFixed(0)}</span></span>
-      <span>B:<span style="color:${(s.bid_pct||0)>=55?'#00e676':'#555'}">${(s.bid_pct||0).toFixed(0)}%</span></span>
-      <span>A:<span style="color:${(s.ask_pct||0)>=55?'#ff3d57':'#555'}">${(s.ask_pct||0).toFixed(0)}%</span></span>
-      <span>ADX:<span style="color:${(s.adx1h||0)>=50?'#00e676':'#555'}">${(s.adx1h||0).toFixed(0)}</span></span>
-      <span style="color:${lc}">L${s.score_long||0}</span>
-      <span style="color:${sc}">S${s.score_short||0}</span>
-    </div>`;
-  }).join('');
-}
-
-function _ovHistHtml(hist) {
-  if (!hist || !hist.length) return `<div style="color:#222;font-family:'JetBrains Mono',monospace;font-size:9px">no history yet</div>`;
-  const rc = (r) => r === 'TP2' ? '#00e676' : r === 'TP1' ? '#66aaff' : r === 'SL' ? '#ff3d57' : '#444';
-  return hist.map(h => {
-    const pnl   = h.pnl_usd || 0;
-    const pc    = pnl >= 0 ? '#00e676' : '#ff3d57';
-    const dirCl = h.direction === 'LONG' ? 'card-dir-l' : 'card-dir-s';
-    const ts    = h.timestamp_closed
-      ? new Date(h.timestamp_closed * 1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})
-      : '—';
-    return `<div class="pov-hr">
-      <span style="color:#333;min-width:36px">${ts}</span>
-      <span class="${dirCl}" style="font-size:8px;padding:1px 5px">${h.direction}</span>
-      <span style="color:#555">${fmtPrice(h.entry_price)}</span>
-      <span style="color:${rc(h.exit_reason)};font-weight:800">${h.exit_reason||'—'}</span>
-      <span style="color:${pc}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</span>
-      <span style="color:#333">${h.r_value != null ? (h.r_value >= 0 ? '+' : '') + h.r_value + 'R' : ''}</span>
-    </div>`;
-  }).join('');
-}
-
-// ── Full render ───────────────────────────────────────────────────────────────
-function _ovRender(pn, d) {
-  const state = _ovState(d);
-  const dir   = _ovDir(d);
-  const trend = d.trend || '';
-  const trade = d.in_trade_long || d.in_trade_short;
-  const alert = d.alert;
-
-  pn.dataset.state = state;
-  pn.style.border  = `1px solid ${_ovBorderCol(state, trend)}`;
-
-  const symCol    = _ovSymCol(state, trend);
-  const statePill = _ovStatePillHtml(state, dir);
-
-  let dirBadge = '';
-  if (alert || state === 'IN_TRADE') {
-    const dl = dir === 'LONG' ? 'pov-dir-l' : 'pov-dir-s';
-    dirBadge = `<span class="pov-badge ${dl}">BOUNCE ${dir||''}</span>`;
-  }
-  let confBadge = '';
-  if (d.confluence_long || d.confluence_short)
-    confBadge = `<span class="pov-badge pov-badge-conf">✦ CONFL</span>`;
-  let tierBadge = '';
-  const tier = alert?.tier || trade?.tier;
-  const lev  = alert?.leverage || trade?.leverage;
-  if (tier && lev) tierBadge = `<span class="pov-badge pov-badge-tier">${tier} ${lev}x</span>`;
-
-  const chg = d.change_24h;
-  const chgHtml = chg != null
-    ? `<span class="pov-chg" style="color:${chg >= 0 ? '#00e676' : '#ff3d57'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`
-    : '';
-
-  let pnlHtml = '';
-  if (state === 'IN_TRADE' && trade) {
-    const pnl = trade.unrealized_pnl || 0;
-    const r   = trade.r || 0;
-    const pc  = pnl >= 0 ? '#00e676' : '#ff3d57';
-    const el  = trade.elapsed_s || 0;
-    const age = el < 3600 ? `${Math.floor(el/60)}m${el%60}s` : `${Math.floor(el/3600)}h${Math.floor((el%3600)/60)}m`;
-    pnlHtml = `<div class="pov-pnl"><div class="pov-pnl-usd" style="color:${pc}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</div><div class="pov-pnl-r">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</div><div class="pov-pnl-age" id="pov-age">${age}</div></div>`;
+    const _ovSessHalt = (dir === 'LONG' ? d.session_halted_long  : d.session_halted_short)  || false;
+    const _ovLgCDRem  = (dir === 'LONG' ? d.large_sl_cooldown_long_remaining : d.large_sl_cooldown_short_remaining) || 0;
+    let _ovStatusHtml = '';
+    if (_ovSessHalt) {
+      _ovStatusHtml = `<div id="pov-halt-info" style="font-size:9px;color:#ff4444;font-family:'JetBrains Mono',monospace;font-weight:700;margin-bottom:6px;text-align:center">\uD83D\uDEAB 2 SL hits this session \u2014 resumes at next session open</div>`;
+    } else if (_ovLgCDRem > 0) {
+      const _m = Math.floor(_ovLgCDRem / 60), _s = _ovLgCDRem % 60;
+      _ovStatusHtml = `<div id="pov-cd-rem" style="font-size:9px;color:#ffaa00;font-family:'JetBrains Mono',monospace;font-weight:700;margin-bottom:6px;text-align:center">\u23f3 90 min cooldown: ${_m}m${_s}s remaining</div>`;
+    }
+    return `${_ovStatusHtml}<button class="pov-btn pov-btn-watch" disabled style="color:${wCol};border-color:${wCol};font-weight:700">WATCHING HL</button>`;
   }
 
-  const showRuler = (state === 'READY' || state === 'IN_TRADE') && (alert || trade);
-  const rulerHtml = showRuler ? _ovRulerHtml(d, dir) : '';
-  const gatesHtml = _ovGateBarsHtml(d, dir);
-  const adxCol    = (d.adx||0) >= 50 ? '#00e676' : (d.adx||0) >= 25 ? '#ffaa00' : '#fff';
-  const staleHtml = state === 'READY' && alert ? _ovStaleHtml(d) : '';
-  const actHtml   = _ovActionsHtml(d, state, dir, trade);
+  // ── Full render ───────────────────────────────────────────────────────────────
+  function _ovRender(pn, d) {
+    const state = _ovState(d);
+    const dir   = _ovDir(d);
+    const trend = d.trend || '';
+    const trade = d.in_trade_long || d.in_trade_short;
+    const isL   = dir !== 'SHORT';
+    const gates = (isL ? d.gate_long : d.gate_short) || [false, false, false, false];
+    const score = gates.filter(Boolean).length;
 
-  pn.innerHTML = `
-    <div class="pov-hdr">
-      <div>
-        <div class="pov-sym" style="color:${symCol}">${d.symbol}</div>
-        <div class="pov-badges">${dirBadge}${confBadge}${tierBadge}${statePill}</div>
-      </div>
-      <button class="pov-x" onclick="closePairOverlay()">✕</button>
-    </div>
-    <div class="pov-body">
-      <div class="pov-price-row">
-        <div><span class="pov-px" id="pov-px">${fmtPrice(d.price)}</span> <span id="pov-chg">${chgHtml}</span></div>
-        <div id="pov-pnl">${pnlHtml}</div>
-      </div>
-      <div id="pov-ruler" class="pov-ruler-wrap">${rulerHtml}</div>
-      <div class="pov-gates-sec" id="pov-gates">${gatesHtml}</div>
-      <div class="pov-adx-row">
-        <div>
-          <div class="pov-adx-val" id="pov-adx" style="color:${adxCol}">${(d.adx||0).toFixed(1)}</div>
-          <div class="pov-adx-lbl">ADX 1H</div>
+    pn.dataset.state = state;
+    pn.style.borderColor = _ovBorderCol(state, trend);
+
+    const price   = d.price || 0;
+    const chg     = d.change_24h;
+    const chgStr  = chg != null ? `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%` : '\u2014';
+    const chgCol  = chg != null ? (chg >= 0 ? '#00e676' : '#ff3d57') : '#555';
+    const adx     = d.adx || 0;
+    const adxTier = adx >= 50 ? 'STRONG' : 'REGULAR';
+    const adxCol  = adx >= 50 ? '#00e676' : adx >= 25 ? '#ffaa00' : '#666';
+
+    let pnlHtml = '';
+    if (state === 'IN_TRADE' && trade) {
+      const pnl = trade.unrealized_pnl || 0;
+      const r   = trade.r || 0;
+      const pc  = pnl >= 0 ? '#00e676' : '#ff3d57';
+      const el  = trade.elapsed_s || 0;
+      const age = el < 3600
+        ? `${Math.floor(el / 60)}m${el % 60}s`
+        : `${Math.floor(el / 3600)}h${Math.floor((el % 3600) / 60)}m`;
+      pnlHtml = `<div style="display:flex;gap:10px;align-items:center;margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:10px">
+        <span id="pov-pnl-usd" style="font-weight:700;color:${pc};font-size:12px">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</span>
+        <span style="color:#555">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</span>
+        <span id="pov-age" style="color:#444">${age}</span>
+      </div>`;
+    }
+
+    const showScanConf = score >= 3;
+
+    pn.innerHTML = `
+      <div style="padding:16px 20px 10px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #1a1a1a">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:#fff;line-height:1;letter-spacing:0.02em">${d.symbol}</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:5px;font-family:'JetBrains Mono',monospace;font-size:12px;flex-wrap:wrap">
+            <span id="pov-px" style="color:#fff;font-weight:600">${fmtPrice(price)}</span>
+            <span id="pov-chg" style="color:${chgCol}">${chgStr}</span>
+            <span style="color:${adxCol}">${adxTier}</span>
+            ${_ovStatePillHtml(state, dir)}
+          </div>
+          ${pnlHtml}
         </div>
-        <div class="pov-scans" id="pov-scans">${_ovScanRowsHtml(d.last_scan_summaries)}</div>
+        <button onclick="closePairOverlay()" style="background:none;border:none;color:#444;font-size:18px;cursor:pointer;padding:2px;line-height:1;flex-shrink:0;margin-left:10px">\u2715</button>
       </div>
-      ${staleHtml ? `<div class="pov-stale" id="pov-stale">${staleHtml}</div>` : '<div id="pov-stale" style="display:none"></div>'}
-      <div class="pov-hist-sec">
-        <div class="pov-hist-lbl">RECENT TRADES</div>
-        <div id="pov-hist">${_ovHistHtml(d.recent_alerts)}</div>
+      ${_ovVerdictHtml(d, dir)}
+      <div id="pov-gates-wrap">
+        ${_ovJ15Html(d, dir)}
+        ${_ovJ1hHtml(d, dir)}
+        ${_ovStochHtml(d, dir)}
+        ${_ovDepthHtml(d, dir)}
+        ${showScanConf ? _ovScanConfHtml(d, dir, score) : ''}
       </div>
-    </div>
-    <div class="pov-actions" id="pov-actions">${actHtml}</div>`;
+      <div style="border-top:1px solid #1a1a1a;padding:8px 0 6px">
+        <div style="font-size:9px;font-weight:700;color:#333;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;padding:0 16px 4px">SCAN HISTORY</div>
+        <div id="pov-scan-hist">${_ovScanHistHtml(d, dir)}</div>
+      </div>
+      <div class="pov-actions" id="pov-actions" style="border-top:1px solid #1a1a1a;padding:12px 16px">${_ovActionsHtml(d, state, dir, trade)}</div>`;
 
-  _ovPrevGates = _ovGates(d, dir);
-}
-
-// ── Targeted update (no full re-render) ───────────────────────────────────────
-function _ovUpdate(pn, d) {
-  const state     = _ovState(d);
-  const dir       = _ovDir(d);
-  const trade     = d.in_trade_long || d.in_trade_short;
-  const prevState = pn.dataset.state;
-
-  // Trade just closed — show exit banner then close
-  if (prevState === 'IN_TRADE' && state !== 'IN_TRADE') {
-    _ovExit(pn, d); return;
-  }
-  // State transition — full re-render
-  if (prevState !== state) { _ovRender(pn, d); return; }
-
-  pn.dataset.state = state;
-
-  // Price
-  const pxEl = document.getElementById('pov-px');
-  if (pxEl) pxEl.textContent = fmtPrice(d.price);
-
-  // Change %
-  const chgEl = document.getElementById('pov-chg');
-  if (chgEl && d.change_24h != null) {
-    const chg = d.change_24h;
-    chgEl.innerHTML = `<span class="pov-chg" style="color:${chg >= 0 ? '#00e676' : '#ff3d57'}">${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%</span>`;
+    _ovPrevGates = gates;
   }
 
-  // Unrealized P&L
-  const pnlEl = document.getElementById('pov-pnl');
-  if (pnlEl && state === 'IN_TRADE' && trade) {
-    const pnl = trade.unrealized_pnl || 0;
-    const r   = trade.r || 0;
-    const pc  = pnl >= 0 ? '#00e676' : '#ff3d57';
-    pnlEl.innerHTML = `<div class="pov-pnl"><div class="pov-pnl-usd" style="color:${pc}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</div><div class="pov-pnl-r">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</div></div>`;
-  }
+  // ── Targeted update (no full re-render) ───────────────────────────────────────
+  function _ovUpdate(pn, d) {
+    const state     = _ovState(d);
+    const dir       = _ovDir(d);
+    const trade     = d.in_trade_long || d.in_trade_short;
+    const prevState = pn.dataset.state;
 
-  // Gate cursors + dot flash on pass/fail change
-  const _snap   = (STATE?.pair_states||[]).find(p => p.symbol === pn.dataset.sym) || {};
-  const _snK    = +(_snap.stoch_k != null ? _snap.stoch_k : (d.stoch_k || 0));
-  const _snD    = +(_snap.stoch_d != null ? _snap.stoch_d : (d.stoch_d || 0));
-  const _snJ15  = +(_snap.j15m    != null ? _snap.j15m    : (d.j15m    || 0));
-  const _snJ1h  = +(_snap.j1h     != null ? _snap.j1h     : (d.j1h     || 0));
-  const _snBid  = +(_snap.bid_pct != null ? _snap.bid_pct : (d.bid_pct || 0));
-  const _snAsk  = +(_snap.ask_pct != null ? _snap.ask_pct : (d.ask_pct || 0));
-  const curGates = (dir !== 'SHORT')
-    ? [_snJ15 < 20, _snJ1h < 40, _snK < 25 && _snK > _snD, _snBid >= 55]
-    : [_snJ15 > 80, _snJ1h > 60, _snK > 75 && _snK < _snD, _snAsk >= 55];
-  const j15mV    = d.j15m    || 0;
-  const j1hV     = d.j1h     || 0;
-  const stochKV  = d.stoch_k || 0;
-  const stochDV  = d.stoch_d || 0;
-  const rsiV     = d.rsi15m  || 0;
-  const j15mC    = j15mV < 20 ? '#00e676' : j15mV > 80 ? '#ff3d57' : '#fff';
-  const j1hC     = j1hV  < 40 ? '#00e676' : j1hV  > 60 ? '#ff3d57' : '#fff';
-  const stochKC  = stochKV < 25 ? '#00e676' : stochKV > 75 ? '#ff3d57' : '#fff';
-  const rsiC     = rsiV   < 35 ? '#00e676' : rsiV   > 65 ? '#ff3d57' : '#fff';
-  const isL = dir !== 'SHORT';
-  const dotPassCls = (pass) => pass ? (isL ? 'pov-gd pov-gd-pass-l' : 'pov-gd pov-gd-pass-s') : 'pov-gd pov-gd-fail';
-  // J15M (0) and J1H (1)
-  [[0, j15mV, j15mC], [1, j1hV, j1hC]].forEach(([i, v, c]) => {
-    const cur = document.getElementById(`pov-gc-${i}`);
-    if (cur) { cur.style.left = `${Math.min(99, v).toFixed(1)}%`; cur.style.background = c; }
-    const val = document.getElementById(`pov-gv-${i}`);
-    if (val) { val.textContent = v.toFixed(0); val.style.color = c; }
-    const dot = document.getElementById(`pov-gd-${i}`);
-    if (dot) {
-      dot.className = dotPassCls(curGates[i]);
-      if (_ovPrevGates && _ovPrevGates[i] !== curGates[i]) {
-        dot.classList.add('pov-gd-flash');
-        setTimeout(() => dot.classList.remove('pov-gd-flash'), 350);
+    if (prevState === 'IN_TRADE' && state !== 'IN_TRADE') { _ovExit(pn, d); return; }
+    if (prevState !== state) { _ovRender(pn, d); return; }
+
+    pn.dataset.state = state;
+    const isL  = dir !== 'SHORT';
+    const gates = (isL ? d.gate_long : d.gate_short) || [false, false, false, false];
+    const score = gates.filter(Boolean).length;
+
+    // Price
+    const pxEl = document.getElementById('pov-px');
+    if (pxEl) pxEl.textContent = fmtPrice(d.price);
+
+    // Change %
+    const chgEl = document.getElementById('pov-chg');
+    if (chgEl && d.change_24h != null) {
+      const c = d.change_24h;
+      chgEl.textContent = `${c >= 0 ? '+' : ''}${c.toFixed(2)}%`;
+      chgEl.style.color = c >= 0 ? '#00e676' : '#ff3d57';
+    }
+
+    // Re-render gate section (values update every 2 s from scanner)
+    const gatesEl = document.getElementById('pov-gates-wrap');
+    if (gatesEl) {
+      gatesEl.innerHTML =
+        _ovJ15Html(d, dir) +
+        _ovJ1hHtml(d, dir) +
+        _ovStochHtml(d, dir) +
+        _ovDepthHtml(d, dir) +
+        (score >= 3 ? _ovScanConfHtml(d, dir, score) : '');
+    }
+
+    // Verdict banner
+    const vEl = document.getElementById('pov-verdict');
+    if (vEl) vEl.outerHTML = _ovVerdictHtml(d, dir);
+
+    // Scan history
+    const histEl = document.getElementById('pov-scan-hist');
+    if (histEl) histEl.innerHTML = _ovScanHistHtml(d, dir);
+
+    // Trade P&L + age
+    if (state === 'IN_TRADE' && trade) {
+      const pnlEl = document.getElementById('pov-pnl-usd');
+      if (pnlEl) {
+        const pnl = trade.unrealized_pnl || 0;
+        pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}`;
+        pnlEl.style.color = pnl >= 0 ? '#00e676' : '#ff3d57';
+      }
+      const ageEl = document.getElementById('pov-age');
+      if (ageEl) {
+        const el = trade.elapsed_s || 0;
+        ageEl.textContent = el < 3600
+          ? `${Math.floor(el / 60)}m${el % 60}s`
+          : `${Math.floor(el / 3600)}h${Math.floor((el % 3600) / 60)}m`;
       }
     }
-  });
-  // STOCH row (index 2): solid %K + hollow %D
-  const gc2k = document.getElementById('pov-gc-2k');
-  if (gc2k) { gc2k.style.left = `${Math.min(99, stochKV).toFixed(1)}%`; gc2k.style.background = stochKC; }
-  const gc2d = document.getElementById('pov-gc-2d');
-    if (gc2d) {
-      gc2d.style.left = `${Math.min(99, stochDV).toFixed(1)}%`;
-      const stochEclipse = Math.abs(stochKV - stochDV) < 5;
-      gc2d.style.border = stochEclipse ? '1px solid #00ff88' : '1px solid rgba(136,136,136,0.7)';
-      gc2d.style.boxShadow = stochEclipse ? '0 0 5px rgba(0,255,136,0.4)' : 'none';
-    }
-  const gv2 = document.getElementById('pov-gv-2');
-  if (gv2) { gv2.textContent = `${stochKV.toFixed(1)}/${stochDV.toFixed(1)}`; gv2.style.color = stochKC; }
-  const gd2 = document.getElementById('pov-gd-2');
-  if (gd2) {
-    gd2.className = dotPassCls(curGates[2]);
-    if (_ovPrevGates && _ovPrevGates[2] !== curGates[2]) {
-      gd2.classList.add('pov-gd-flash');
-      setTimeout(() => gd2.classList.remove('pov-gd-flash'), 350);
-    }
+
+    // Actions
+    const actEl = document.getElementById('pov-actions');
+    if (actEl) actEl.innerHTML = _ovActionsHtml(d, state, dir, trade);
+
+    _ovPrevGates = gates;
+
   }
-  // RSI reference row — cursor and value update only, dot stays grey
-  const gcRsi = document.getElementById('pov-gc-rsi');
-  if (gcRsi) { gcRsi.style.left = `${Math.min(99, rsiV).toFixed(1)}%`; gcRsi.style.background = rsiC; }
-  const gvRsi = document.getElementById('pov-gv-rsi');
-  if (gvRsi) { gvRsi.textContent = rsiV.toFixed(0); gvRsi.style.color = rsiC; }
-  // Gate dot 3 — DEPTH (add to same update pass)
-  const dot3 = document.getElementById('pov-gd-3');
-  if (dot3) {
-    dot3.className = dotPassCls(curGates[3]);
-    if (_ovPrevGates && _ovPrevGates[3] !== curGates[3]) {
-      dot3.classList.add('pov-gd-flash');
-      setTimeout(() => dot3.classList.remove('pov-gd-flash'), 350);
-    }
-  }
-  // Depth fills
-  const dbid = document.getElementById('pov-dbid');
-  const dask = document.getElementById('pov-dask');
-  if (dbid) { dbid.style.width = `${Math.min(100,d.bid_pct||0).toFixed(0)}%`; dbid.style.opacity = isL && (d.bid_pct||0) >= 55 ? '0.75' : '0.2'; }
-  if (dask) { dask.style.width = `${Math.min(100,d.ask_pct||0).toFixed(0)}%`; dask.style.opacity = !isL && (d.ask_pct||0) >= 55 ? '0.75' : '0.2'; }
-  const gv3 = document.getElementById('pov-gv-3');
-  if (gv3) { gv3.textContent = `${(isL ? d.bid_pct : d.ask_pct || 0).toFixed(0)}%`; }
-
-  // Trade age timer
-  const ageEl = document.getElementById('pov-age');
-  if (ageEl && state === 'IN_TRADE' && trade) {
-    const el = trade.elapsed_s || 0;
-    ageEl.textContent = el < 3600 ? `${Math.floor(el/60)}m${el%60}s` : `${Math.floor(el/3600)}h${Math.floor((el%3600)/60)}m`;
-  }
-
-  // Ruler price dot
-  const rdot = document.getElementById('pov-rdot');
-  if (rdot) {
-    const src = trade || d.alert;
-    if (src?.sl_price && src?.entry_price) {
-      const sl = src.sl_price, ep = src.entry_price;
-      const slD = Math.abs(ep - sl);
-      const tp2R = src.tp2_price || (dir === 'LONG' ? ep + slD * 2 : ep - slD * 2);
-      const lo   = Math.min(sl, d.price, tp2R) - slD * 0.05;
-      const hi   = Math.max(sl, d.price, tp2R) + slD * 0.05;
-      const span = hi - lo || 1;
-      const p    = Math.min(99, Math.max(1, ((d.price - lo) / span) * 100));
-      const col  = (dir === 'LONG' ? d.price >= ep : d.price <= ep) ? '#00e676' : '#ff3d57';
-      rdot.style.left       = `${p.toFixed(1)}%`;
-      rdot.style.background = col;
-    }
-  }
-
-  // Stale bar drain
-  const sfill = document.getElementById('pov-sfill');
-  if (sfill && state === 'READY') {
-    const age = d.alert_age_seconds || 0;
-    const pct = Math.max(0, Math.min(100, 100 - (age / 600) * 100));
-    const col = d.alert_state === 'STALE' ? '#ff3d57' : d.alert_state === 'AGING' ? '#ffaa00' : '#00e676';
-    sfill.style.width      = `${pct.toFixed(1)}%`;
-    sfill.style.background = col;
-  }
-
-  // ADX
-  const adxEl = document.getElementById('pov-adx');
-  if (adxEl) {
-    adxEl.textContent = (d.adx||0).toFixed(1);
-    adxEl.style.color = (d.adx||0) >= 50 ? '#00e676' : (d.adx||0) >= 25 ? '#ffaa00' : '#fff';
-  }
-
-  // Scan rows (updated each poll)
-  const scanEl = document.getElementById('pov-scans');
-  if (scanEl) scanEl.innerHTML = _ovScanRowsHtml(d.last_scan_summaries);
-
-  // Actions
-  const actEl = document.getElementById('pov-actions');
-  if (actEl) actEl.innerHTML = _ovActionsHtml(d, state, dir, trade);
-
-  // Session halt / large SL CD live refresh
-  const _ovHaltEl = document.getElementById('pov-halt-info');
-  const _ovCdEl   = document.getElementById('pov-cd-rem');
-  if (_ovCdEl) {
-    const _rem = (dir === 'LONG' ? d.large_sl_cooldown_long_remaining : d.large_sl_cooldown_short_remaining) || 0;
-    if (_rem > 0) {
-      const _m = Math.floor(_rem / 60), _s = _rem % 60;
-      _ovCdEl.textContent = `⏳ 90 min cooldown: ${_m}m${_s}s remaining`;
-    } else {
-      _ovCdEl.textContent = '';
-    }
-  }
-  _ovPrevGates = curGates;
-}
-
+  
 // ── Exit banner (3 s auto-close) ──────────────────────────────────────────────
 function _ovExit(pn, d) {
   clearInterval(_ovPollId);
@@ -2177,10 +2039,17 @@ async function confirmResetSession() {
   } catch (e) { alert('Request failed'); }
 }
 
-// Injected styles for session halt + large SL CD pills and RESET SESSION button
+// Injected styles for overlay card, session halt + large SL CD pills and RESET SESSION button
 (function _injectStyles() {
   const id = 'bounce-extra-styles';
   if (document.getElementById(id)) return;
+  // Bebas Neue font
+  if (!document.querySelector('link[href*="Bebas+Neue"]')) {
+    const lk = document.createElement('link');
+    lk.rel = 'stylesheet';
+    lk.href = 'https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap';
+    document.head.appendChild(lk);
+  }
   const s = document.createElement('style');
   s.id = id;
   s.textContent = [
@@ -2188,6 +2057,15 @@ async function confirmResetSession() {
     '.pill-cd-large{background:rgba(255,170,0,0.12);color:#ffaa00;border:1px solid rgba(255,170,0,0.4);border-radius:4px;font-size:8px;padding:2px 6px;font-family:\'JetBrains Mono\',monospace;font-weight:700}',
     '.reset-session-btn{background:transparent;border:1px solid #ffaa00;border-radius:5px;color:#ffaa00;font-family:\'JetBrains Mono\',monospace;font-size:9px;font-weight:700;padding:3px 8px;cursor:pointer;letter-spacing:0.06em;margin-left:6px;vertical-align:middle}',
     '.reset-session-btn:hover{background:rgba(255,170,0,0.1)}',
+    '#pair-ov-bd{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9000}',
+    '#pair-ov-pn{background:#111;border:1px solid #222;border-radius:6px;width:420px;max-width:95vw;max-height:88vh;overflow-y:auto;font-family:\'JetBrains Mono\',monospace;position:relative}',
+    '.pov-actions{display:flex;flex-wrap:wrap;gap:8px}',
+    '.pov-btn{flex:1;padding:9px 0;background:transparent;border:1px solid #444;border-radius:5px;color:#888;font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:0.06em;min-width:100px}',
+    '.pov-btn:not(:disabled):hover{opacity:0.8}',
+    '.pov-btn-hl{border-color:#00e676!important;color:#00e676!important}',
+    '.pov-btn-close,.pov-btn-force{border-color:#ff5252;color:#ff5252}',
+    '.pov-btn-watch:disabled{cursor:default;opacity:0.7}',
+    '.pov-loading{padding:30px;text-align:center;font-family:\'JetBrains Mono\',monospace;color:#555;font-size:11px}',
   ].join('');
   document.head.appendChild(s);
 })();
