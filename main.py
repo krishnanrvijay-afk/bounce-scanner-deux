@@ -1674,6 +1674,7 @@ def hl_balance():
         if resp.status_code != 200:
             return {"error": f"HL API error: {resp.status_code}"}
         data = resp.json()
+        import json as _json; print("[HL BALANCE RAW]", _json.dumps(data)[:500])
         ms             = data.get("marginSummary", {})
         equity         = float(ms.get("accountValue",    0) or 0)
         available      = float(data.get("withdrawable",  0) or 0)
