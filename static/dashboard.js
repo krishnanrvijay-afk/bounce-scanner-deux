@@ -1665,20 +1665,52 @@ async function _ovFetch(sym, isFirst) {
   }
 
   function _ovJ15Html(d, dir) {
-    const isL  = dir !== 'SHORT';
-    const v    = d.j15m || 0;
-    const pass = isL ? v < 20 : v > 80;
-    const col  = pass ? '#00e676' : '#ff5252';
-    const body = `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#ffffff">needs ${isL ? '&lt;20' : '&gt;80'} for ${isL ? 'LONG' : 'SHORT'}, currently <span id="pov-j15-val" style="color:#ffffff;font-weight:700">${v.toFixed(0)}</span></div>`;
+    const isL    = dir !== 'SHORT';
+    const v      = d.j15m || 0;
+    const pass   = isL ? v < 20 : v > 80;
+    const inZone = v <= 20 || v >= 80;
+    const jCol   = inZone ? (v <= 20 ? '#00e676' : '#ff3d3d') : '#888';
+    const jGlow  = inZone ? `box-shadow:0 0 6px ${jCol};` : '';
+    const jLeft  = Math.min(99.5, Math.max(0.5, v)).toFixed(1);
+    const txtCol = pass ? '#00e676' : '#ff5252';
+    const body   = `
+      <div style="position:relative;height:28px;margin:6px 0 0">
+        <div style="position:absolute;left:0;width:20%;top:50%;transform:translateY(-50%);height:10px;background:rgba(0,255,106,0.2);border-radius:1px 0 0 1px;pointer-events:none"></div>
+        <div style="position:absolute;left:20%;width:60%;top:50%;transform:translateY(-50%);height:10px;background:#222;pointer-events:none"></div>
+        <div style="position:absolute;left:80%;width:20%;top:50%;transform:translateY(-50%);height:10px;background:rgba(255,61,61,0.2);border-radius:0 1px 1px 0;pointer-events:none"></div>
+        <div id="pov-j15-dot" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${jLeft}%;width:12px;height:12px;border-radius:50%;background:${jCol};${jGlow}display:flex;align-items:center;justify-content:center;z-index:2">
+          <span style="font-size:7px;font-weight:700;color:#000;font-family:'JetBrains Mono',monospace;line-height:1">${v.toFixed(0)}</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:#2a2a2a;font-family:'JetBrains Mono',monospace;margin:2px 0 4px">
+        <span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${txtCol}">needs ${isL ? '&lt;20' : '&gt;80'} for ${isL ? 'LONG' : 'SHORT'}, currently <span id="pov-j15-val" style="color:${txtCol};font-weight:700">${v.toFixed(0)}</span></div>`;
     return _ovGateRowHtml('j15', 'J 15M', _ovPassIcon(pass), body);
   }
 
   function _ovJ1hHtml(d, dir) {
-    const isL  = dir !== 'SHORT';
-    const v    = d.j1h || 0;
-    const pass = isL ? v < 40 : v > 60;
-    const col  = pass ? '#00e676' : '#ff5252';
-    const body = `<div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#ffffff">needs ${isL ? '&lt;40' : '&gt;60'} for ${isL ? 'LONG' : 'SHORT'}, currently <span id="pov-j1h-val" style="color:#ffffff;font-weight:700">${v.toFixed(0)}</span></div>`;
+    const isL    = dir !== 'SHORT';
+    const v      = d.j1h || 0;
+    const pass   = isL ? v < 40 : v > 60;
+    const inZone = v <= 20 || v >= 80;
+    const jCol   = inZone ? (v <= 20 ? '#00e676' : '#ff3d3d') : '#888';
+    const jGlow  = inZone ? `box-shadow:0 0 6px ${jCol};` : '';
+    const jLeft  = Math.min(99.5, Math.max(0.5, v)).toFixed(1);
+    const txtCol = pass ? '#00e676' : '#ff5252';
+    const body   = `
+      <div style="position:relative;height:28px;margin:6px 0 0">
+        <div style="position:absolute;left:0;width:20%;top:50%;transform:translateY(-50%);height:10px;background:rgba(0,255,106,0.2);border-radius:1px 0 0 1px;pointer-events:none"></div>
+        <div style="position:absolute;left:20%;width:60%;top:50%;transform:translateY(-50%);height:10px;background:#222;pointer-events:none"></div>
+        <div style="position:absolute;left:80%;width:20%;top:50%;transform:translateY(-50%);height:10px;background:rgba(255,61,61,0.2);border-radius:0 1px 1px 0;pointer-events:none"></div>
+        <div id="pov-j1h-dot" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${jLeft}%;width:12px;height:12px;border-radius:50%;background:${jCol};${jGlow}display:flex;align-items:center;justify-content:center;z-index:2">
+          <span style="font-size:7px;font-weight:700;color:#000;font-family:'JetBrains Mono',monospace;line-height:1">${v.toFixed(0)}</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:#2a2a2a;font-family:'JetBrains Mono',monospace;margin:2px 0 4px">
+        <span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${txtCol}">needs ${isL ? '&lt;40' : '&gt;60'} for ${isL ? 'LONG' : 'SHORT'}, currently <span id="pov-j1h-val" style="color:${txtCol};font-weight:700">${v.toFixed(0)}</span></div>`;
     return _ovGateRowHtml('j1h', 'J 1H', _ovPassIcon(pass), body);
   }
 
@@ -1731,19 +1763,28 @@ async function _ovFetch(sym, isFirst) {
   }
 
   function _ovDepthHtml(d, dir) {
-    const isL  = dir !== 'SHORT';
-    const v    = isL ? (d.bid_pct || 0) : (d.ask_pct || 0);
-    const pass = v >= 55;
-    const col  = isL ? '#00e676' : '#ff3d3d';
-    const label = isL ? 'Bid' : 'Ask';
-    const barCol = pass ? col : 'rgba(100,100,100,0.3)';
-    const body = `
-      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#ffffff">${label} orders need at least 55% of the order book for ${isL ? 'LONG' : 'SHORT'}</div>
-      <div style="position:relative;height:8px;background:#1a1a1a;border-radius:3px;margin:6px 0 4px;overflow:hidden">
-        <div id="pov-depth-bar" style="position:absolute;left:0;height:100%;width:${Math.min(100, v).toFixed(0)}%;background:${barCol};border-radius:3px;transition:width 0.4s"></div>
-        <div style="position:absolute;left:55%;top:0;height:100%;width:1px;background:rgba(255,255,255,0.35)"></div>
+    const isL     = dir !== 'SHORT';
+    const v       = isL ? (d.bid_pct || 0) : (d.ask_pct || 0);
+    const pass    = v >= 55;
+    const label   = isL ? 'bid' : 'ask';
+    const zoneCol = isL ? 'rgba(0,255,106,0.2)' : 'rgba(255,61,61,0.2)';
+    const dotCol  = pass ? (isL ? '#00e676' : '#ff5252') : '#888';
+    const dotGlow = pass ? `box-shadow:0 0 6px ${dotCol};` : '';
+    const dLeft   = Math.min(99.5, Math.max(0.5, v)).toFixed(1);
+    const txtCol  = pass ? '#00e676' : '#ff5252';
+    const body    = `
+      <div style="position:relative;height:28px;margin:6px 0 0">
+        <div style="position:absolute;left:0;width:55%;top:50%;transform:translateY(-50%);height:10px;background:#222;border-radius:1px 0 0 1px;pointer-events:none"></div>
+        <div style="position:absolute;left:55%;width:45%;top:50%;transform:translateY(-50%);height:10px;background:${zoneCol};border-radius:0 1px 1px 0;pointer-events:none"></div>
+        <div style="position:absolute;left:55%;top:50%;transform:translate(-50%,-50%);width:2px;height:10px;background:#ffffff;z-index:3;pointer-events:none"></div>
+        <div id="pov-depth-dot" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${dLeft}%;width:12px;height:12px;border-radius:50%;background:${dotCol};${dotGlow}display:flex;align-items:center;justify-content:center;z-index:2">
+          <span style="font-size:7px;font-weight:700;color:#000;font-family:'JetBrains Mono',monospace;line-height:1">${v.toFixed(0)}</span>
+        </div>
       </div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#aaaaaa;font-weight:600"><span id="pov-depth-val" style="color:#ffffff;font-weight:700">${v.toFixed(0)}%</span> \u00b7 threshold 55%</div>`;
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:#2a2a2a;font-family:'JetBrains Mono',monospace;margin:2px 0 4px">
+        <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${txtCol}">≥55% ${label} depth needed, currently <span id="pov-depth-val" style="color:${txtCol};font-weight:700">${v.toFixed(0)}%</span></div>`;
     return _ovGateRowHtml('depth', 'BID/ASK DEPTH', _ovPassIcon(pass), body);
   }
 
