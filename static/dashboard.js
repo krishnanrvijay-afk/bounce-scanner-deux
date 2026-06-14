@@ -1647,155 +1647,148 @@ function _btcRegime(btc) {
 }
 
 function _btcRegimeCardHtml(sym, btc, regime, corr) {
-  if (!btc) btc = {};
-  const j1h  = btc.j1h     || 0;
-  const j15m = btc.j15m    || 0;
-  const sk   = btc.stoch_k || 0;
-  const sd   = btc.stoch_d || 0;
-  const adx  = btc.adx     || 0;
-  const atr  = btc.atr     || 0;
-  const px   = btc.price   || 0;
-  const chg  = btc.change_24h ?? null;
-  const chgStr = chg != null ? ((chg >= 0 ? '+' : '') + chg.toFixed(2) + '%') : '—';
-  const chgCol = chg != null ? (chg >= 0 ? '#00e676' : '#ff3d57') : '#555';
-  const col  = regime.color || '#fff';
-  const cls  = regime.cls   || 'exempt';
-  const lbl  = regime.label || '';
-  const isExempt = cls === 'exempt';
-  const corrNote = !isExempt ? (corr >= 0.75 ? 'Correlation ' + corr.toFixed(2) + ' — regime gate applies' : corr >= 0.65 ? 'Correlation ' + corr.toFixed(2) + ' — regime advisory only' : '') : '';
-  const j15Left = Math.min(99.5, Math.max(0.5, j15m)).toFixed(1);
-  const j15Cls  = j15m < 20 ? 'glz' : j15m > 80 ? 'gsz' : 'gnz';
-  const j1hLeft = Math.min(99.5, Math.max(0.5, j1h)).toFixed(1);
-  const j1hCls  = j1h < 20 ? 'glz' : j1h > 80 ? 'gsz' : 'gnz';
-  const cursorLeft = Math.min(99.5, Math.max(0.5, j1h)).toFixed(1);
-  const j1hZone = j1h < 20 ? 'Deep in LONG SAFE zone' : j1h < 40 ? 'CAUTION zone' : j1h <= 60 ? 'STOP zone — no longs' : j1h < 80 ? 'CAUTION SHORT zone' : 'SHORT SAFE zone';
-  const skLeft = Math.min(99.5, Math.max(0.5, sk)).toFixed(1);
-  const sdLeft = Math.min(99.5, Math.max(0.5, sd)).toFixed(1);
-  const skCls  = sk < 25 ? 'glz' : sk > 75 ? 'gsz' : 'gnz';
-  const sdCls  = sd < 25 ? 'glz' : sd > 75 ? 'gsz' : 'gnz';
-  const kAboveD = sk > sd;
-  const crossCls = (kAboveD && sk < 25) || (!kAboveD && sk > 75) ? '#00e676' : '#ff4646';
-  const crossLabel = kAboveD ? 'K above D ↑' : 'K below D ↓';
-  const crossLabelCol = kAboveD ? '#00e676' : '#ff3d57';
-  let decTitle = '', decBody = '';
-  if (isExempt) {
-    decTitle = '⚪ BTC REGIME NOT APPLIED';
-    decBody  = 'ZEC correlation 0.40 · HYPE 0.50 — below 0.65 threshold · Independent catalysts drive these pairs · BTC regime does not gate entries';
-  } else {
-    const s = regime.state;
-    const kv = sk.toFixed(0), dv = sd.toFixed(0), jv = j1h.toFixed(0);
-    if (s === 'CONFIRMED_LONG') {
-      decTitle = '✅ CONFIRMED — FULL GREEN LIGHT';
-      decBody  = 'BTC J1H=' + jv + ' deep in safe zone · K=' + kv + ' crossed above D=' + dv + ' · Historical win rate ~78% · Highest conviction long entries';
-    } else if (s === 'CAUTION_LONG') {
-      decTitle = '⚠️ YOUR CALL — CAUTION ZONE';
-      decBody  = 'BTC J1H=' + jv + ' between safe and stop · K=' + kv + ' still below D=' + dv + ' · Historical win rate ~42% · Wait for J1H<20 + K cross for conviction';
-    } else if (s === 'STOP') {
-      decTitle = '🚫 ABSOLUTE STOP — NO LONG ENTRY';
-      decBody  = 'BTC J1H=' + jv + ' in stop zone · K=' + kv + ' / D=' + dv + ' · 89% SL rate on longs here · SHORT entries permitted if pair gates pass';
-    } else if (s === 'CAUTION_SHORT') {
-      decTitle = '⚠️ CAUTION — SHORT SIDE';
-      decBody  = 'BTC J1H=' + jv + ' · approaching short safe zone · wait for J1H>80 confirmation';
-    } else {
-      decTitle = '✅ SHORT CONFIRMED';
-      decBody  = 'BTC J1H=' + jv + ' in short safe zone · K above D · shorts supported';
-    }
+    const j15m   = Math.min(100, Math.max(0, btc?.j15m    || 0));
+    const j1h    = Math.min(100, Math.max(0, btc?.j1h     || 0));
+    const stochK = Math.min(100, Math.max(0, btc?.stoch_k || 0));
+    const stochD = Math.min(100, Math.max(0, btc?.stoch_d || 0));
+    const adx    = btc?.adx1h || btc?.adx || 0;
+    const price  = btc?.price  || 0;
+    const isExempt = corr < 0.65;
+    const cls    = isExempt ? 'exempt'   : regime.cls;
+    const color  = isExempt ? '#fff'     : regime.color;
+    const state  = isExempt ? 'EXEMPT'   : regime.state;
+
+    const j1hGlow = cls === 'confirmed' ? '0 0 20px rgba(0,230,118,0.5),0 0 40px rgba(0,230,118,0.2)'
+                  : cls === 'caution'   ? '0 0 20px rgba(255,179,0,0.5),0 0 40px rgba(255,179,0,0.2)'
+                  : cls === 'stop'      ? '0 0 20px rgba(255,70,70,0.5),0 0 40px rgba(255,70,70,0.2)'
+                  :                       'none';
+
+    const heroBg  = cls === 'confirmed' ? '#0a1a0a'
+                  : cls === 'caution'   ? '#1a1200'
+                  : cls === 'stop'      ? '#1a0808'
+                  :                       '#0d0d0d';
+    const heroBor = cls === 'confirmed' ? '1px solid #00e67644'
+                  : cls === 'caution'   ? '1px solid #ffb30044'
+                  : cls === 'stop'      ? '1px solid #ff525244'
+                  :                       '1px solid #2a2a2a';
+
+    const stateLabel = state === 'CONFIRMED_LONG'  ? '✅ LONG SAFE ZONE'
+                     : state === 'CAUTION_LONG'    ? '⚠️ CAUTION ZONE'
+                     : state === 'STOP'            ? '🚫 STOP ZONE'
+                     : state === 'CAUTION_SHORT'   ? '⚠️ CAUTION ZONE'
+                     : state === 'CONFIRMED_SHORT' ? '✅ SHORT SAFE ZONE'
+                     :                              '⚪ NOT APPLIED';
+
+    const threshNote = state === 'CONFIRMED_LONG'  ? 'below 20 threshold'
+                     : state === 'CAUTION_LONG'    ? 'below 40 threshold'
+                     : state === 'STOP'            ? 'in 40–60 stop zone'
+                     : state === 'CAUTION_SHORT'   ? 'above 60 threshold'
+                     : state === 'CONFIRMED_SHORT' ? 'above 80 threshold'
+                     :                              'exempt';
+
+    const kAboveD   = stochK > stochD;
+    const stochLine = 'K=' + stochK.toFixed(0) + (kAboveD ? ' above' : ' below') + ' D=' + stochD.toFixed(0) + (kAboveD ? ' ↑' : ' ↓');
+
+    let narrative = '';
+    if      (state === 'CONFIRMED_LONG')  narrative = 'BTC is deeply oversold on the hourly and momentum has turned up — the market is in bounce territory and longs have a green light from the regime.';
+    else if (state === 'CAUTION_LONG')    narrative = 'BTC hourly is between oversold and neutral — bounce possible but not confirmed yet. ' + sym + ' pair gates are ready. Wait for BTC J1H to drop below 20 for full conviction, or enter knowing the risk.';
+    else if (state === 'STOP')            narrative = "BTC is in no-man's land — not oversold enough to bounce, momentum falling. Every long entered in this regime this week hit its stop loss. Wait for J1H to drop below 20.";
+    else if (state === 'CAUTION_SHORT')   narrative = 'BTC hourly is between overbought and neutral on the short side — approaching but not confirmed. Wait for J1H above 80 for full conviction.';
+    else if (state === 'CONFIRMED_SHORT') narrative = 'BTC is deeply overbought on the hourly — the market is extended and shorts have a green light from the regime.';
+    else                                  narrative = 'BTC regime does not apply to ' + sym + '. Correlation ' + corr.toFixed(2) + ' is below the 0.65 threshold — this pair moves on independent catalysts.';
+
+    const cursorPct = Math.min(99.5, Math.max(0.5, j1h)).toFixed(1);
+    const j15mCol   = j15m > 80 ? '#ff4646' : j15m < 20 ? '#00e676' : '#fff';
+    const j15mSub   = j15m > 80 ? 'overbought ST' : j15m < 20 ? 'oversold ST ✅' : 'neutral';
+    const adxCol    = adx >= 25 ? '#ffb300' : '#fff';
+    const adxSub    = adx >= 40 ? 'strong trend' : adx >= 25 ? 'moderate' : 'weak';
+    const stochCol  = kAboveD ? '#00e676' : '#ff4646';
+
+    let stochPillBg = '#222', stochPillCol = '#888', stochPillTxt = 'not confirmed';
+    if      (kAboveD  && stochK < 25) { stochPillBg = '#00e67622'; stochPillCol = '#00e676'; stochPillTxt = 'K▶D ✅ BULLISH'; }
+    else if (!kAboveD && stochK > 75) { stochPillBg = '#ff464622'; stochPillCol = '#ff4646'; stochPillTxt = 'K▼D ❌ BEARISH'; }
+    else                               { stochPillBg = '#222';      stochPillCol = '#888';    stochPillTxt = kAboveD ? 'K▶D not in zone' : 'K▼D not confirmed'; }
+
+    const footerNote = state === 'CONFIRMED_LONG'  ? '~78% WR in this zone'
+                     : state === 'CAUTION_LONG'    ? '~42% WR · your discretion'
+                     : state === 'STOP'            ? '89% SL rate · wait for J1H <20'
+                     : state === 'CONFIRMED_SHORT' ? '~78% WR in this zone'
+                     : state === 'CAUTION_SHORT'   ? '~42% WR · your discretion'
+                     :                              'independent catalysts · no gate';
+    const gateDesc  = corr >= 0.75 ? 'regime gate' : corr >= 0.65 ? 'advisory only' : 'no gate';
+
+    const p = [];
+    // C) HEADER
+    p.push('<div style="padding:10px 12px 8px;border-bottom:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:center">');
+    p.push('<div>');
+    p.push('<div style="font-family:\'Bebas Neue\',sans-serif;font-size:20px;color:' + color + ';letter-spacing:0.04em">BTC REGIME</div>');
+    p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:8px;color:#fff;font-weight:700;margin-top:2px">' + fmtPrice(price) + ' · ADX ' + adx.toFixed(0) + ' · ' + sym + ' corr ' + corr.toFixed(2) + '</div>');
+    p.push('</div>');
+    p.push('<span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:3px;border:1px solid ' + color + '66;color:' + color + ';font-family:\'JetBrains Mono\',monospace;background:' + color + '11">' + (isExempt ? '⚪ EXEMPT' : regime.label) + '</span>');
+    p.push('</div>');
+    // D) HERO
+    p.push('<div style="border-radius:6px;padding:14px 14px 10px;margin:8px 12px 0;background:' + heroBg + ';border:' + heroBor + '">');
+    p.push('<div style="font-size:8px;font-weight:700;color:#fff;letter-spacing:0.1em;margin-bottom:4px">BTC J 1H — KEY GATE</div>');
+    p.push('<div style="display:flex;align-items:flex-end;gap:10px">');
+    p.push('<div style="font-family:\'Bebas Neue\',sans-serif;font-size:56px;line-height:1;color:' + color + ';text-shadow:' + j1hGlow + '">' + j1h.toFixed(0) + '</div>');
+    p.push('<div style="display:flex;flex-direction:column;gap:4px;padding-bottom:4px">');
+    p.push('<div style="font-size:11px;font-weight:700;color:' + color + '">' + stateLabel + '</div>');
+    p.push('<div style="font-size:8px;font-weight:700;color:#fff">' + threshNote + '</div>');
+    p.push('<div style="font-size:8px;font-weight:700;color:#fff">' + stochLine + '</div>');
+    p.push('</div></div>');
+    p.push('<div style="border-top:1px solid ' + color + '33;padding-top:8px;margin-top:8px;font-size:11px;font-weight:700;color:#fff;line-height:1.6">' + narrative + '</div>');
+    p.push('</div>');
+    // E) THRESHOLD BAR
+    p.push('<div style="margin:8px 12px 0;border-radius:6px;padding:10px 12px;background:' + heroBg + ';border:' + heroBor + '">');
+    p.push('<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;margin-bottom:4px"><span style="color:#fff">J1H POSITION ON SCALE</span><span style="color:' + color + '">' + j1h.toFixed(0) + ' of 100</span></div>');
+    p.push('<div style="display:flex;justify-content:space-between;font-size:7px;font-weight:700;color:#fff;font-family:\'JetBrains Mono\',monospace;margin-bottom:2px"><span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span></div>');
+    p.push('<div class="tbar-wrap"><div class="tbar"><div class="tz-safe">0–20</div><div class="tz-caut">20–40</div><div class="tz-stop">40–60</div><div class="tz-caut2">60–80</div><div class="tz-safe2">80–100</div></div><div class="tcursor ' + cls + '" style="left:' + cursorPct + '%"></div></div>');
+    p.push('<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:7px;font-weight:700;margin-top:4px"><span style="color:#00e676">&lt;20 LONG SAFE</span><span style="color:#ffb300">20–40 CAUTION</span><span style="color:#ff4646">40–60 STOP</span><span style="color:#ffb300">60–80 CAUTION</span><span style="color:#ff4646">&gt;80 SHORT SAFE</span></div>');
+    p.push('</div>');
+    // F) SUPPORT METRICS
+    p.push('<div style="display:flex;gap:6px;margin:8px 12px 0">');
+    p.push('<div style="flex:1;background:' + heroBg + ';border:' + heroBor + ';border-radius:6px;padding:8px;text-align:center">');
+    p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;color:#fff;margin-bottom:4px">BTC J 15M</div>');
+    p.push('<div style="font-family:\'Bebas Neue\',sans-serif;font-size:28px;line-height:1;color:' + j15mCol + '">' + j15m.toFixed(0) + '</div>');
+    p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:7px;font-weight:700;color:#fff;margin-top:3px">' + j15mSub + '</div>');
+    p.push('</div>');
+    p.push('<div style="flex:1;background:' + heroBg + ';border:' + heroBor + ';border-radius:6px;padding:8px;text-align:center">');
+    p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;color:#fff;margin-bottom:4px">BTC STOCH K/D</div>');
+    p.push('<div style="font-family:\'Bebas Neue\',sans-serif;font-size:22px;line-height:1;color:' + stochCol + '">' + stochK.toFixed(0) + '/' + stochD.toFixed(0) + '</div>');
+    p.push('<div style="margin-top:4px;font-family:\'JetBrains Mono\',monospace;font-size:7px;font-weight:700;padding:2px 4px;border-radius:3px;display:inline-block;color:' + stochPillCol + ';background:' + stochPillBg + ';border:1px solid ' + stochPillCol + '44">' + stochPillTxt + '</div>');
+    p.push('</div>');
+    p.push('<div style="flex:1;background:' + heroBg + ';border:' + heroBor + ';border-radius:6px;padding:8px;text-align:center">');
+    p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;color:#fff;margin-bottom:4px">BTC ADX</div>');
+    p.push('<div style="font-family:\'Bebas Neue\',sans-serif;font-size:28px;line-height:1;color:' + adxCol + '">' + adx.toFixed(0) + '</div>');
+    p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:7px;font-weight:700;color:#fff;margin-top:3px">' + adxSub + '</div>');
+    p.push('</div></div>');
+    // G) LIVE BTC ROW
+    p.push('<div style="display:flex;align-items:center;gap:8px;margin:8px 12px 0;font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;flex-wrap:wrap">');
+    p.push('<span style="background:#1a1200;border:1px solid #ffb30066;color:#ffb300;font-size:7px;padding:2px 6px;border-radius:3px;flex-shrink:0">LIVE BTC</span>');
+    p.push('<span style="color:#fff">PRICE <span style="color:#fff">' + fmtPrice(price) + '</span></span>');
+    p.push('<span style="color:#fff">J15M <span style="color:' + j15mCol + '">' + j15m.toFixed(0) + '</span></span>');
+    p.push('<span style="color:#fff">J1H <span style="color:' + color + '">' + j1h.toFixed(0) + '</span></span>');
+    p.push('<span style="color:#fff">K/D <span style="color:' + stochCol + '">' + stochK.toFixed(0) + '/' + stochD.toFixed(0) + '</span></span>');
+    p.push('</div>');
+    // H) SPACER
+    p.push('<div style="flex:1"></div>');
+    // I) FOOTER
+    p.push('<div style="padding:8px 12px;border-top:1px solid #1a1a1a;font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;color:#666;text-align:right">');
+    p.push('corr ' + corr.toFixed(2) + ' · ' + gateDesc + ' · ' + footerNote);
+    p.push('</div>');
+
+    return p.join('');
   }
-  return [
-    '<div style="padding:10px 12px;border-bottom:1px solid #1a1a1a;display:flex;flex-direction:column;gap:3px">',
-      '<div style="display:flex;justify-content:space-between;align-items:center">',
-        '<span style="font-family:\'Bebas Neue\',sans-serif;font-size:20px;color:' + col + ';letter-spacing:0.04em">BTC REGIME</span>',
-        '<span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;border:1px solid ' + col + '44;color:' + col + ';font-family:\'JetBrains Mono\',monospace;background:' + col + '11">' + lbl + '</span>',
-      '</div>',
-      '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;color:#fff;font-weight:700">',
-        fmtPrice(px) + ' · <span style="color:' + chgCol + '">' + chgStr + '</span> · ADX ' + adx.toFixed(0) + ' · ' + sym + ' corr ' + corr.toFixed(2),
-      '</div>',
-    '</div>',
-    '<div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:8px 12px">',
-      '<div>',
-        '<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;margin-bottom:3px">',
-          '<span style="color:#fff;font-weight:700">J1H REGIME ZONE</span>',
-          '<span style="color:' + col + '">' + j1h.toFixed(0) + ' — ' + regime.state + '</span>',
-        '</div>',
-        '<div style="display:flex;justify-content:space-between;font-size:7px;font-weight:700;color:#fff;font-family:\'JetBrains Mono\',monospace;margin-bottom:2px">',
-          '<span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span>',
-        '</div>',
-        '<div class="tbar-wrap">',
-          '<div class="tbar"><div class="tz-safe">0–20</div><div class="tz-caut">20–40</div><div class="tz-stop">40–60</div><div class="tz-caut2">60–80</div><div class="tz-safe2">80–100</div></div>',
-          '<div class="tcursor ' + cls + '" style="left:' + cursorLeft + '%"></div>',
-        '</div>',
-        '<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:7px;font-weight:700;margin-top:3px">',
-          '<span style="color:#00e676">&lt;20 LONG SAFE</span>',
-          '<span style="color:#ffb300">20–40 CAUTION</span>',
-          '<span style="color:#ff4646">40–60 STOP</span>',
-          '<span style="color:#ffb300">60–80 CAUTION</span>',
-          '<span style="color:#ff4646">&gt;80 SHORT SAFE</span>',
-        '</div>',
-      '</div>',
-      '<div>',
-        '<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;margin-bottom:2px">',
-          '<span style="color:#fff;font-weight:700">BTC J 15M</span>',
-          '<span style="color:' + (j15m < 20 ? '#00e676' : j15m > 80 ? '#ff4646' : '#fff') + ';font-weight:700">' + j15m.toFixed(0) + '</span>',
-        '</div>',
-        '<div class="rtw"><div class="rtl"></div><div class="rtm"></div><div class="rth"></div>' +
-          '<div class="rdot ' + j15Cls + '" style="left:' + j15Left + '%">' + Math.round(j15m) + '</div>' +
-        '</div>',
-        '<div class="rtticks"><span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span></div>',
-      '</div>',
-      '<div>',
-        '<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;margin-bottom:2px">',
-          '<span style="color:#fff;font-weight:700">BTC J 1H</span>',
-          '<span style="color:' + (j1h < 20 ? '#00e676' : j1h > 80 ? '#ff4646' : '#fff') + ';font-weight:700">' + j1h.toFixed(0) + '</span>',
-        '</div>',
-        '<div class="rtw"><div class="rtl"></div><div class="rtm"></div><div class="rth"></div>' +
-          '<div class="rdot ' + j1hCls + '" style="left:' + j1hLeft + '%">' + Math.round(j1h) + '</div>' +
-        '</div>',
-        '<div class="rtticks"><span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span></div>',
-        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;color:' + col + ';margin-top:2px">' + j1hZone + '</div>',
-      '</div>',
-      '<div>',
-        '<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;margin-bottom:2px">',
-          '<span style="color:#fff;font-weight:700">BTC STOCH K/D</span>',
-          '<span style="color:' + crossLabelCol + '">' + crossLabel + '</span>',
-        '</div>',
-        '<div class="rtw">' +
-          '<div style="position:absolute;left:0;width:25%;height:10px;background:#00e676;opacity:0.35;top:50%;transform:translateY(-50%);border-radius:2px 0 0 2px;"></div>' +
-          '<div style="position:absolute;left:25%;width:50%;height:10px;background:#2a2a2a;top:50%;transform:translateY(-50%);"></div>' +
-          '<div style="position:absolute;right:0;width:25%;height:10px;background:#ff4646;opacity:0.35;top:50%;transform:translateY(-50%);border-radius:0 2px 2px 0;"></div>' +
-          '<div class="rdot ' + skCls + '" style="left:' + skLeft + '%">K</div>' +
-          '<div class="rsq ' + sdCls + '" style="left:' + sdLeft + '%">D</div>' +
-        '</div>',
-        '<div class="rtticks"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>',
-        '<div style="margin-top:3px;font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px;display:inline-block;color:#000;background:' + crossCls + '">' + (kAboveD ? 'K&gt;D BULLISH CROSS' : 'K&lt;D BEARISH') + '</div>',
-      '</div>',
-      '<div>',
-        '<div style="display:flex;gap:6px;align-items:center;font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700">',
-          '<span class="sn-pill now">LIVE</span>',
-          '<span style="color:#fff;flex:1;font-weight:700">J15M <span style="color:' + (j15m < 20 ? '#00e676' : j15m > 80 ? '#ff4646' : '#fff') + ';font-weight:700">' + j15m.toFixed(0) + '</span></span>',
-          '<span style="color:#fff;flex:1">J1H <span style="color:' + col + '">' + j1h.toFixed(0) + '</span></span>',
-          '<span style="color:#fff;flex:1">K/D <span style="color:' + (sk > sd ? '#00e676' : '#ff4646') + '">' + sk.toFixed(0) + '/' + sd.toFixed(0) + '</span></span>',
-          '<span style="color:#fff;flex:1;font-weight:700">ADX <span style="color:#fff;font-weight:700">' + adx.toFixed(0) + '</span></span>',
-          '<span style="color:#fff;flex:1;font-weight:700">ATR <span style="color:#fff;font-weight:700">' + (atr ? atr.toFixed(2) : '—') + '</span></span>',
-        '</div>',
-      '</div>',
-      '<div class="rdec ' + cls + '">',
-        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:9px;font-weight:700;color:' + col + ';margin-bottom:4px">' + decTitle + '</div>',
-        '<div style="font-family:\'JetBrains Mono\',monospace;font-size:8px;color:#fff;font-weight:700;line-height:1.5">' + decBody + '</div>',
-        (corrNote ? '<div style="font-family:\'JetBrains Mono\',monospace;font-size:8px;color:#fff;font-weight:700;margin-top:4px">' + corrNote + '</div>' : ''),
-      '</div>',
-    '</div>',
-  ].join('');
-}
 
 function openPairOverlay(sym) {
   if (document.getElementById('pair-ov-bd')) return;
   const bd = document.createElement('div');
   bd.id = 'pair-ov-bd';
-  bd.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;gap:12px;padding:20px;z-index:9000';
+  bd.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(8px);display:flex;align-items:stretch;justify-content:center;gap:12px;padding:20px;z-index:9000';
   bd.addEventListener('click', e => { if (e.target === bd) closePairOverlay(); });
   const pn = document.createElement('div');
   pn.id = 'pair-ov-pn';
-  pn.style.cssText = 'width:380px;flex-shrink:0;max-height:80vh;min-height:500px';
+  pn.style.cssText = 'flex:1;min-width:0';
   pn.dataset.sym   = sym;
   pn.dataset.state = '';
   pn.innerHTML = `<div class="pov-loading">Loading ${sym}…</div>`;
@@ -1807,7 +1800,7 @@ function openPairOverlay(sym) {
   if (_showRegime) {
     const rn = document.createElement('div');
     rn.id = 'btc-regime-pn';
-    rn.style.cssText = 'width:380px;flex-shrink:0;max-height:80vh;min-height:500px';
+    rn.style.cssText = 'flex:1;min-width:0';
     const _regimeCorr = BTC_CORRELATION[sym] ?? 0.75;
     const _exemptState = _regimeCorr < 0.65;
     rn.className = _exemptState ? 'exempt' : (_regimeResult?.cls || 'exempt');
@@ -2392,8 +2385,8 @@ async function confirmResetSession() {
     '.pill-cd-large{background:rgba(255,170,0,0.12);color:#ffaa00;border:1px solid rgba(255,170,0,0.4);border-radius:4px;font-size:8px;padding:2px 6px;font-family:\'JetBrains Mono\',monospace;font-weight:700}',
     '.reset-session-btn{background:transparent;border:1px solid #ffaa00;border-radius:5px;color:#ffaa00;font-family:\'JetBrains Mono\',monospace;font-size:9px;font-weight:700;padding:3px 8px;cursor:pointer;letter-spacing:0.06em;margin-left:6px;vertical-align:middle}',
     '.reset-session-btn:hover{background:rgba(255,170,0,0.1)}',
-    '#pair-ov-bd{position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;gap:12px;padding:20px;z-index:9000}',
-    '#pair-ov-pn{background:#111;border:1px solid #222;border-radius:6px;width:380px;flex-shrink:0;max-height:80vh;min-height:500px;overflow-y:auto;font-family:\'JetBrains Mono\',monospace;position:relative;box-shadow:0 0 60px rgba(0,0,0,0.8),0 0 120px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.05)}',
+    '#pair-ov-bd{position:fixed;inset:0;background:rgba(0,0,0,0.92);backdrop-filter:blur(8px);display:flex!important;align-items:stretch!important;justify-content:center!important;gap:12px!important;padding:20px!important;z-index:9000}',
+    '#pair-ov-pn{background:#111;border:1px solid #222;border-radius:6px;flex:1;min-width:0;overflow-y:auto;font-family:\'JetBrains Mono\',monospace;position:relative;box-shadow:0 0 60px rgba(0,0,0,0.8),0 0 120px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.05)}',
     '.pov-actions{display:flex;flex-wrap:wrap;gap:8px}',
     '.pov-btn{flex:1;padding:9px 0;background:transparent;border:1px solid #444;border-radius:5px;color:#888;font-family:\'JetBrains Mono\',monospace;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:0.06em;min-width:100px}',
     '.pov-btn:not(:disabled):hover{opacity:0.8}',
@@ -2404,11 +2397,11 @@ async function confirmResetSession() {
     /* BTC Regime two-panel backdrop */
     '#ov-backdrop{display:flex;align-items:center;justify-content:center;gap:12px;padding:20px;}',
     '#ov-backdrop{display:flex;align-items:center;justify-content:center;gap:12px;padding:20px;}',
-    '#btc-regime-pn{width:380px;flex-shrink:0;max-height:80vh;min-height:500px;background:#0a0a12;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;font-family:\'JetBrains Mono\',monospace;}',
-    '#btc-regime-pn.confirmed{border:2px solid #00e67666;box-shadow:0 0 40px rgba(0,230,118,0.20),0 0 80px rgba(0,230,118,0.08),0 0 120px rgba(0,0,0,0.8);}',
-    '#btc-regime-pn.caution{border:2px solid #ffb30066;box-shadow:0 0 40px rgba(255,179,0,0.18),0 0 80px rgba(255,179,0,0.07),0 0 120px rgba(0,0,0,0.8);}',
-    '#btc-regime-pn.stop{border:2px solid #ff525266;box-shadow:0 0 40px rgba(255,82,82,0.22),0 0 80px rgba(255,82,82,0.09),0 0 120px rgba(0,0,0,0.8);}',
-    '#btc-regime-pn.exempt{border:1px solid #2a2a2a;box-shadow:0 0 40px rgba(255,255,255,0.05),0 0 120px rgba(0,0,0,0.8);}',
+    '#btc-regime-pn{flex:1;min-width:0;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;font-family:\'JetBrains Mono\',monospace;}',
+    '#btc-regime-pn.confirmed{background:#081408;border:2px solid #00e67666;box-shadow:0 0 40px rgba(0,230,118,0.20),0 0 80px rgba(0,230,118,0.08),0 0 120px rgba(0,0,0,0.8);}',
+    '#btc-regime-pn.caution{background:#0e0b00;border:2px solid #ffb30066;box-shadow:0 0 40px rgba(255,179,0,0.18),0 0 80px rgba(255,179,0,0.07),0 0 120px rgba(0,0,0,0.8);}',
+    '#btc-regime-pn.stop{background:#140808;border:2px solid #ff525266;box-shadow:0 0 40px rgba(255,82,82,0.22),0 0 80px rgba(255,82,82,0.09),0 0 120px rgba(0,0,0,0.8);}',
+    '#btc-regime-pn.exempt{background:#0a0a0a;border:1px solid #2a2a2a;box-shadow:0 0 40px rgba(255,255,255,0.05),0 0 120px rgba(0,0,0,0.8);}',
     /* Threshold bar zones */
     '.tbar{display:flex;height:16px;border-radius:4px;overflow:hidden;}',
     '.tz-safe{flex:2;background:rgba(0,230,118,0.30);display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#00e676;}',
