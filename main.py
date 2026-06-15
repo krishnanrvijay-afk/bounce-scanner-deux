@@ -40,7 +40,7 @@ from supabase import create_client, Client
 from hl_client import HLClient
 from mexc_client import MexcClient
 from scanner import (
-    run_full_scan, scan_pair_state, get_pending,
+    run_full_scan, scan_pair_state,
     get_scan_count, set_close_cooldown, clear_cooldown,
     get_cooldown_remaining, clear_all_scanner_state, log_startup_config,
     compute_market_health, get_session_name,
@@ -160,7 +160,6 @@ class AppState:
             "pair_states":    pair_states_out,
             "session":        get_session_name(),
             "alerts":         self.alerts,
-            "pending_alerts": get_pending(),
             "prices":         self.prices,
             "open_trades":    trades_out,
             "trade_log":      self.trade_log,
