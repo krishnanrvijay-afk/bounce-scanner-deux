@@ -17,7 +17,8 @@ log = logging.getLogger("scanner")
 # ── Module-level state ────────────────────────────────────────────────────────
 
 _last_scores: dict[str, int]   = {}   # keyed "BTCSHORT" / "BTCLONG"
-_last_stoch:  dict[str, tuple] = {}   # keyed symbol → (stoch_k, stoch_d) from previous scan
+_last_stoch:  dict[str, tuple] = {}   # keyed symbol -> (stoch_k, stoch_d) from previous scan
+_last_stoch_fast: dict[str, tuple] = {}   # keyed symbol -> (stoch_k_fast, stoch_d_fast) 8,3,3
 _cooldowns:   dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" → expiry ts
 _scan_count:  int              = 0
 _pending:     dict[str, dict]  = {}   # first-scan confirmed, awaiting 2nd
@@ -268,6 +269,7 @@ def clear_all_scanner_state():
     global _scan_count
     _last_scores.clear()
     _last_stoch.clear()
+    _last_stoch_fast.clear()
     _cooldowns.clear()
     _pending.clear()
     _scan_count = 0
@@ -375,6 +377,10 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             stoch_k, stoch_d           = _compute_stochastic(candles_15m)
             stoch_k_prev, stoch_d_prev = _last_stoch.get(symbol, (50.0, 50.0))
             _last_stoch[symbol]        = (stoch_k, stoch_d)
+            stoch_k_fast, stoch_d_fast           = _compute_stochastic(candles_15m, k_period=8)
+            stoch_k_prev_fast, stoch_d_prev_fast = _last_stoch_fast.get(symbol, (50.0, 50.0))
+            _last_stoch_fast[symbol]             = (stoch_k_fast, stoch_d_fast)
+            print(f"[STOCH FAST] {symbol} K={stoch_k_fast:.1f} D={stoch_d_fast:.1f} prev_K={stoch_k_prev_fast:.1f}")
             atr5m      = _compute_atr(candles_5m)
             atr15m     = _compute_atr(candles_15m)
             atr1h      = _compute_atr(candles_1h)
@@ -590,6 +596,10 @@ async def scan_pair_state(hl_client) -> list[dict]:
             stoch_k, stoch_d           = _compute_stochastic(candles_15m)
             stoch_k_prev, stoch_d_prev = _last_stoch.get(symbol, (50.0, 50.0))
             _last_stoch[symbol]        = (stoch_k, stoch_d)
+            stoch_k_fast, stoch_d_fast           = _compute_stochastic(candles_15m, k_period=8)
+            stoch_k_prev_fast, stoch_d_prev_fast = _last_stoch_fast.get(symbol, (50.0, 50.0))
+            _last_stoch_fast[symbol]             = (stoch_k_fast, stoch_d_fast)
+            print(f"[STOCH FAST] {symbol} K={stoch_k_fast:.1f} D={stoch_d_fast:.1f} prev_K={stoch_k_prev_fast:.1f}")
             atr15m     = _compute_atr(candles_15m)
             adx1h      = _compute_adx(candles_1h)
             ma10       = _compute_ma(candles_1h, 10)
@@ -618,6 +628,10 @@ async def scan_pair_state(hl_client) -> list[dict]:
                 "stoch_d":     round(stoch_d, 2),
                 "stoch_k_prev": round(stoch_k_prev, 2),
                 "stoch_d_prev": round(stoch_d_prev, 2),
+                "stoch_k_fast":      round(stoch_k_fast, 2),
+                "stoch_d_fast":      round(stoch_d_fast, 2),
+                "stoch_k_prev_fast": round(stoch_k_prev_fast, 2),
+                "stoch_d_prev_fast": round(stoch_d_prev_fast, 2),
                 "rsi1h":       round(rsi1h, 2),
                 "atr15m":      round(atr15m, 6),
                 "adx1h":       round(adx1h, 2),
