@@ -3,17 +3,17 @@ from datetime import datetime, timezone
 
 HL_API_URL = "https://api.hyperliquid.xyz/info"
 
-# ââ Supabase persistence âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# -- Supabase persistence -------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-PAIRS = ["DOGE", "SUI", "BTC", "LINK", "ETH", "NEAR", "XRP", "SOL", "WIF", "AVAX", "HYPE", "ZEC"]
+PAIRS = ["DOGE", "SUI", "BTC", "LINK", "ETH", "NEAR", "XRP", "SOL", "WIF", "AVAX", "HYPE", "ZEC", "TON", "@107", "@8", "@1"]
 
 SCAN_INTERVAL_SECONDS  = 30
 PRICE_INTERVAL_SECONDS = 8
 PAPER_MODE             = True
 
-# ââ Live trading safety ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+# -- Live trading safety --------------------------------------------------------
 # When PAPER_MODE is False and LIVE_MANUAL_ENTRY_ONLY is True, the scanner will
 # never automatically open a live exchange position. Alerts fire and the overlay
 # updates normally but all live trade entry requires deliberate human action via
@@ -38,7 +38,7 @@ ATR_SL_MULTIPLIER = 1.0
 TP1_R                = 1.0
 TP1_CLOSE_PCT        = 0.70        # Trailblazer: close 70% at TP1 (runner 30% stays open)
 TP2_R                = 1.5         # still used for tp2_price alert calc; exit replaced by Trailblazer
-TRAIL_ATR_MULTIPLIER = 0.5         # trail_stop = trail_best ± (atr15m × TRAIL_ATR_MULTIPLIER)
+TRAIL_ATR_MULTIPLIER = 0.5         # trail_stop = trail_best  (atr15m  TRAIL_ATR_MULTIPLIER)
 
 LEVERAGE_HIGH = 10
 LEVERAGE_MID  = 7
