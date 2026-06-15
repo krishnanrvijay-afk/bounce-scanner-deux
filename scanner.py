@@ -16,12 +16,10 @@ log = logging.getLogger("scanner")
 
 # ── Module-level state ────────────────────────────────────────────────────────
 
-_last_scores: dict[str, int]   = {}   # keyed "BTCSHORT" / "BTCLONG"
 _last_stoch:  dict[str, tuple] = {}   # keyed symbol -> (stoch_k, stoch_d) from previous scan
 _last_stoch_fast: dict[str, tuple] = {}   # keyed symbol -> (stoch_k_fast, stoch_d_fast) 8,3,3
 _cooldowns:   dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" → expiry ts
 _scan_count:  int              = 0
-_pending:     dict[str, dict]  = {}   # first-scan confirmed, awaiting 2nd
 _stale_prices: set[str]        = set()  # symbols with 2 consecutive missing prices
 _btc_j1h: float = 50.0   # cached BTC J1H — updated each scan when BTC is processed
 
@@ -257,21 +255,15 @@ def clear_cooldown(symbol: str, direction: str):
     _cooldowns.pop(f"{symbol}{direction}", None)
 
 
-def get_pending() -> dict:
-    return dict(_pending)
-
-
 def get_scan_count() -> int:
     return _scan_count
 
 
 def clear_all_scanner_state():
     global _scan_count
-    _last_scores.clear()
     _last_stoch.clear()
     _last_stoch_fast.clear()
     _cooldowns.clear()
-    _pending.clear()
     _scan_count = 0
 
 
@@ -429,8 +421,6 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                 if direction == "SHORT":
                     if _regime_block_short:
                         log.info(f"[REGIME] {symbol} SHORT blocked — BTC J1H={_btc_j1h:.1f} corr={_pair_corr}")
-                        _last_scores[key] = 0
-                        _pending.pop(key, None)
                         continue
                     g_j15m  = j15m > J15M_SHORT_GATE
                     g_j1h   = j1h  > J1H_SHORT_MIN
@@ -448,8 +438,6 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                 else:
                     if _regime_block_long:
                         log.info(f"[REGIME] {symbol} LONG blocked — BTC J1H={_btc_j1h:.1f} corr={_pair_corr}")
-                        _last_scores[key] = 0
-                        _pending.pop(key, None)
                         continue
                     g_j15m  = j15m < J15M_LONG_GATE
                     g_j1h   = j1h  < J1H_LONG_MAX
@@ -480,24 +468,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                 if score >= 4:
                     log.info(f"[SCORE] {symbol} {direction} gates=PASS score={score} {log_gates}")
                 else:
-                    if _last_scores.get(key, 0) >= 4:
-                        log.info(f"[SCORE] {symbol} {direction} score=0 {log_gates}")
-                    _last_scores[key] = 0
-                    _pending.pop(key, None)
                     continue
-
-                # Consecutive scan confirmation
-                if _last_scores.get(key, 0) < 4:
-                    _last_scores[key] = score
-                    _pending[key] = {
-                        "symbol": symbol, "direction": direction,
-                        "score": score, "tier": tier,
-                    }
-                    log.info(f"[SCORE] {symbol} {direction} first-scan confirmed — awaiting 2nd")
-                    continue
-
-                # Second consecutive scan — check ADX fade-max before emitting alert
-                _last_scores[key] = score
 
                 if adx1h > ADX_FADE_MAX:
                     log.info(f"[SKIP] {symbol} {direction} adx={adx1h:.1f} exceeds fade max {ADX_FADE_MAX} — trend too strong to fade")
@@ -565,7 +536,6 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     "session":       get_session_name(),
                 }
                 new_alerts.append(alert)
-                _pending.pop(key, None)
                 log.info(f"[ALERT] {symbol} {direction} tier={tier} lev={lev}x entry={price} "
                          f"sl={sl_price} tp1={tp1_price} adx={adx1h:.1f} "
                          f"stoch_k={stoch_k:.1f} stoch_d={stoch_d:.1f} rsi={rsi15m:.1f}")
