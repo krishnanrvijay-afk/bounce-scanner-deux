@@ -2120,7 +2120,17 @@ async function _ovFetch(sym, isFirst) {
         <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
       </div>
       <div id="pov-stoch-note" style="font-size:9px;color:${noteCol};font-family:'JetBrains Mono',monospace">${crossNote}</div>`;
-    return _ovGateRowHtml('stoch', 'STOCH K/D', _ovPassIcon(pass), body);
+    const kf = Math.min(100, Math.max(0, d.stoch_k_fast || 0));
+    const df_fast = Math.min(100, Math.max(0, d.stoch_d_fast || 0));
+    const isLf = dir === 'LONG';
+    const crossFast = isLf ? (kf > df_fast && kf < 25) : (kf < df_fast && kf > 75);
+    const fastLabel = 'K=' + kf.toFixed(1) + ' D=' + df_fast.toFixed(1) + (crossFast ? ' [confirms ' + dir + ']' : ' [no cross]');
+    const fastCol = crossFast ? '#b388ff' : '#444';
+    const shadowRow = '<div style="margin-top:5px;padding-top:5px;border-top:1px solid #1a1a1a;display:flex;justify-content:space-between;align-items:center">'
+      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:7px;font-weight:700;background:#0e0814;border:1px solid #b388ff44;color:#b388ff;padding:1px 5px;border-radius:3px">8,3,3 SHADOW</span>'
+      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:8px;font-weight:700;color:' + fastCol + '">' + fastLabel + '</span>'
+      + '</div>';
+    return _ovGateRowHtml('stoch', 'STOCH K/D', _ovPassIcon(pass), body) + shadowRow;
   }
 
   function _ovDepthHtml(d, dir) {
