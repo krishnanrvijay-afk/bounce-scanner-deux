@@ -2077,49 +2077,64 @@ async function _ovFetch(sym, isFirst) {
 
   function _ovStochHtml(d, dir) {
     const isL    = dir !== 'SHORT';
-    const K      = d.stoch_k || 0;
-    const D      = d.stoch_d || 0;
+    const K      = Math.min(99, Math.max(0.5, d.stoch_k || 0));
+    const D      = Math.min(99, Math.max(0.5, d.stoch_d || 0));
     const inZone = isL ? K < 25 : K > 75;
     const pass   = isL ? (K < 25 && K > D) : (K > 75 && K < D);
-    const kCol   = inZone ? (isL ? '#00e676' : '#ff3d3d') : '#888';
     const dZone  = isL ? D < 25 : D > 75;
-    const dCol   = dZone ? (isL ? '#00e676' : '#ff5252') : '#666';
-    const desc1  = isL
-      ? 'K needs to drop below 25 and cross above D'
-      : 'K needs to rise above 75 and cross below D';
+    const desc1  = isL ? 'K needs to drop below 25 and cross above D' : 'K needs to rise above 75 and cross below D';
     let crossNote;
     if (pass) {
-      crossNote = `K ${isL ? 'below' : 'above'} D in zone \u2014 ${isL ? 'LONG' : 'SHORT'} crossover confirmed \u2705`;
+      crossNote = 'K ' + (isL ? 'above' : 'below') + ' D in zone - ' + (isL ? 'LONG' : 'SHORT') + ' crossover confirmed';
     } else if (isL) {
-      crossNote = inZone
-        ? 'K is in zone but below D \u2014 needs to cross above D \u2191'
-        : 'K is above 25 and above zone \u2014 needs to fall and cross \u2193';
+      crossNote = inZone ? 'K is in zone but below D - needs to cross above D' : 'K is above 25 and above zone - needs to fall and cross';
     } else {
-      crossNote = inZone
-        ? 'K is in zone but above D \u2014 needs to cross below D \u2193'
-        : 'K is below 75 \u2014 needs to rise and cross \u2191';
+      crossNote = inZone ? 'K is in zone but above D - needs to cross below D' : 'K is below 75 - needs to rise and cross';
     }
-    const noteCol = pass ? '#00e676' : '#ff5252';
-    const kLeft = Math.min(99, Math.max(0.5, K)).toFixed(1);
-    const dLeft = Math.min(99, Math.max(0.5, D)).toFixed(1);
-    const kGlow = inZone ? `box-shadow:0 0 6px ${kCol};` : '';
-    const body = `
-      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#ffffff">${desc1} for ${isL ? 'LONG' : 'SHORT'}</div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#ffffff;margin-top:2px">Currently <span id="pov-sk-val" style="color:#ffffff;font-weight:700">K=${K.toFixed(1)}</span> \u00b7 <span id="pov-sd-val" style="color:#ffffff;font-weight:700">D=${D.toFixed(1)}</span></div>
-      <div style="position:relative;height:10px;background:#1a1a1a;border-radius:3px;margin:8px 0 0;overflow:visible">
-        <div style="position:absolute;left:0;width:25%;height:100%;background:#00ff6a;opacity:0.2;border-radius:3px 0 0 3px;pointer-events:none"></div>
-        <div style="position:absolute;left:75%;width:25%;height:100%;background:#ff3d3d;opacity:0.2;border-radius:0 3px 3px 0;pointer-events:none"></div>
-        <div id="pov-stoch-k" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${kLeft}%;width:14px;height:14px;border-radius:50%;background:${kCol};${kGlow}display:flex;align-items:center;justify-content:center;z-index:2">
-          <span style="font-size:7px;font-weight:700;color:#000;font-family:'JetBrains Mono',monospace;line-height:1">K</span>
-        </div>
-        <div id="pov-stoch-d" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:${dLeft}%;width:12px;height:12px;border-radius:2px;border:1.5px solid ${dCol};background:transparent;display:flex;align-items:center;justify-content:center;z-index:1">
-          <span style="font-size:7px;font-weight:700;color:${dCol};font-family:'JetBrains Mono',monospace;line-height:1">D</span>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:8px;color:#444;font-family:'JetBrains Mono',monospace;margin:3px 0 4px">
-        <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
-      </div>
-      <div id="pov-stoch-note" style="font-size:9px;color:${noteCol};font-family:'JetBrains Mono',monospace">${crossNote}</div>`;
+    const noteCol  = pass ? '#00e676' : '#ff5252';
+    const kColHex  = inZone ? (isL ? '#00e676' : '#ff4646') : '#888';
+    const dColHex  = dZone  ? (isL ? '#00e676' : '#ff4646') : '#666';
+    const kGlow    = inZone ? 'box-shadow:0 0 8px ' + kColHex + ',0 0 16px rgba(0,230,118,0.4);' : '';
+    const gradGreen = '#003d1f 0%,#003d1f 4.8%,#0a0a0a 4.8%,#0a0a0a 5%,'
+      + '#005a2d 5%,#005a2d 9.8%,#0a0a0a 9.8%,#0a0a0a 10%,'
+      + '#007a3d 10%,#007a3d 14.8%,#0a0a0a 14.8%,#0a0a0a 15%,'
+      + '#009e4e 15%,#009e4e 19.8%,#0a0a0a 19.8%,#0a0a0a 20%,'
+      + '#00c261 20%,#00c261 24.8%,#0a0a0a 24.8%,#0a0a0a 25%,'
+      + '#00e676 25%';
+    const gradGrey  = '#1a1a1a 25%,#1a1a1a 75%';
+    const gradRed   = '#ff4646 75%,#ff4646 79.8%,#0a0a0a 79.8%,#0a0a0a 80%,'
+      + '#d93a3a 80%,#d93a3a 84.8%,#0a0a0a 84.8%,#0a0a0a 85%,'
+      + '#b02f2f 85%,#b02f2f 89.8%,#0a0a0a 89.8%,#0a0a0a 90%,'
+      + '#882424 90%,#882424 94.8%,#0a0a0a 94.8%,#0a0a0a 95%,'
+      + '#601a1a 95%,#601a1a 99.8%,#0a0a0a 99.8%,#0a0a0a 100%,'
+      + '#3a0f0f 100%';
+    const ticksHtml = '<div style="display:flex;margin-top:3px;font-size:7px;font-weight:700;">'
+      + '<span style="width:5%;text-align:center;color:#00e676">0</span>'
+      + '<span style="width:5%;text-align:center;color:#00e676">5</span>'
+      + '<span style="width:5%;text-align:center;color:#00e676">10</span>'
+      + '<span style="width:5%;text-align:center;color:#00e676">15</span>'
+      + '<span style="width:5%;text-align:center;color:#00e676">20</span>'
+      + '<span style="width:5%;text-align:center;color:#00e676">25</span>'
+      + '<span style="flex:1;text-align:center;color:#444">50</span>'
+      + '<span style="width:5%;text-align:center;color:#ff4646">75</span>'
+      + '<span style="width:5%;text-align:center;color:#ff4646">80</span>'
+      + '<span style="width:5%;text-align:center;color:#ff4646">85</span>'
+      + '<span style="width:5%;text-align:center;color:#ff4646">90</span>'
+      + '<span style="width:5%;text-align:center;color:#ff4646">95</span>'
+      + '<span style="width:5%;text-align:center;color:#ff4646">100</span>'
+      + '</div>';
+    const body = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:#ffffff">' + desc1 + ' for ' + (isL ? 'LONG' : 'SHORT') + '</div>'
+      + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:#ffffff;margin-top:2px">Currently <span id="pov-sk-val" style="color:#ffffff;font-weight:700">K=' + (d.stoch_k||0).toFixed(1) + '</span> D=' + (d.stoch_d||0).toFixed(1) + '</div>'
+      + '<div style="position:relative;height:10px;border-radius:4px;width:100%;margin:8px 0 0;background:linear-gradient(to right,' + gradGreen + ',' + gradGrey + ',' + gradRed + ')">'
+      + '<div id="pov-stoch-d" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:' + D.toFixed(1) + '%;width:12px;height:12px;border-radius:2px;border:1.5px solid ' + dColHex + ';background:#000;display:flex;align-items:center;justify-content:center;z-index:1">'
+      + '<span style="font-size:7px;font-weight:700;color:' + dColHex + ';font-family:\'JetBrains Mono\',monospace;line-height:1">D</span>'
+      + '</div>'
+      + '<div id="pov-stoch-k" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:' + K.toFixed(1) + '%;width:14px;height:14px;border-radius:50%;background:' + kColHex + ';' + kGlow + 'display:flex;align-items:center;justify-content:center;z-index:2">'
+      + '<span style="font-size:7px;font-weight:700;color:#000;font-family:\'JetBrains Mono\',monospace;line-height:1">K</span>'
+      + '</div>'
+      + '</div>'
+      + ticksHtml
+      + '<div id="pov-stoch-note" style="font-size:9px;color:' + noteCol + ';font-family:\'JetBrains Mono\',monospace;margin-top:4px">' + crossNote + '</div>';
     const kf     = Math.min(99, Math.max(0.5, d.stoch_k_fast || 0));
     const df_val = Math.min(99, Math.max(0.5, d.stoch_d_fast || 0));
     const isLf   = dir !== 'SHORT';
@@ -2136,34 +2151,19 @@ async function _ovFetch(sym, isFirst) {
       crossNotef = inZonef ? 'K is in zone but above D - needs to cross below D' : 'K is below 75 - needs to rise and cross';
     }
     const noteColF = passf ? '#b388ff' : '#6a3fa0';
-    const kfLeft = kf.toFixed(1);
-    const dfLeft = df_val.toFixed(1);
-    const shadowRow = '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #1e1e1e">'
-      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:7px;font-weight:700;background:#0e0814;border:1px solid #b388ff44;color:#b388ff;padding:1px 5px;border-radius:3px">8,3,3 SHADOW</span>'
-      + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:#b388ff;margin-top:4px">' + desc1f + ' for ' + (isLf ? 'LONG' : 'SHORT') + '</div>'
-      + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:#b388ff;margin-top:2px">Currently K=' + (d.stoch_k_fast||0).toFixed(1) + ' D=' + (d.stoch_d_fast||0).toFixed(1) + '</div>'
-      + '<div style="position:relative;height:10px;border-radius:4px;width:100%;margin:8px 0 0;background:linear-gradient(to right,'
-      + '#1a0a2e 0%,#1a0a2e 4.8%,#0a0a0a 4.8%,#0a0a0a 5%,'
+    const gradPurpGreen = '#1a0a2e 0%,#1a0a2e 4.8%,#0a0a0a 4.8%,#0a0a0a 5%,'
       + '#2a1248 5%,#2a1248 9.8%,#0a0a0a 9.8%,#0a0a0a 10%,'
       + '#3d1d6a 10%,#3d1d6a 14.8%,#0a0a0a 14.8%,#0a0a0a 15%,'
       + '#5a2a9a 15%,#5a2a9a 19.8%,#0a0a0a 19.8%,#0a0a0a 20%,'
       + '#7a3dc8 20%,#7a3dc8 24.8%,#0a0a0a 24.8%,#0a0a0a 25%,'
-      + '#b388ff 25%,'
-      + '#1a1a1a 25%,#1a1a1a 75%,'
-      + '#b388ff 75%,#b388ff 79.8%,#0a0a0a 79.8%,#0a0a0a 80%,'
+      + '#b388ff 25%';
+    const gradPurpRed = '#b388ff 75%,#b388ff 79.8%,#0a0a0a 79.8%,#0a0a0a 80%,'
       + '#7a3dc8 80%,#7a3dc8 84.8%,#0a0a0a 84.8%,#0a0a0a 85%,'
       + '#5a2a9a 85%,#5a2a9a 89.8%,#0a0a0a 89.8%,#0a0a0a 90%,'
       + '#3d1d6a 90%,#3d1d6a 94.8%,#0a0a0a 94.8%,#0a0a0a 95%,'
       + '#2a1248 95%,#2a1248 99.8%,#0a0a0a 99.8%,#0a0a0a 100%,'
-      + '#1a0a2e 100%)">'
-      + '<div style="position:absolute;top:50%;transform:translate(-50%,-50%);left:' + dfLeft + '%;width:12px;height:12px;border-radius:2px;border:1.5px solid ' + (dfZonef ? '#b388ff' : '#4a2a7a') + ';background:#000;display:flex;align-items:center;justify-content:center;z-index:1">'
-      + '<span style="font-size:7px;font-weight:700;color:' + (dfZonef ? '#b388ff' : '#4a2a7a') + ';font-family:\'JetBrains Mono\',monospace;line-height:1">D</span>'
-      + '</div>'
-      + '<div style="position:absolute;top:50%;transform:translate(-50%,-50%);left:' + kfLeft + '%;width:14px;height:14px;border-radius:50%;background:' + (inZonef ? '#b388ff' : '#2a1a40') + ';' + (inZonef ? 'box-shadow:0 0 8px #b388ff,0 0 16px rgba(179,136,255,0.4);' : '') + 'display:flex;align-items:center;justify-content:center;z-index:2">'
-      + '<span style="font-size:7px;font-weight:700;color:#000;font-family:\'JetBrains Mono\',monospace;line-height:1">K</span>'
-      + '</div>'
-      + '</div>'
-      + '<div style="display:flex;margin-top:3px;font-size:7px;font-weight:700;">'
+      + '#1a0a2e 100%';
+    const ticksPurp = '<div style="display:flex;margin-top:3px;font-size:7px;font-weight:700;">'
       + '<span style="width:5%;text-align:center;color:#b388ff">0</span>'
       + '<span style="width:5%;text-align:center;color:#b388ff">5</span>'
       + '<span style="width:5%;text-align:center;color:#b388ff">10</span>'
@@ -2177,7 +2177,20 @@ async function _ovFetch(sym, isFirst) {
       + '<span style="width:5%;text-align:center;color:#6a3fa0">90</span>'
       + '<span style="width:5%;text-align:center;color:#6a3fa0">95</span>'
       + '<span style="width:5%;text-align:center;color:#6a3fa0">100</span>'
+      + '</div>';
+    const shadowRow = '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #1e1e1e">'
+      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:7px;font-weight:700;background:#0e0814;border:1px solid #b388ff44;color:#b388ff;padding:1px 5px;border-radius:3px">8,3,3 SHADOW</span>'
+      + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:#b388ff;margin-top:4px">' + desc1f + ' for ' + (isLf ? 'LONG' : 'SHORT') + '</div>'
+      + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:#b388ff;margin-top:2px">Currently K=' + (d.stoch_k_fast||0).toFixed(1) + ' D=' + (d.stoch_d_fast||0).toFixed(1) + '</div>'
+      + '<div style="position:relative;height:10px;border-radius:4px;width:100%;margin:8px 0 0;background:linear-gradient(to right,' + gradPurpGreen + ',' + gradGrey + ',' + gradPurpRed + ')">'
+      + '<div style="position:absolute;top:50%;transform:translate(-50%,-50%);left:' + df_val.toFixed(1) + '%;width:12px;height:12px;border-radius:2px;border:1.5px solid ' + (dfZonef ? '#b388ff' : '#4a2a7a') + ';background:#000;display:flex;align-items:center;justify-content:center;z-index:1">'
+      + '<span style="font-size:7px;font-weight:700;color:' + (dfZonef ? '#b388ff' : '#4a2a7a') + ';font-family:\'JetBrains Mono\',monospace;line-height:1">D</span>'
       + '</div>'
+      + '<div style="position:absolute;top:50%;transform:translate(-50%,-50%);left:' + kf.toFixed(1) + '%;width:14px;height:14px;border-radius:50%;background:' + (inZonef ? '#b388ff' : '#2a1a40') + ';' + (inZonef ? 'box-shadow:0 0 8px #b388ff,0 0 16px rgba(179,136,255,0.4);' : '') + 'display:flex;align-items:center;justify-content:center;z-index:2">'
+      + '<span style="font-size:7px;font-weight:700;color:#000;font-family:\'JetBrains Mono\',monospace;line-height:1">K</span>'
+      + '</div>'
+      + '</div>'
+      + ticksPurp
       + '<div style="font-size:9px;color:' + noteColF + ';font-family:\'JetBrains Mono\',monospace;margin-top:4px">' + crossNotef + '</div>'
       + '</div>';
     return _ovGateRowHtml('stoch', 'STOCH K/D', _ovPassIcon(pass), body) + shadowRow;
