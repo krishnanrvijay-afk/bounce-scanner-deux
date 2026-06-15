@@ -1389,6 +1389,10 @@ async def get_pair(symbol: str):
     stoch_d      = ps.get("stoch_d",      50)
     stoch_k_prev = ps.get("stoch_k_prev", stoch_k)
     stoch_d_prev = ps.get("stoch_d_prev", stoch_d)
+    stoch_k_fast      = ps.get("stoch_k_fast",      50)
+    stoch_d_fast      = ps.get("stoch_d_fast",      50)
+    stoch_k_prev_fast = ps.get("stoch_k_prev_fast", stoch_k_fast)
+    stoch_d_prev_fast = ps.get("stoch_d_prev_fast", stoch_d_fast)
     stoch_gate_long  = stoch_k < 25 and stoch_k_prev <= stoch_d_prev and stoch_k > stoch_d
     stoch_gate_short = stoch_k > 75 and stoch_k_prev >= stoch_d_prev and stoch_k < stoch_d
     gate_long  = [j15m < 20, j1h < 40, stoch_gate_long,  bid_pct >= 55]
@@ -1463,6 +1467,10 @@ async def get_pair(symbol: str):
         "stoch_d":             stoch_d,
         "stoch_k_prev":        stoch_k_prev,
         "stoch_d_prev":        stoch_d_prev,
+        "stoch_k_fast":         stoch_k_fast,
+        "stoch_d_fast":         stoch_d_fast,
+        "stoch_k_prev_fast":    stoch_k_prev_fast,
+        "stoch_d_prev_fast":    stoch_d_prev_fast,
         "gate_long":           gate_long,
         "gate_short":          gate_short,
         "score_long":          score_long,
