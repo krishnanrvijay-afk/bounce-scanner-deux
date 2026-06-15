@@ -1,4 +1,4 @@
-/* ── Bounce Scanner II — dashboard.js ──────────────────────────────────────── */
+/* ââ Bounce Scanner II â dashboard.js ââââââââââââââââââââââââââââââââââââââââ */
 let STATE        = null;
 let activeFilter = 'ALL';
 let activeTab    = 'grid';
@@ -14,11 +14,11 @@ const BTC_CORRELATION = {
   WIF:0.65, HYPE:0.50, ZEC:0.40
 };
 
-// ── Fetch + countdown state ───────────────────────────────────────────────────
+// ââ Fetch + countdown state âââââââââââââââââââââââââââââââââââââââââââââââââââ
 let _scanCdSec   = 0;   // counts down to next scan
 let _priceCdSec  = 0;   // counts down to next price update
 
-// Tick every second — scan countdown, per-card price countdown
+// Tick every second â scan countdown, per-card price countdown
 setInterval(() => {
   _scanCdSec  = Math.max(0, _scanCdSec  - 1);
   _priceCdSec = Math.max(0, _priceCdSec - 1);
@@ -56,7 +56,7 @@ document.addEventListener('click', e => {
   if (marketOpen && !e.target.closest('.mkt-btn-wrap')) closeMarket();
 });
 
-// ── Navigation ────────────────────────────────────────────────────────────────
+// ââ Navigation ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function setNav(el) {
   document.querySelectorAll('.fp').forEach(f => f.classList.remove('active'));
   el.classList.add('active');
@@ -71,7 +71,7 @@ function setNav(el) {
   if (STATE) render();
 }
 
-// ── HyperLiquid Account Pill & Overlay ───────────────────────────────────────
+// ââ HyperLiquid Account Pill & Overlay âââââââââââââââââââââââââââââââââââââââ
 let _hlAccFetched = false;
 let _hlAccMasked  = false;
 let _hlAccData    = null;
@@ -89,7 +89,7 @@ function hlAccCloseCard() {
 function hlAccToggleMask(e) {
   e.stopPropagation();
   _hlAccMasked = !_hlAccMasked;
-  const icon = _hlAccMasked ? '🚫' : '👁';
+  const icon = _hlAccMasked ? 'ð«' : 'ð';
   const eye1 = document.getElementById('hl-acc-pill-eye');
   const eye2 = document.getElementById('hl-acc-card-eye');
   if (eye1) eye1.textContent = icon;
@@ -100,11 +100,11 @@ function hlAccToggleMask(e) {
 async function hlAccFetch() {
   const btn = document.getElementById('hl-acc-refresh');
   const pv  = document.getElementById('hl-acc-pill-val');
-  if (btn) { btn.textContent = '⟳ FETCHING…'; btn.disabled = true; }
-  if (pv)  { pv.textContent = '⟳ fetching…'; pv.style.color = '#444'; pv.style.fontSize = '10px'; }
+  if (btn) { btn.textContent = 'â³ FETCHINGâ¦'; btn.disabled = true; }
+  if (pv)  { pv.textContent = 'â³ fetchingâ¦'; pv.style.color = '#444'; pv.style.fontSize = '10px'; }
   ['equity','avail','margin','pnl','pos'].forEach(k => {
     const el = document.getElementById('hl-acc-' + k);
-    if (el) { el.textContent = '⟳'; el.style.color = '#333'; }
+    if (el) { el.textContent = 'â³'; el.style.color = '#333'; }
   });
   try {
     const r = await fetch('/api/hl-balance');
@@ -118,14 +118,14 @@ async function hlAccFetch() {
     }
     const pill = document.getElementById('hl-acc-pill');
     if (pill) pill.classList.add('fetched');
-    if (btn) { btn.textContent = '⟳ REFRESH BALANCE'; btn.disabled = false; }
+    if (btn) { btn.textContent = 'â³ REFRESH BALANCE'; btn.disabled = false; }
     _hlAccRender();
   } catch(err) {
-    if (btn) { btn.textContent = '⟳ FETCH BALANCE'; btn.disabled = false; }
+    if (btn) { btn.textContent = 'â³ FETCH BALANCE'; btn.disabled = false; }
     if (pv)  { pv.textContent = 'TAP FOR BALANCE'; pv.style.color = '#444'; pv.style.fontSize = '10px'; pv.style.fontWeight = '700'; }
     ['equity','avail','margin','pnl','pos'].forEach(k => {
       const el = document.getElementById('hl-acc-' + k);
-      if (el) { el.textContent = '—'; el.style.color = '#2a2a2a'; }
+      if (el) { el.textContent = 'â'; el.style.color = '#2a2a2a'; }
     });
   }
 }
@@ -134,14 +134,14 @@ function _hlAccRender() {
   if (!_hlAccData) return;
   const d   = _hlAccData;
   const msk = _hlAccMasked;
-  const fmt = v => msk ? '••••••' : '$' + v.toFixed(2);
+  const fmt = v => msk ? 'â¢â¢â¢â¢â¢â¢' : '$' + v.toFixed(2);
   // Pill equity value
   const pv = document.getElementById('hl-acc-pill-val');
   if (pv) {
     pv.style.fontSize   = '12px';
     pv.style.fontWeight = '700';
     pv.style.color      = msk ? '#333' : '#fff';
-    pv.textContent      = msk ? '••••••' : '$' + d.equity.toFixed(2);
+    pv.textContent      = msk ? 'â¢â¢â¢â¢â¢â¢' : '$' + d.equity.toFixed(2);
   }
   // Card values
   const eq = document.getElementById('hl-acc-equity');
@@ -153,7 +153,7 @@ function _hlAccRender() {
   if (av) { av.textContent = fmt(d.available);   av.style.color = msk ? '#2a2a2a' : '#00e676'; }
   if (mg) { mg.textContent = fmt(d.margin_used); mg.style.color = msk ? '#2a2a2a' : '#b388ff'; }
   if (pn) {
-    if (msk) { pn.textContent = '••••••'; pn.style.color = '#2a2a2a'; }
+    if (msk) { pn.textContent = 'â¢â¢â¢â¢â¢â¢'; pn.style.color = '#2a2a2a'; }
     else { pn.textContent = (d.unrealized_pnl >= 0 ? '+' : '') + '$' + d.unrealized_pnl.toFixed(2); pn.style.color = d.unrealized_pnl >= 0 ? '#00e676' : '#ff5252'; }
   }
   if (ps) { ps.textContent = d.open_positions; ps.style.color = '#ffffff'; }
@@ -174,24 +174,24 @@ function closeMarket() {
   document.getElementById('mkt-popover').classList.remove('open');
 }
 
-// ── Scan status text (updated by ticker and by render) ────────────────────────
+// ââ Scan status text (updated by ticker and by render) ââââââââââââââââââââââââ
 function updateScanStatus() {
   const el = document.getElementById('scan-status');
   if (!el) return;
-  if (!lastScanAt) { el.innerHTML = 'waiting for scan…'; return; }
+  if (!lastScanAt) { el.innerHTML = 'waiting for scanâ¦'; return; }
   const d = new Date(lastScanAt * 1000);
   const ts = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  el.innerHTML = `last scan <span class="ts">${ts}</span> · #${STATE?.scan_count||0} · <span class="cd">next in ${_scanCdSec}s</span>`;
+  el.innerHTML = `last scan <span class="ts">${ts}</span> Â· #${STATE?.scan_count||0} Â· <span class="cd">next in ${_scanCdSec}s</span>`;
 }
 
-// ── Master render ─────────────────────────────────────────────────────────────
+// ââ Master render âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-// ── Market Health strip ───────────────────────────────────────────────────────
+// ââ Market Health strip âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderMarketHealth() {
     const mh = STATE?.market_health;
 
     const context = (status, side, mh) => {
-      if (!mh) return '<div class="mh-ctx-line">Initialising…</div>';
+      if (!mh) return '<div class="mh-ctx-line">Initialisingâ¦</div>';
       const isBear = side === 'SHORT';
       const ratio  = isBear ? (mh.bear_ratio ?? 0) : (mh.bull_ratio ?? 0);
       const total  = mh.total || 10;
@@ -202,14 +202,14 @@ function renderMarketHealth() {
       const slN    = Math.round((mh.sl_rate || 0) * 6);
       if (status === 'RUN') {
         return '<div class="mh-ctx-line">All conditions met</div>' +
-               '<div class="mh-ctx-line">Signals clear — ready to fire</div>';
+               '<div class="mh-ctx-line">Signals clear â ready to fire</div>';
       }
       if (status === 'HALT') {
         const lines = [];
         if (ratio < 0.3)
-          lines.push(`${lbl} pairs ${pCount} of ${total} — need ${Math.ceil(total * 0.3)}+`);
+          lines.push(`${lbl} pairs ${pCount} of ${total} â need ${Math.ceil(total * 0.3)}+`);
         if ((mh.sl_rate || 0) >= 0.6)
-          lines.push(`SL rate ${slN}/6 — too high`);
+          lines.push(`SL rate ${slN}/6 â too high`);
         if (isBear  && j5 >= 85 && ratio < 0.5)
           lines.push(`Avg J5 ${j5.toFixed(1)} overbought + bears below 50%`);
         if (!isBear && j5 <= 15 && ratio < 0.5)
@@ -219,15 +219,15 @@ function renderMarketHealth() {
       }
       const lines = [];
       if (ratio < 0.6)
-        lines.push(`Need ${lbl} ratio 0.6 — currently ${ratio.toFixed(2)}`);
+        lines.push(`Need ${lbl} ratio 0.6 â currently ${ratio.toFixed(2)}`);
       if (adx < 35)
-        lines.push(`Need avg ADX 35 — currently ${adx.toFixed(1)}`);
+        lines.push(`Need avg ADX 35 â currently ${adx.toFixed(1)}`);
       if (isBear && j5 > 70)
-        lines.push(`Need avg J5 ≤70 — currently ${j5.toFixed(1)}`);
+        lines.push(`Need avg J5 â¤70 â currently ${j5.toFixed(1)}`);
       if (!isBear && j5 < 30)
-        lines.push(`Need avg J5 ≥30 — currently ${j5.toFixed(1)}`);
+        lines.push(`Need avg J5 â¥30 â currently ${j5.toFixed(1)}`);
       if ((mh.sl_rate || 0) >= 0.4)
-        lines.push(`SL rate ${slN}/6 — need below 3`);
+        lines.push(`SL rate ${slN}/6 â need below 3`);
       if (!lines.length) lines.push('Near RUN threshold');
       return lines.slice(0, 2).map(l => `<div class="mh-ctx-line">${l}</div>`).join('');
     };
@@ -257,8 +257,8 @@ function renderMarketHealth() {
     if (!bd || !body) return;
     const sStatus = window._mhStatusShort || 'CAUTION';
     const lStatus = window._mhStatusLong  || 'CAUTION';
-    const sCtx    = (window._mhCtxShort || '<div class="mh-ctx-line">Initialising…</div>').replace(/mh-ctx-line/g, 'mh-ov-ctx-line');
-    const lCtx    = (window._mhCtxLong  || '<div class="mh-ctx-line">Initialising…</div>').replace(/mh-ctx-line/g, 'mh-ov-ctx-line');
+    const sCtx    = (window._mhCtxShort || '<div class="mh-ctx-line">Initialisingâ¦</div>').replace(/mh-ctx-line/g, 'mh-ov-ctx-line');
+    const lCtx    = (window._mhCtxLong  || '<div class="mh-ctx-line">Initialisingâ¦</div>').replace(/mh-ctx-line/g, 'mh-ov-ctx-line');
     const pilCls  = st => `mh-ov-pill mh-ov-pill-${st.toLowerCase()}`;
     body.innerHTML =
       '<div class="mh-ov-section">' +
@@ -284,6 +284,8 @@ function renderMarketHealth() {
   }
 function render() {
   renderHeader();
+  _renderBtcRegimePill();
+  _renderJmapRegimeBadge();
   updateNavCounts();
   updateScanStatus();
   renderBanner();
@@ -295,7 +297,7 @@ function render() {
   if (marketOpen)             updateMarketPopover();
 }
 
-// ── Nav counts ────────────────────────────────────────────────────────────────
+// ââ Nav counts ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function updateNavCounts() {
   const alerts = STATE?.alerts      || [];
   const trades = STATE?.open_trades || {};
@@ -305,8 +307,95 @@ function updateNavCounts() {
   document.getElementById('nav-log-count').textContent   = log.length;
 }
 
-// ── Header ────────────────────────────────────────────────────────────────────
-function renderHeader() {
+// ââ Header ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── BTC Regime pill helpers ───────────────────────────────────────────────────────
+  function _getBtcRegime() {
+    const btc = (STATE?.pair_states||[]).find(p => p.symbol === 'BTC');
+    if (!btc) return { state:'UNKNOWN', cls:'unknown', color:'#555', label:'BTC DATA MISSING', j1h:50, j15m:50, stochK:50, stochD:50 };
+    const j1h   = Math.min(100, Math.max(0, btc.j1h||0));
+    const j15m  = Math.min(100, Math.max(0, btc.j15m||0));
+    const stochK = Math.min(100, Math.max(0, btc.stoch_k||0));
+    const stochD = Math.min(100, Math.max(0, btc.stoch_d||0));
+    let state, cls, color, label, narrative;
+    if (j1h < 20) {
+      state='CONFIRMED_LONG'; cls='long'; color='#00e676'; label='✅ LONG SAFE ZONE';
+      narrative='BTC is deeply oversold — longs have a green light from the regime.';
+    } else if (j1h < 40) {
+      state='CAUTION_LONG'; cls='caution'; color='#ffb300'; label='⚠️ CAUTION — YOUR CALL';
+      narrative='Bounce possible but not confirmed. Enter longs at your discretion.';
+    } else if (j1h <= 60) {
+      state='STOP'; cls='stop'; color='#ff4646'; label='🚫 STOP ZONE — NO ENTRY';
+      narrative="BTC in no-man’s land — no edge either direction. Wait.";
+    } else if (j1h < 80) {
+      state='CAUTION_SHORT'; cls='caution'; color='#ffb300'; label='⚠️ CAUTION — YOUR CALL';
+      narrative='Approaching short safe zone. Wait for J1H above 80 for conviction.';
+    } else {
+      state='CONFIRMED_SHORT'; cls='short'; color='#ff4646'; label='✅ SHORT SAFE ZONE';
+      narrative='BTC is deeply overbought — shorts have a green light from the regime.';
+    }
+    return { state, cls, color, label, narrative, j1h, j15m, stochK, stochD };
+  }
+
+  function _renderBtcRegimePill() {
+    const el = document.getElementById('btc-regime-pill');
+    if (!el || !STATE) return;
+    const r = _getBtcRegime();
+    const styles = {
+      long:    'background:linear-gradient(135deg,#081a08 0%,#040d04 100%);border:1.5px solid #00e67666;box-shadow:0 0 20px rgba(0,230,118,0.25),0 0 40px rgba(0,230,118,0.10),inset 0 1px 0 rgba(0,230,118,0.1);',
+      short:   'background:linear-gradient(135deg,#1a0808 0%,#0d0404 100%);border:1.5px solid #ff525266;box-shadow:0 0 20px rgba(255,82,82,0.25),0 0 40px rgba(255,82,82,0.10),inset 0 1px 0 rgba(255,82,82,0.1);',
+      caution: 'background:linear-gradient(135deg,#1a1200 0%,#0d0900 100%);border:1.5px solid #ffb30066;box-shadow:0 0 20px rgba(255,179,0,0.20),0 0 40px rgba(255,179,0,0.08),inset 0 1px 0 rgba(255,179,0,0.1);',
+      stop:    'background:linear-gradient(135deg,#1a0808 0%,#0d0404 100%);border:1.5px solid #ff525288;box-shadow:0 0 24px rgba(255,82,82,0.30),0 0 48px rgba(255,82,82,0.12),inset 0 1px 0 rgba(255,82,82,0.15);animation:stopPulse 2s ease-in-out infinite;',
+      unknown: 'background:#0d0d0d;border:1px solid #333;',
+    };
+    const j1hGlow = {
+      long:    'color:#00e676;text-shadow:0 0 20px rgba(0,230,118,0.6),0 0 40px rgba(0,230,118,0.3);',
+      short:   'color:#ff4646;text-shadow:0 0 20px rgba(255,70,70,0.6),0 0 40px rgba(255,70,70,0.3);',
+      caution: 'color:#ffb300;text-shadow:0 0 20px rgba(255,179,0,0.6),0 0 40px rgba(255,179,0,0.3);',
+      stop:    'color:#ff4646;text-shadow:0 0 20px rgba(255,70,70,0.8),0 0 40px rgba(255,70,70,0.4);',
+      unknown: 'color:#555;',
+    };
+    const leftBg = {
+      long:'rgba(0,230,118,0.08)', short:'rgba(255,82,82,0.08)',
+      caution:'rgba(255,179,0,0.08)', stop:'rgba(255,82,82,0.10)', unknown:'transparent'
+    };
+    const cursorColor = { long:'#00e676', short:'#ff4646', caution:'#ffb300', stop:'#ff4646', unknown:'#555' };
+    const cursorGlow  = { long:'0 0 6px #00e676', short:'0 0 6px #ff4646', caution:'0 0 6px #ffb300', stop:'0 0 8px #ff4646', unknown:'none' };
+    const kDir = r.stochK > r.stochD ? '↑' : '↓';
+    el.style.cssText = `display:flex;align-items:center;gap:0;border-radius:8px;overflow:hidden;cursor:pointer;flex-shrink:0;transition:transform 0.1s;${styles[r.cls]||styles.unknown}`;
+    el.innerHTML = `
+      <div style="padding:8px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:64px;background:${leftBg[r.cls]||'transparent'}">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:7px;font-weight:700;color:#fff;opacity:0.6;letter-spacing:0.08em;margin-bottom:1px">BTC J1H</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;line-height:1;${j1hGlow[r.cls]||j1hGlow.unknown}">${r.j1h.toFixed(0)}</div>
+      </div>
+      <div style="padding:8px 12px;display:flex;flex-direction:column;justify-content:center;gap:2px;border-left:1px solid rgba(255,255,255,0.06)">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:${r.color};letter-spacing:0.06em">${r.label}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;color:#fff;opacity:0.7">K=${r.stochK.toFixed(0)} ${kDir} D=${r.stochD.toFixed(0)} · J15M ${r.j15m.toFixed(0)}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;color:#fff;line-height:1.5;margin-top:2px;padding-top:3px;border-top:1px solid rgba(255,255,255,0.06);max-width:220px">${r.narrative}</div>
+        <div style="position:relative;margin-top:3px">
+          <div style="display:flex;height:3px;border-radius:2px;overflow:hidden;width:100%">
+            <div style="flex:2;background:rgba(0,230,118,0.5)"></div>
+            <div style="flex:2;background:rgba(255,179,0,0.4)"></div>
+            <div style="flex:2;background:rgba(255,82,82,0.6)"></div>
+            <div style="flex:2;background:rgba(255,179,0,0.4)"></div>
+            <div style="flex:2;background:rgba(255,82,82,0.5)"></div>
+          </div>
+          <div style="position:absolute;top:-2px;bottom:-2px;width:3px;border-radius:2px;transform:translateX(-50%);left:${Math.min(99,Math.max(1,r.j1h))}%;background:${cursorColor[r.cls]};box-shadow:${cursorGlow[r.cls]}"></div>
+        </div>
+      </div>`;
+  }
+
+  function _renderJmapRegimeBadge() {
+    const el = document.getElementById('jmap-regime-badge');
+    if (!el || !STATE) return;
+    const r = _getBtcRegime();
+    const dot = r.cls === 'stop'
+      ? `background:${r.color};box-shadow:0 0 6px ${r.color};animation:stopPulse 2s infinite`
+      : `background:${r.color};box-shadow:0 0 4px ${r.color}`;
+    el.style.cssText = `display:flex;align-items:center;gap:5px;background:${r.color}11;border:1px solid ${r.color}44;border-radius:4px;padding:2px 7px`;
+    el.innerHTML = `<div style="width:6px;height:6px;border-radius:50%;${dot};flex-shrink:0"></div><span style="font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;color:${r.color};letter-spacing:0.05em">BTC J1H ${r.j1h.toFixed(0)} · ${r.label.replace(/[✅⚠️🚫]/g,'').trim()}</span>`;
+  }
+
+  function renderHeader() {
   const { daily, account, circuit_breaker, scan_count } = STATE;
 
   const pnlEl = document.getElementById('h-pnl');
@@ -331,18 +420,18 @@ function renderHeader() {
     } else if (account?.live_manual_entry_only) {
       modeBadge.style.display    = 'block';
       modeBadge.className        = 'mode-badge mode-badge-live-safe';
-      modeBadge.textContent      = 'LIVE 🔒';
+      modeBadge.textContent      = 'LIVE ð';
     } else {
       modeBadge.style.display    = 'block';
       modeBadge.className        = 'mode-badge mode-badge-live-danger';
-      modeBadge.textContent      = 'LIVE ⚠';
+      modeBadge.textContent      = 'LIVE â ';
     }
   }
   document.getElementById('cb-badge').style.display    = circuit_breaker?.active ? 'block' : 'none';
   renderResetSessionBtn();
 }
 
-// ── Market popover ────────────────────────────────────────────────────────────
+// ââ Market popover ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function updateMarketPopover() {
   const pairs = STATE?.pair_states || [];
   const bulls = pairs.filter(p => p.trend === 'Strong Bull').map(p => p.symbol);
@@ -360,7 +449,7 @@ function updateMarketPopover() {
   document.getElementById('mkt-os').innerHTML   = chips(os,    '#00ff88');
 }
 
-// ── Pair cards ────────────────────────────────────────────────────────────────
+// ââ Pair cards ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderCards() {
   const grid    = document.getElementById('card-grid');
   const pairs   = STATE.pair_states || [];
@@ -431,7 +520,7 @@ function buildCard(p, alerts, trades, changes) {
   const isConf     = longConf || shortConf;
   const confIsLong = longConf;
 
-  // ── Card glow — unified trend-based ──────────────────────────────────────────
+  // ââ Card glow â unified trend-based ââââââââââââââââââââââââââââââââââââââââââ
   const cardCls = 'pair-card';
   let glowStyle;
   const trend = p.trend || 'Neutral';
@@ -448,15 +537,15 @@ function buildCard(p, alerts, trades, changes) {
   } else {
     glowStyle = 'border:1px solid rgba(255,255,255,0.1);box-shadow:none';
   }
-  // ── Symbol class for confluence name glow ────────────────────────────────────
+  // ââ Symbol class for confluence name glow ââââââââââââââââââââââââââââââââââââ
   const symCls = (trend === 'Strong Bull' || trend === 'Bullish') ? 'card-sym card-sym-conf-long'
                : (trend === 'Strong Bear' || trend === 'Bearish') ? 'card-sym card-sym-conf-short'
                : 'card-sym';
 
-  // ── Inline direction rows: arrow + 4 gate dots + J15M/J1H values ─────────────
+  // ââ Inline direction rows: arrow + 4 gate dots + J15M/J1H values âââââââââââââ
   function dotRowJ(dir, gateArr) {
     const isL    = dir === 'LONG';
-    const arrow  = isL ? '▲' : '▼';
+    const arrow  = isL ? 'â²' : 'â¼';
     const arCls  = isL ? 'arrow-long' : 'arrow-short';
     const pfx    = isL ? 'long' : 'short';
     const dots   = gateArr.map(g => `<span class="gc-dot ${pfx}-${g ? 'pass' : 'fail'}"></span>`).join('');
@@ -478,12 +567,12 @@ function buildCard(p, alerts, trades, changes) {
     inlineDir = `<div class="sym-dir-wrap">${dotRowJ('LONG', longGates)}</div>`;
   }
 
-  // ── Gate rows: RSI + DEPTH only (J moved to symbol line) ─────────────────────
+  // ââ Gate rows: RSI + DEPTH only (J moved to symbol line) âââââââââââââââââââââ
   let rows = '';
   if (showShort) rows += dirRow('SHORT', stochK, stochD, rsi15m, askPct);
   if (showLong)  rows += dirRow('LONG',  stochK, stochD, rsi15m, bidPct);
 
-  // ── Confluence mini bars (RSI + Depth) — shown only on confluence cards ───────
+  // ââ Confluence mini bars (RSI + Depth) â shown only on confluence cards âââââââ
   let confBars = '';
   if (isConf) {
     const depthPct   = confIsLong ? bidPct : askPct;
@@ -525,7 +614,7 @@ function buildCard(p, alerts, trades, changes) {
     </div>`;
   }
 
-  // ── Pills / readiness ─────────────────────────────────────────────────────────
+  // ââ Pills / readiness âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   let pills = '';
   if (isConf) {
     const gateArr = confIsLong ? longGates : shortGates;
@@ -543,7 +632,7 @@ function buildCard(p, alerts, trades, changes) {
       if (STATE.circuit_breaker?.active && !_veto) _veto = 'CIRCUIT BRK';
       pills = _veto
         ? `<span class="pill" style="color:#ff9900;border-color:#ff9900;background:rgba(255,153,0,0.12)">BLOCKED: ${_veto}</span>`
-        : `<span class="pill ${rdyCls}">✦ READY</span>`;
+        : `<span class="pill ${rdyCls}">â¦ READY</span>`;
     }
     else if (passing === 3) pills = `<span class="pill pill-near-rdy">NEAR 3/4</span>`;
     else                    pills = `<span class="pill pill-partial">PARTIAL ${passing}/4</span>`;
@@ -560,12 +649,12 @@ function buildCard(p, alerts, trades, changes) {
     const _sHaltS    = p.session_halted_short;
     const _lgCDL     = p.large_sl_cd_long  || 0;
     const _lgCDS     = p.large_sl_cd_short || 0;
-    if (_sHaltL) pills += `<span class="pill pill-halted">LONG HALTED — ${_sess}</span>`;
-    if (_sHaltS) pills += `<span class="pill pill-halted">SHORT HALTED — ${_sess}</span>`;
+    if (_sHaltL) pills += `<span class="pill pill-halted">LONG HALTED â ${_sess}</span>`;
+    if (_sHaltS) pills += `<span class="pill pill-halted">SHORT HALTED â ${_sess}</span>`;
     if (!_sHaltL && _lgCDL > 0) pills += `<span class="pill pill-cd-large">COOLDOWN ${fmtCd(_lgCDL)}</span>`;
     if (!_sHaltS && _lgCDS > 0) pills += `<span class="pill pill-cd-large">COOLDOWN ${fmtCd(_lgCDS)}</span>`;
-    if (shortFull && hasAlert) pills += `<span class="pill pill-alert-s">▼ ALERT</span>`;
-    if (longFull  && hasAlert) pills += `<span class="pill pill-alert">▲ ALERT</span>`;
+    if (shortFull && hasAlert) pills += `<span class="pill pill-alert-s">â¼ ALERT</span>`;
+    if (longFull  && hasAlert) pills += `<span class="pill pill-alert">â² ALERT</span>`;
   }
 
   return `<div class="${cardCls}" style="${glowStyle}">
@@ -580,7 +669,7 @@ function buildCard(p, alerts, trades, changes) {
         </div>
       </div>
     </div>
-    <div class="card-adx-compact"><span class="adx-cl">ADX</span><span class="adx-cv" style="color:${adxColor}">${adx1h.toFixed(1)}</span><span class="card-meta-sep">·</span><span class="adx-cl">J15M</span><span class="adx-cv" style="color:${j15m < 20 ? '#00ff88' : j15m > 80 ? '#ff4444' : '#fff'}">${j15m.toFixed(0)}</span><span class="card-meta-sep">·</span><span class="adx-cl">J1H</span><span class="adx-cv" style="color:${j1h < 40 ? '#00ff88' : j1h > 60 ? '#ff4444' : '#fff'}">${j1h.toFixed(0)}</span></div>
+    <div class="card-adx-compact"><span class="adx-cl">ADX</span><span class="adx-cv" style="color:${adxColor}">${adx1h.toFixed(1)}</span><span class="card-meta-sep">Â·</span><span class="adx-cl">J15M</span><span class="adx-cv" style="color:${j15m < 20 ? '#00ff88' : j15m > 80 ? '#ff4444' : '#fff'}">${j15m.toFixed(0)}</span><span class="card-meta-sep">Â·</span><span class="adx-cl">J1H</span><span class="adx-cv" style="color:${j1h < 40 ? '#00ff88' : j1h > 60 ? '#ff4444' : '#fff'}">${j1h.toFixed(0)}</span></div>
     ${rows}
     ${confBars}
     <div class="card-footer">${pills || `<span class="pill pill-scanning">SCANNING</span>`}</div>
@@ -609,7 +698,7 @@ function dirRow(direction, stochK, stochD, rsi15m, depthPct) {
   </div>`;
 }
 
-// ── Banner TF switcher ────────────────────────────────────────────────────────
+// ââ Banner TF switcher ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function setBannerTF(tf) {
   bannerTF = tf;
   ['15M', '1H', 'BOTH'].forEach(t => {
@@ -624,7 +713,7 @@ function setBannerTF(tf) {
   renderBanner();
 }
 
-// ── Compact J Opportunity Banner — chips on bar ───────────────────────────────
+// ââ Compact J Opportunity Banner â chips on bar âââââââââââââââââââââââââââââââ
 function renderBanner() {
   const pairs = STATE?.pair_states || [];
   if (!pairs.length) return;
@@ -641,7 +730,7 @@ function renderBanner() {
       return { sym: p.symbol, j, longConf, shortConf };
     }).sort((a, b) => a.j - b.j);
 
-    // Anti-overlap: up to 3 stagger rows — pairs within 6 pts try next row
+    // Anti-overlap: up to 3 stagger rows â pairs within 6 pts try next row
       const NUM_ROWS = 3;
       const rowEdge = new Array(NUM_ROWS).fill(undefined);
       const placed = items.map(item => {
@@ -661,7 +750,7 @@ function renderBanner() {
         : (j < 40 ? '#00e676' : j < 50 ? 'rgba(0,230,118,0.5)' : j < 60 ? 'rgba(255,255,255,0.4)' : j < 70 ? 'rgba(255,61,87,0.5)' : '#ff3d57');
       const pulseCls   = isConf ? ' cb-conf' : '';
       const extraBot   = row * 16;
-      return `<div class="cb-chip${pulseCls}" style="left:${j.toFixed(1)}%;bottom:${extraBot}px;color:${col}">${sym}${isConf ? '✦' : ''}<div class="cb-tick"></div></div>`;
+      return `<div class="cb-chip${pulseCls}" style="left:${j.toFixed(1)}%;bottom:${extraBot}px;color:${col}">${sym}${isConf ? 'â¦' : ''}<div class="cb-tick"></div></div>`;
     }).join('');
   }
 
@@ -669,7 +758,7 @@ function renderBanner() {
   fillRuler('jb-chips-1h',  '1h');
 }
 
-// ── Alerts tab ────────────────────────────────────────────────────────────────
+// ââ Alerts tab ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function dismissAlert(symbol, direction) {
   fetch('/api/alert/dismiss', {
     method: 'POST',
@@ -705,7 +794,7 @@ function buildAlertCard(a, trades, pairMap) {
   const inTrade  = a.is_in_trade || (key in trades);
   const isPaper  = STATE.account?.paper_mode;
 
-  // ── Snap data (frozen at alert fire) ──────────────────────────────────────
+  // ââ Snap data (frozen at alert fire) ââââââââââââââââââââââââââââââââââââââ
   const snapJ15m = +(a.j15m   || 0);
   const snapRsi    = +(a.rsi15m  || 0);
   const snapStochK = +(a.stoch_k || 0);
@@ -713,7 +802,7 @@ function buildAlertCard(a, trades, pairMap) {
   const snapAdx    = +(a.adx1h   || 0);
   const snapAtr    = +(a.atr15m  || 0);
 
-  // ── NOW data (live from pair_states) ──────────────────────────────────────
+  // ââ NOW data (live from pair_states) ââââââââââââââââââââââââââââââââââââââ
   const ps       = (pairMap || {})[sym] || {};
   const nowJ15m  = ps.j15m    != null ? +ps.j15m    : snapJ15m;
   const nowRsi   = ps.rsi15m  != null ? +ps.rsi15m  : snapRsi;
@@ -722,12 +811,12 @@ function buildAlertCard(a, trades, pairMap) {
   const nowAdx   = ps.adx1h   != null ? +ps.adx1h   : snapAdx;
   const nowAtr   = ps.atr15m  != null ? +ps.atr15m  : snapAtr;
 
-  // ── Live price + 24h change ───────────────────────────────────────────────
+  // ââ Live price + 24h change âââââââââââââââââââââââââââââââââââââââââââââââ
   const livePrice     = (STATE.prices || {})[sym] || a.entry_price || 0;
   const chg24h        = ((STATE.price_changes || {})[sym]) ?? null;
   const priceDriftPct = a.entry_price ? Math.abs(livePrice - a.entry_price) / a.entry_price * 100 : 0;
 
-  // ── Staleness ─────────────────────────────────────────────────────────────
+  // ââ Staleness âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const elapsed    = a.fired_at ? Math.floor(Date.now() / 1000 - a.fired_at) : 0;
   const j15mDrift  = Math.abs(nowJ15m - snapJ15m);
   const isStale    = elapsed > 480 || j15mDrift > 30 || priceDriftPct > 1.5;
@@ -743,20 +832,20 @@ function buildAlertCard(a, trades, pairMap) {
     ? `${elapsed}s`
     : `${Math.floor(elapsed/60)}m${String(elapsed % 60).padStart(2,'0')}s`;
 
-  // ── Header badges ─────────────────────────────────────────────────────────
+  // ââ Header badges âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const dirPill = isShort
     ? '<span class="ac-dir dir-short">BOUNCE SHORT</span>'
     : '<span class="ac-dir dir-long">BOUNCE LONG</span>';
   const tierCls = a.tier === 'HIGH_PROB' ? 'tp-high' : a.tier === 'STRONG' ? 'tp-strong' : 'tp-regular';
   const tierLbl = a.tier === 'HIGH_PROB' ? 'HIGH PROB' : a.tier === 'STRONG' ? 'STRONG' : 'REGULAR';
 
-  // ── Live price row ────────────────────────────────────────────────────────
+  // ââ Live price row ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const chgHtml  = chg24h !== null
     ? `<span class="ac2-chg" style="color:${chg24h >= 0 ? '#00ff88' : '#ff4444'}">${chg24h >= 0 ? '+' : ''}${chg24h.toFixed(2)}%</span>`
     : '';
-  const warnHtml = priceDriftPct > 1 ? '<span class="ac2-warn">⚠</span>' : '';
+  const warnHtml = priceDriftPct > 1 ? '<span class="ac2-warn">â </span>' : '';
 
-  // ── Metric color helpers ──────────────────────────────────────────────────
+  // ââ Metric color helpers ââââââââââââââââââââââââââââââââââââââââââââââââââ
   const j15mClr = v => v > 80 ? '#ff4444' : v < 20 ? '#00ff88' : '#ffaa00';
   const rsiClr   = v => v > 65 ? '#ff4444' : v < 35 ? '#00ff88' : '#fff';
   const stochClr = v => v > 75 ? '#ff4444' : v < 25 ? '#00ff88' : '#fff';
@@ -780,7 +869,7 @@ function buildAlertCard(a, trades, pairMap) {
     + mkMetric('ADX',    nowAdx,     adxClr,   1)
     + mkMetric('ATR',    nowAtr,     () => '#fff', 4);
 
-  // ── Buttons ───────────────────────────────────────────────────────────────
+  // ââ Buttons âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   const dis      = inTrade ? 'disabled' : '';
   const btnsHtml = isStale
     ? `<button class="ac-btn ac-btn-dismiss" onclick="dismissAlert('${sym}','${a.direction}')">DISMISS</button>`
@@ -837,7 +926,7 @@ function buildAlertCard(a, trades, pairMap) {
   </div>`;
 }
 
-// ── Positions tab ─────────────────────────────────────────────────────────────
+// ââ Positions tab âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderPositionsTab() {
   const trades     = STATE.open_trades || {};
   const prices     = STATE.prices      || {};
@@ -909,7 +998,7 @@ function buildPosCard(t, prices, pairStates) {
   const pnlCol = pnl >= 0 ? '#00ff88' : '#ff4444';
   const rCol   = r   >= 0 ? '#00ff88' : '#ff4444';
   const winning = isLong ? current >= entry : current <= entry;
-  const arrow   = winning ? '▲' : '▼';
+  const arrow   = winning ? 'â²' : 'â¼';
   const arrCol  = winning ? '#00ff88' : '#ff4444';
   const delta   = current - entry;
   const dltCol  = isLong ? (delta >= 0 ? '#00ff88' : '#ff4444') : (delta <= 0 ? '#00ff88' : '#ff4444');
@@ -918,9 +1007,9 @@ function buildPosCard(t, prices, pairStates) {
     ? absDlt.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})
     : absDlt >= 1 ? absDlt.toFixed(4) : absDlt.toFixed(6));
 
-  // Price ruler: spans SL (0%) → 2R (100%)
-  // Works for both LONG and SHORT: pct = (price−sl)/(2R−sl)×100
-  // For SHORT sl>entry>2R so denominator is negative — ratios still correct
+  // Price ruler: spans SL (0%) â 2R (100%)
+  // Works for both LONG and SHORT: pct = (priceâsl)/(2Râsl)Ã100
+  // For SHORT sl>entry>2R so denominator is negative â ratios still correct
   const oneR     = Math.abs(entry - sl);
   const twoR     = isLong ? entry + 2 * oneR : entry - 2 * oneR;
   const barRange = twoR - sl;
@@ -940,7 +1029,7 @@ function buildPosCard(t, prices, pairStates) {
   const p2R  = bp(twoR);
   const pCur = bp(current);
 
-  // Zone widths (loss zone: 0%→entry%, gain zone: entry%→100%)
+  // Zone widths (loss zone: 0%âentry%, gain zone: entry%â100%)
   const gainLeft = Math.min(pEn, p2R).toFixed(1);
   const gainW    = Math.abs(p2R - pEn).toFixed(1);
   const tp1SL    = Math.min(pTp1, pCur).toFixed(1);
@@ -954,7 +1043,7 @@ function buildPosCard(t, prices, pairStates) {
   const pnlTrailStop = trailStop ? dollarAt(trailStop) : 0;
 
   // Subheader
-  const openFmt   = openedAt ? new Date(openedAt*1000).toISOString().replace('T',' ').slice(0,19) : '—';
+  const openFmt   = openedAt ? new Date(openedAt*1000).toISOString().replace('T',' ').slice(0,19) : 'â';
   const marginFmt = margin >= 1000 ? `$${(margin/1000).toFixed(1)}k` : `$${Math.round(margin)}`;
 
   // Metrics (live from pair state, fallback to trade snapshot)
@@ -978,7 +1067,7 @@ function buildPosCard(t, prices, pairStates) {
   const jTr  = j15m > 60 ? 'rising' : j15m < 40 ? 'falling' : 'flat';
   const narr = ps.symbol
     ? `SCAN  J ${(+j15m).toFixed(1)}  ${dLbl} ${(+dPct).toFixed(1)}%  ADX ${(+adx).toFixed(1)}  RSI ${(+rsi).toFixed(1)}  K/D ${(+sK).toFixed(0)}/${(+sD).toFixed(0)}  J ${jTr}`
-    : 'SCAN  awaiting next scan…';
+    : 'SCAN  awaiting next scanâ¦';
 
   const tid      = `pct-${sym}-${t.direction}`;
   const closeLbl = `${paper ? 'PAPER ' : ''}CLOSE HL`;
@@ -991,7 +1080,7 @@ function buildPosCard(t, prices, pairStates) {
     <div class="pcv2-hdr-l">
       <span class="pcv2-sym">${sym}</span>
       <span class="pcv2-dir" style="color:${dirCol};border-color:${dirCol}">${t.direction}</span>
-      <span style="color:#ffaa00;font-size:13px;line-height:1">★</span>
+      <span style="color:#ffaa00;font-size:13px;line-height:1">â</span>
       <span class="pcv2-sig">Bounce</span>
       <span style="font-size:11px;font-weight:700;color:${dirCol}">${cond}</span>
       ${score ? `<span class="pcv2-sc">${score}pts</span>` : ''}
@@ -999,7 +1088,7 @@ function buildPosCard(t, prices, pairStates) {
     <span class="pcv2-timer" id="${tid}">00:00:00</span>
   </div>
 
-  <div class="pcv2-sub">${lev}x · ${marginFmt} · ${openFmt}${t.session ? ' · <span style="color:#aaa;font-size:10px;letter-spacing:1px">' + t.session + '</span>' : ''}</div>
+  <div class="pcv2-sub">${lev}x Â· ${marginFmt} Â· ${openFmt}${t.session ? ' Â· <span style="color:#aaa;font-size:10px;letter-spacing:1px">' + t.session + '</span>' : ''}</div>
 
   <div class="pcv2-live">
     <span style="font-size:20px;color:${arrCol};line-height:1">${arrow}</span>
@@ -1017,7 +1106,7 @@ function buildPosCard(t, prices, pairStates) {
       <div class="pcv2-mk" style="left:${pSl.toFixed(1)}%">
         <span class="pcv2-mkt" style="color:#ff4444">SL<br>${fmtPrice(sl)}</span>
         <span class="pcv2-mck" style="background:#ff4444"></span>
-        <span class="pcv2-mkb" style="color:#ff4444">−$${Math.abs(pnlSl).toFixed(0)}</span>
+        <span class="pcv2-mkb" style="color:#ff4444">â$${Math.abs(pnlSl).toFixed(0)}</span>
       </div>
       <div class="pcv2-mk" style="left:${pEn.toFixed(1)}%">
         <span class="pcv2-mkt" style="color:#fff;font-weight:700">ENTRY<br>${fmtPrice(entry)}</span>
@@ -1027,7 +1116,7 @@ function buildPosCard(t, prices, pairStates) {
       <div class="pcv2-mk" style="left:${pBe.toFixed(1)}%">
         <span class="pcv2-mkt pcv2-mkt-be" style="color:#ffaa00">BE<br>${fmtPrice(be)}</span>
         <span class="pcv2-mck" style="background:#ffaa00"></span>
-        <span class="pcv2-mkb" style="color:#ffaa00">≈$0</span>
+        <span class="pcv2-mkb" style="color:#ffaa00">â$0</span>
       </div>
       ${tp1 ? `<div class="pcv2-mk" style="left:${pTp1.toFixed(1)}%">
         <span class="pcv2-mkt" style="color:#00ff88">TP1<br>${fmtPrice(tp1)}</span>
@@ -1074,7 +1163,7 @@ function buildPosCard(t, prices, pairStates) {
 </div>`;
 }
 
-// ── CHANGE 1–4: Performance Stats Panel ──────────────────────────────────────
+// ââ CHANGE 1â4: Performance Stats Panel ââââââââââââââââââââââââââââââââââââââ
 
 function calcStats(log) {
   if (!log.length) return null;
@@ -1145,7 +1234,7 @@ function renderStatsPanel(log) {
   var collapsed = localStorage.getItem("stats-collapsed") === "1";
 
   if (!log.length) {
-    el.innerHTML = '<div class="stats-empty">NO TRADES YET — stats will appear after first closed trade</div>';
+    el.innerHTML = '<div class="stats-empty">NO TRADES YET â stats will appear after first closed trade</div>';
     return;
   }
 
@@ -1159,7 +1248,7 @@ function renderStatsPanel(log) {
   function pnlC(v)   { return v >= 0 ? "#00ff88" : "#ff4444"; }
 
   var pfStr, pfColor;
-  if (s.profitFactor === null) { pfStr = "∞"; pfColor = "#00ff88"; }
+  if (s.profitFactor === null) { pfStr = "â"; pfColor = "#00ff88"; }
   else { pfStr = s.profitFactor.toFixed(2); pfColor = s.profitFactor >= 2 ? "#00ff88" : s.profitFactor >= 1 ? "#ffaa00" : "#ff4444"; }
 
   function card(label, valHtml, subHtml) {
@@ -1174,8 +1263,8 @@ function renderStatsPanel(log) {
     card("NET P&L",      '<span style="color:' + pnlC(s.netPnl)    + '">' + dollar(s.netPnl)  + '</span>') +
     card("WIN RATE",     '<span style="color:' + wrColor(s.winRate)  + '">' + pct(s.winRate)   + '</span>') +
     card("TRADES",       '<span style="color:#fff">' + s.total + '</span>', "LONG " + s.longCount + " / SHORT " + s.shortCount) +
-    card("AVG WIN",      s.avgWin  !== null ? '<span style="color:#00ff88">' + dollar(s.avgWin)  + '</span>' : '<span style="color:#444">—</span>') +
-    card("AVG LOSS",     s.avgLoss !== null ? '<span style="color:#ff4444">' + dollar(s.avgLoss) + '</span>' : '<span style="color:#444">—</span>') +
+    card("AVG WIN",      s.avgWin  !== null ? '<span style="color:#00ff88">' + dollar(s.avgWin)  + '</span>' : '<span style="color:#444">â</span>') +
+    card("AVG LOSS",     s.avgLoss !== null ? '<span style="color:#ff4444">' + dollar(s.avgLoss) + '</span>' : '<span style="color:#444">â</span>') +
     card("PROF FACTOR",  '<span style="color:' + pfColor + '">' + pfStr + '</span>');
 
   function srow(labelHtml, countHtml, wrHtml, rHtml, pnlHtml) {
@@ -1192,8 +1281,8 @@ function renderStatsPanel(log) {
     return '<div class="srow">' +
       '<span class="srow-label" style="color:' + t.color + '">' + t.label + '</span>' +
       '<span class="srow-count">' + t.count + '</span>' +
-      '<span class="srow-wr" style="color:' + wrColor(t.winRate) + '">' + (t.count ? pct(t.winRate) : "—") + '</span>' +
-      '<span class="srow-r">' + (t.count ? rFmt(t.avgR) : "—") + '</span>' +
+      '<span class="srow-wr" style="color:' + wrColor(t.winRate) + '">' + (t.count ? pct(t.winRate) : "â") + '</span>' +
+      '<span class="srow-r">' + (t.count ? rFmt(t.avgR) : "â") + '</span>' +
       '</div>';
   }).join("");
 
@@ -1220,15 +1309,15 @@ function renderStatsPanel(log) {
   }).join("");
 
   var slTierStr = s.slByTier.filter(function(t){ return t.count > 0; })
-    .map(function(t){ return t.label.split(" ")[0] + " " + t.count; }).join(" · ") || "—";
+    .map(function(t){ return t.label.split(" ")[0] + " " + t.count; }).join(" Â· ") || "â";
   var slRows =
     '<div class="srow"><span class="srow-label" style="color:#ff4444">SL HITS</span>' +
     '<span style="color:#ff4444;font-weight:700">' + s.slCount + '</span>' +
     '<span class="srow-wr" style="color:#ff4444">' + pct(s.slRate) + '</span></div>' +
     '<div class="srow"><span class="srow-label">AVG LOSS</span>' +
-    '<span style="color:#ff4444">' + (s.avgSLLoss !== null ? dollar(s.avgSLLoss) : "—") + '</span></div>' +
+    '<span style="color:#ff4444">' + (s.avgSLLoss !== null ? dollar(s.avgSLLoss) : "â") + '</span></div>' +
     '<div class="srow"><span class="srow-label">WORST SL</span>' +
-    '<span style="color:#ff4444">' + (s.worstSL !== null ? dollar(s.worstSL) : "—") + '</span></div>' +
+    '<span style="color:#ff4444">' + (s.worstSL !== null ? dollar(s.worstSL) : "â") + '</span></div>' +
     '<div class="srow"><span style="font-size:7.5px;color:#444">' + slTierStr + '</span></div>';
 
   function wide(label, body) {
@@ -1240,11 +1329,11 @@ function renderStatsPanel(log) {
   var inlineSummary = collapsed
     ? '<span class="stats-header-summary">' +
       '<span style="color:' + pnlC(s.netPnl) + ';font-weight:700">' + dollar(s.netPnl) + '</span>' +
-      '<span style="color:#444"> · </span>' +
+      '<span style="color:#444"> Â· </span>' +
       '<span style="color:' + wrColor(s.winRate) + '">' + pct(s.winRate) + ' WIN</span>' +
       '</span>'
     : "";
-  var chevron = collapsed ? "›" : "‹";
+  var chevron = collapsed ? "âº" : "â¹";
   var chevRot = collapsed ? "0" : "90";
 
   el.className = "stats-panel";
@@ -1266,7 +1355,7 @@ function toggleStatsPanel() {
   localStorage.setItem("stats-collapsed", was ? "0" : "1");
   renderStatsPanel(STATE.trade_log || []);
 }
-// ── Per-trade visual row helpers ──────────────────────────────────────────────
+// ââ Per-trade visual row helpers ââââââââââââââââââââââââââââââââââââââââââââââ
 function _exitDotPct(r) {
   var sl = r.sl_price, tp1 = r.tp1_price, exit = r.exit_price;
   if (!sl || !tp1 || !exit) return 50;
@@ -1294,7 +1383,7 @@ function _tradeVisRow(r) {
     '<div class="tl-vis">' +
       '<span class="tl-badge ' + badgeCls + '">' + badgeTxt + '</span>' +
       '<span class="tl-rpill" style="background:' + rBg + '">' + rStr + '</span>' +
-      '<div class="tl-pbar-wrap" title="SL ← exit → TP1">' +
+      '<div class="tl-pbar-wrap" title="SL â exit â TP1">' +
         '<div class="tl-pdot" style="left:' + dotPct.toFixed(1) + '%;background:' + dotBg + '"></div>' +
       '</div>' +
     '</div>' +
@@ -1306,7 +1395,7 @@ function _toggleExpand(id) {
   if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
-// ── Streak calculator ─────────────────────────────────────────────────────────
+// ââ Streak calculator âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function _calcStreak(log) {
   if (!log.length) return { type: null, count: 0 };
   var isW = function(r) { return r.exit_reason === 'TP1' || r.exit_reason === 'TP2'; };
@@ -1319,7 +1408,7 @@ function _calcStreak(log) {
   return { type: cur, count: count };
 }
 
-// ── Performance panel ─────────────────────────────────────────────────────────
+// ââ Performance panel âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderPerfPanel(log) {
   var el = document.getElementById('perf-panel');
   if (!el) return;
@@ -1335,7 +1424,7 @@ function renderPerfPanel(log) {
   var wrBg   = wr >= 60 ? '#14532d' : wr >= 40 ? '#78350f' : '#7f1d1d';
   var pnlBg  = netPnl >= 0 ? '#14532d' : '#7f1d1d';
   var stkBg  = stk.type === 'W' ? '#14532d' : '#7f1d1d';
-  var stkStr = stk.count > 0 ? (stk.type + stk.count) : '—';
+  var stkStr = stk.count > 0 ? (stk.type + stk.count) : 'â';
   var pnlStr = (netPnl >= 0 ? '+' : '') + '$' + Math.abs(netPnl).toFixed(2);
 
   var last20 = log.slice(-20);
@@ -1359,7 +1448,7 @@ function renderPerfPanel(log) {
       '<span class="perf-pill" style="background:#1a1a1a;border:1px solid #2a2a2a">' + log.length + ' TRADES</span>' +
       '<span class="perf-pill" style="background:' + stkBg + '">' + stkStr + '</span>' +
     '</div>' +
-    '<div class="perf-bar-lbl">LAST ' + last20.length + ' TRADES — OLDEST LEFT · NEWEST RIGHT</div>' +
+    '<div class="perf-bar-lbl">LAST ' + last20.length + ' TRADES â OLDEST LEFT Â· NEWEST RIGHT</div>' +
     '<div class="perf-bar-wrap">' + segs + '</div>' +
     '<div class="perf-at">' +
       '<div class="perf-at-item"><span class="perf-at-label">TOTAL</span><span class="perf-at-val" style="color:#fff">' + log.length + '</span></div>' +
@@ -1371,7 +1460,7 @@ function renderPerfPanel(log) {
   '</div>';
 }
 
-// ── Session breakdown ───────────────────────────────────────────────────────
+// ââ Session breakdown âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderSessionPanel(log) {
   var el = document.getElementById('session-panel');
   if (!el) return;
@@ -1396,7 +1485,7 @@ function renderSessionPanel(log) {
     var avgR      = trades.reduce(function(s,r){ return s+(r.r_value||0); }, 0) / trades.length;
     var wrCol     = wr >= 60 ? '#00ff88' : wr >= 40 ? '#ffaa00' : '#ff4444';
     var pnlCol    = netPnl >= 0 ? '#00ff88' : '#ff4444';
-    var pfStr     = pf === null ? '∞' : pf.toFixed(2);
+    var pfStr     = pf === null ? 'â' : pf.toFixed(2);
     var pfCol     = (pf === null || pf >= 2) ? '#00ff88' : pf >= 1 ? '#ffaa00' : '#ff4444';
     var avgRCol   = avgR >= 0 ? '#00ff88' : '#ff4444';
     return '<div class="srow">' +
@@ -1426,11 +1515,11 @@ function renderSessionPanel(log) {
     var _lMae = _hasMae.filter(_isSL2);
     var _wMfe = _hasMae.filter(function(r){ return r.mfe_r!=null; }).filter(_isWin2);
     var _avg  = function(arr,f){ return arr.length ? arr.reduce(function(s,r){return s+(+r[f]||0);},0)/arr.length : null; };
-    var _fR   = function(v){ return v==null?'—':(v>=0?'+':'')+v.toFixed(1)+'R'; };
+    var _fR   = function(v){ return v==null?'â':(v>=0?'+':'')+v.toFixed(1)+'R'; };
     _excLine = '<div style="font-size:9px;color:#555;font-family:\'JetBrains Mono\',monospace;padding:5px 8px 3px;letter-spacing:0.4px">' +
       'EXCURSION &nbsp;&nbsp; winners avg MAE <span style="color:#ff8800">' + _fR(_avg(_wMae,'mae_r')) + '</span>' +
-      ' · losers avg MAE <span style="color:#ff4444">' + _fR(_avg(_lMae,'mae_r')) + '</span>' +
-      ' · winners avg MFE <span style="color:#00ff88">' + _fR(_avg(_wMfe,'mfe_r')) + '</span>' +
+      ' Â· losers avg MAE <span style="color:#ff4444">' + _fR(_avg(_lMae,'mae_r')) + '</span>' +
+      ' Â· winners avg MFE <span style="color:#00ff88">' + _fR(_avg(_wMfe,'mfe_r')) + '</span>' +
       '</div>';
   }
   el.innerHTML =
@@ -1440,8 +1529,8 @@ function renderSessionPanel(log) {
     '</div>' + _excLine;
 }
 
-// ── Log tab ───────────────────────────────────────────────────────────────────
-// ── Date-filter helpers ─────────────────────────────────────────────────────────────────────────────
+// ââ Log tab âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ââ Date-filter helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function _localDateStr(d) {
   return d.getFullYear() + '-' +
     String(d.getMonth()+1).padStart(2,'0') + '-' +
@@ -1499,13 +1588,13 @@ function renderLogTab() {
                     : r.exit_reason === 'TP2'         ? 'reason-tp2'
                     : r.exit_reason === 'TRAILBLAZER' ? 'reason-tp2'
                     : r.exit_reason === 'SL'          ? 'reason-sl' : 'reason-manual';
-    const reasonLbl = r.exit_reason === 'TRAILBLAZER' ? '🏃 TRAILBLAZER' : (r.exit_reason || '—');
+    const reasonLbl = r.exit_reason === 'TRAILBLAZER' ? 'ð TRAILBLAZER' : (r.exit_reason || 'â');
     const pnlColor = (r.pnl_usd||0) >= 0 ? '#00ff88' : '#ff4444';
     const rColor   = (r.r_value||0) >= 0 ? '#555'    : '#ff4444';
     const dur      = r.duration_seconds || 0;
     const durStr   = dur < 3600 ? `${Math.floor(dur/60)}m` : `${Math.floor(dur/3600)}h${Math.floor((dur%3600)/60)}m`;
-    const openTime = r.timestamp_opened ? new Date(r.timestamp_opened*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
-    const closeTime= r.timestamp_closed ? new Date(r.timestamp_closed*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : '—';
+    const openTime = r.timestamp_opened ? new Date(r.timestamp_opened*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'â';
+    const closeTime= r.timestamp_closed ? new Date(r.timestamp_closed*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'â';
     const isLong   = r.direction === 'LONG';
     const _sessC = { ASIA: '#9966ff', EU: '#4488ff', US: '#00ff88', OFF: '#888' };
     const _sCol  = _sessC[r.session_opened] || '#555';
@@ -1515,16 +1604,16 @@ function renderLogTab() {
     const _maeV = r.mae_r != null ? (+r.mae_r).toFixed(1) : null;
     const _mfeV = r.mfe_r != null ? ((+r.mfe_r >= 0 ? '+' : '') + (+r.mfe_r).toFixed(1)) : null;
     const _excl = (_maeV !== null || _mfeV !== null)
-      ? `<span style="font-size:8px;color:#444;display:block;margin-top:1px">${_maeV !== null ? _maeV : '—'}/${_mfeV !== null ? _mfeV : '—'}</span>`
+      ? `<span style="font-size:8px;color:#444;display:block;margin-top:1px">${_maeV !== null ? _maeV : 'â'}/${_mfeV !== null ? _mfeV : 'â'}</span>`
       : '';
     const _rid  = 'tlr-' + (r.timestamp_opened||0) + '-' + (r.timestamp_closed||0);
-    const _nd   = v => v != null ? (+v).toFixed(1) : '—';
-    const _expR = `<tr id="${_rid}" style="display:none;background:#050505"><td colspan="14" style="padding:2px 14px 8px;border-top:none;font-family:'JetBrains Mono',monospace;font-size:10px;color:#666;letter-spacing:0.3px">J ${_nd(r.j15m_entry)} · K/D ${_nd(r.stoch_k_entry)}/${_nd(r.stoch_d_entry)} · RSI ${_nd(r.rsi_entry)} · depth ${_nd(r.depth_pct_entry)}% · 24h ${_nd(r.chg24h_entry)}% · MAE ${_nd(r.mae_r)}R · MFE ${_nd(r.mfe_r)}R</td></tr>`;
+    const _nd   = v => v != null ? (+v).toFixed(1) : 'â';
+    const _expR = `<tr id="${_rid}" style="display:none;background:#050505"><td colspan="14" style="padding:2px 14px 8px;border-top:none;font-family:'JetBrains Mono',monospace;font-size:10px;color:#666;letter-spacing:0.3px">J ${_nd(r.j15m_entry)} Â· K/D ${_nd(r.stoch_k_entry)}/${_nd(r.stoch_d_entry)} Â· RSI ${_nd(r.rsi_entry)} Â· depth ${_nd(r.depth_pct_entry)}% Â· 24h ${_nd(r.chg24h_entry)}% Â· MAE ${_nd(r.mae_r)}R Â· MFE ${_nd(r.mfe_r)}R</td></tr>`;
     return `<tr onclick="_toggleExpand('${_rid}')" style="cursor:pointer">
       <td style="font-weight:700;font-size:12px;">${r.symbol}${_spill}</td>
       <td style="color:${isLong?'#00ff88':'#ff4444'};font-weight:700;">${r.direction}</td>
-      <td style="color:#fff;">${r.tier||'—'}</td>
-      <td style="color:#fff;">${r.leverage||'—'}x</td>
+      <td style="color:#fff;">${r.tier||'â'}</td>
+      <td style="color:#fff;">${r.leverage||'â'}x</td>
       <td>${fmtPrice(r.entry_price)}</td>
       <td>${fmtPrice(r.exit_price)}</td>
       <td style="color:#ff4444;">${fmtPrice(r.sl_price)}</td>
@@ -1551,7 +1640,7 @@ function renderLogTab() {
     </table>`;
 }
 
-// ── Trade actions ─────────────────────────────────────────────────────────────
+// ââ Trade actions âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function openTrade(symbol, direction, exchange, leverage) {
   try {
     const r = await fetch('/api/trade/open', {
@@ -1631,19 +1720,19 @@ async function clearLog() {
   } catch (e) { alert('Request failed'); }
 }
 
-// ── Pair Symbol Overlay ───────────────────────────────────────────────────────
+// ââ Pair Symbol Overlay âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 let _ovPollId    = null;
 let _ovPrevGates = null;
 
-// ── BTC Regime helpers ────────────────────────────────────────────────────────
+// ââ BTC Regime helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function _btcRegime(btc) {
-  if (!btc) return { state:'EXEMPT', cls:'exempt', color:'#fff', label:'⚪ EXEMPT' };
+  if (!btc) return { state:'EXEMPT', cls:'exempt', color:'#fff', label:'âª EXEMPT' };
   const j1h = btc.j1h || 0;
-  if (j1h < 20)  return { state:'CONFIRMED_LONG',  cls:'confirmed', color:'#00e676', label:'✅ CONFIRMED' };
-  if (j1h < 40)  return { state:'CAUTION_LONG',    cls:'caution',   color:'#ffb300', label:'⚠️ CAUTION'  };
-  if (j1h <= 60) return { state:'STOP',            cls:'stop',      color:'#ff4646', label:'🚫 STOP'     };
-  if (j1h < 80)  return { state:'CAUTION_SHORT',   cls:'caution',   color:'#ffb300', label:'⚠️ CAUTION'  };
-  return           { state:'CONFIRMED_SHORT',  cls:'confirmed', color:'#ff4646', label:'✅ SHORT SAFE' };
+  if (j1h < 20)  return { state:'CONFIRMED_LONG',  cls:'confirmed', color:'#00e676', label:'â CONFIRMED' };
+  if (j1h < 40)  return { state:'CAUTION_LONG',    cls:'caution',   color:'#ffb300', label:'â ï¸ CAUTION'  };
+  if (j1h <= 60) return { state:'STOP',            cls:'stop',      color:'#ff4646', label:'ð« STOP'     };
+  if (j1h < 80)  return { state:'CAUTION_SHORT',   cls:'caution',   color:'#ffb300', label:'â ï¸ CAUTION'  };
+  return           { state:'CONFIRMED_SHORT',  cls:'confirmed', color:'#ff4646', label:'â SHORT SAFE' };
 }
 
 function _btcRegimeCardHtml(sym, btc, regime, corr) {
@@ -1664,38 +1753,38 @@ function _btcRegimeCardHtml(sym, btc, regime, corr) {
     const j1hGlow = cls==='confirmed' ? '0 0 16px rgba(0,230,118,0.5)' : cls==='caution' ? '0 0 16px rgba(255,179,0,0.5)' : cls==='stop' ? '0 0 16px rgba(255,70,70,0.5)' : 'none';
 
     const kAboveD = sK > sD;
-    const stateLabel = state==='CONFIRMED_LONG'  ? '✅ LONG SAFE ZONE'
-                     : state==='CAUTION_LONG'    ? '⚠️ CAUTION ZONE'
-                     : state==='STOP'            ? '🚫 STOP ZONE'
-                     : state==='CAUTION_SHORT'   ? '⚠ CAUTION ZONE'
-                     : state==='CONFIRMED_SHORT' ? '✅ SHORT SAFE ZONE'
-                     :                            '⚪ NOT APPLIED';
+    const stateLabel = state==='CONFIRMED_LONG'  ? 'â LONG SAFE ZONE'
+                     : state==='CAUTION_LONG'    ? 'â ï¸ CAUTION ZONE'
+                     : state==='STOP'            ? 'ð« STOP ZONE'
+                     : state==='CAUTION_SHORT'   ? 'â  CAUTION ZONE'
+                     : state==='CONFIRMED_SHORT' ? 'â SHORT SAFE ZONE'
+                     :                            'âª NOT APPLIED';
     const threshNote = state==='CONFIRMED_LONG'  ? 'below 20 threshold'
                      : state==='CAUTION_LONG'    ? 'below 40 threshold'
-                     : state==='STOP'            ? 'in 40–60 stop band'
+                     : state==='STOP'            ? 'in 40â60 stop band'
                      : state==='CAUTION_SHORT'   ? 'above 60 threshold'
                      : state==='CONFIRMED_SHORT' ? 'above 80 threshold'
                      :                            'exempt';
-    const stochLine = 'K=' + sK.toFixed(0) + (kAboveD ? ' above' : ' below') + ' D=' + sD.toFixed(0) + (kAboveD ? ' ↑' : ' ↓');
+    const stochLine = 'K=' + sK.toFixed(0) + (kAboveD ? ' above' : ' below') + ' D=' + sD.toFixed(0) + (kAboveD ? ' â' : ' â');
 
     let narrative = '';
-    if      (state==='CONFIRMED_LONG')  narrative = 'BTC is deeply oversold on the hourly and momentum has turned up — the market is in bounce territory and longs have a green light from the regime.';
-    else if (state==='CAUTION_LONG')    narrative = 'BTC hourly is between oversold and neutral — bounce possible but not confirmed yet. ' + sym + ' pair gates are ready. Wait for J1H below 20 for full conviction, or enter knowing the risk.';
-    else if (state==='STOP')            narrative = "BTC is in no-man's land — not oversold enough to bounce, momentum falling. Every long entered in this regime hit its stop loss. Wait for J1H to drop below 20.";
+    if      (state==='CONFIRMED_LONG')  narrative = 'BTC is deeply oversold on the hourly and momentum has turned up â the market is in bounce territory and longs have a green light from the regime.';
+    else if (state==='CAUTION_LONG')    narrative = 'BTC hourly is between oversold and neutral â bounce possible but not confirmed yet. ' + sym + ' pair gates are ready. Wait for J1H below 20 for full conviction, or enter knowing the risk.';
+    else if (state==='STOP')            narrative = "BTC is in no-man's land â not oversold enough to bounce, momentum falling. Every long entered in this regime hit its stop loss. Wait for J1H to drop below 20.";
     else if (state==='CAUTION_SHORT')   narrative = 'BTC hourly is approaching overbought but not confirmed yet. Wait for J1H above 80 for full short conviction.';
-    else if (state==='CONFIRMED_SHORT') narrative = 'BTC is deeply overbought on the hourly — the market is extended and shorts have a green light from the regime.';
-    else                                narrative = 'BTC regime does not apply to ' + sym + '. Correlation ' + corr.toFixed(2) + ' is below the 0.65 threshold — this pair moves on independent catalysts and is not gated by BTC.';
+    else if (state==='CONFIRMED_SHORT') narrative = 'BTC is deeply overbought on the hourly â the market is extended and shorts have a green light from the regime.';
+    else                                narrative = 'BTC regime does not apply to ' + sym + '. Correlation ' + corr.toFixed(2) + ' is below the 0.65 threshold â this pair moves on independent catalysts and is not gated by BTC.';
 
     const gateDesc  = corr>=0.75 ? 'regime gate' : corr>=0.65 ? 'advisory only' : 'no gate';
     const j15mCol   = j15m>80 ? '#ff4646' : j15m<20 ? '#00e676' : '#fff';
-    const j15mSub   = j15m>80 ? 'overbought ST' : j15m<20 ? 'oversold ST ✅' : 'neutral';
+    const j15mSub   = j15m>80 ? 'overbought ST' : j15m<20 ? 'oversold ST â' : 'neutral';
     const adxCol2   = adx>=25 ? '#ffb300' : '#fff';
     const adxSub    = adx>=40 ? 'strong' : adx>=25 ? 'moderate' : 'weak';
     const stochVal  = sK>sD && sK<25 ? '#00e676' : sK<sD && sK>75 ? '#ff4646' : sK>sD ? '#ffb300' : '#fff';
-    let stochPillCol = '#888', stochPillBg = '#1a1a1a', stochPillTxt = 'K▼D not confirmed';
-    if      (sK>sD && sK<25)  { stochPillCol='#00e676'; stochPillBg='#00e67622'; stochPillTxt='K▶D ✅ BULL'; }
-    else if (sK<sD && sK>75)  { stochPillCol='#ff4646'; stochPillBg='#ff464622'; stochPillTxt='K▼D ❌ BEAR'; }
-    else if (sK>sD)           { stochPillCol='#ffb300'; stochPillBg='#ffb30022'; stochPillTxt='K▶D not in zone'; }
+    let stochPillCol = '#888', stochPillBg = '#1a1a1a', stochPillTxt = 'Kâ¼D not confirmed';
+    if      (sK>sD && sK<25)  { stochPillCol='#00e676'; stochPillBg='#00e67622'; stochPillTxt='Kâ¶D â BULL'; }
+    else if (sK<sD && sK>75)  { stochPillCol='#ff4646'; stochPillBg='#ff464622'; stochPillTxt='Kâ¼D â BEAR'; }
+    else if (sK>sD)           { stochPillCol='#ffb300'; stochPillBg='#ffb30022'; stochPillTxt='Kâ¶D not in zone'; }
 
     // Cursor
     const curPct = Math.min(99, Math.max(1, j1h)).toFixed(1);
@@ -1707,23 +1796,23 @@ function _btcRegimeCardHtml(sym, btc, regime, corr) {
 
     // Footer
     const footerCol = cls==='confirmed' ? '#00e676' : cls==='caution' ? '#ffb300' : cls==='stop' ? '#ff4646' : '#aaa';
-    const footerTxt = cls==='confirmed' ? 'corr ' + corr.toFixed(2) + ' · gate active · ~78% WR in this zone'
-                    : cls==='caution'   ? 'corr ' + corr.toFixed(2) + ' · your discretion · ~42% WR in caution zone'
-                    : cls==='stop'      ? 'corr ' + corr.toFixed(2) + ' · regime gate · 89% SL rate · wait for J1H <20'
-                    :                     'corr ' + corr.toFixed(2) + ' · independent catalysts · no gate';
+    const footerTxt = cls==='confirmed' ? 'corr ' + corr.toFixed(2) + ' Â· gate active Â· ~78% WR in this zone'
+                    : cls==='caution'   ? 'corr ' + corr.toFixed(2) + ' Â· your discretion Â· ~42% WR in caution zone'
+                    : cls==='stop'      ? 'corr ' + corr.toFixed(2) + ' Â· regime gate Â· 89% SL rate Â· wait for J1H <20'
+                    :                     'corr ' + corr.toFixed(2) + ' Â· independent catalysts Â· no gate';
 
     const p = [];
     // A) HEADER
     p.push('<div style="padding:8px 12px 6px;border-bottom:1px solid ' + hdrBor + ';display:flex;justify-content:space-between;align-items:center">');
     p.push('<div>');
     p.push('<div style="font-family:\'Bebas Neue\',sans-serif;font-size:16px;color:' + color + ';letter-spacing:0.04em;line-height:1">BTC REGIME</div>');
-    p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:7px;color:#fff;font-weight:700;margin-top:2px">' + price + ' · ADX ' + adx + ' · ' + sym + ' corr ' + corr.toFixed(2) + ' · ' + gateDesc + '</div>');
+    p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:7px;color:#fff;font-weight:700;margin-top:2px">' + price + ' Â· ADX ' + adx + ' Â· ' + sym + ' corr ' + corr.toFixed(2) + ' Â· ' + gateDesc + '</div>');
     p.push('</div>');
-    p.push('<span style="font-size:7px;font-weight:700;padding:2px 6px;border-radius:3px;border:1px solid ' + color + '66;color:' + color + ';font-family:\'JetBrains Mono\',monospace;background:' + color + '11">' + (isExempt ? '⚪ EXEMPT' : regime.label) + '</span>');
+    p.push('<span style="font-size:7px;font-weight:700;padding:2px 6px;border-radius:3px;border:1px solid ' + color + '66;color:' + color + ';font-family:\'JetBrains Mono\',monospace;background:' + color + '11">' + (isExempt ? 'âª EXEMPT' : regime.label) + '</span>');
     p.push('</div>');
     // B) HERO
     p.push('<div style="border-radius:5px;padding:10px;margin:6px 8px 0;background:' + heroBg + ';border:' + heroBor + '">');
-    p.push('<div style="font-size:7px;font-weight:700;color:#fff;letter-spacing:0.1em;margin-bottom:3px">BTC J 1H — KEY GATE</div>');
+    p.push('<div style="font-size:7px;font-weight:700;color:#fff;letter-spacing:0.1em;margin-bottom:3px">BTC J 1H â KEY GATE</div>');
     p.push('<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">');
     p.push('<div style="font-family:\'Bebas Neue\',sans-serif;font-size:44px;line-height:1;color:' + color + ';text-shadow:' + j1hGlow + '">' + j1h.toFixed(0) + '</div>');
     p.push('<div style="display:flex;flex-direction:column;gap:2px">');
@@ -1744,23 +1833,23 @@ function _btcRegimeCardHtml(sym, btc, regime, corr) {
     p.push('<div style="flex:2;background:rgba(255,70,70,0.30);border-radius:0 3px 3px 0"></div>');
     p.push('<div style="position:absolute;top:-2px;bottom:-2px;width:3px;border-radius:2px;left:' + curPct + '%;transform:translateX(-50%);background:' + curBg + ';box-shadow:' + curGlow + '"></div>');
     p.push('</div>');
-    p.push('<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:6px;font-weight:700;margin-top:2px"><span style="color:#00e676">&lt;20 LONG</span><span style="color:#ffb300">20–40</span><span style="color:#ff4646">40–60 STOP</span><span style="color:#ffb300">60–80</span><span style="color:#ff4646">&gt;80 SHORT</span></div>');
+    p.push('<div style="display:flex;justify-content:space-between;font-family:\'JetBrains Mono\',monospace;font-size:6px;font-weight:700;margin-top:2px"><span style="color:#00e676">&lt;20 LONG</span><span style="color:#ffb300">20â40</span><span style="color:#ff4646">40â60 STOP</span><span style="color:#ffb300">60â80</span><span style="color:#ff4646">&gt;80 SHORT</span></div>');
     p.push('</div>');
     // D) SUPPORT METRICS ROW
     p.push('<div style="display:flex;gap:4px;margin:6px 8px 0;flex-shrink:0">');
-    // Cell 1 — J15M
+    // Cell 1 â J15M
     p.push('<div style="flex:1;background:' + heroBg + ';border:' + heroBor + ';border-radius:4px;padding:5px 6px">');
     p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:6px;font-weight:700;color:#fff;margin-bottom:2px">BTC J 15M</div>');
     p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:13px;font-weight:700;line-height:1;color:' + j15mCol + '">' + j15m.toFixed(0) + '</div>');
     p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:6px;font-weight:700;color:#fff;margin-top:2px">' + j15mSub + '</div>');
     p.push('</div>');
-    // Cell 2 — STOCH K/D
+    // Cell 2 â STOCH K/D
     p.push('<div style="flex:1;background:' + heroBg + ';border:' + heroBor + ';border-radius:4px;padding:5px 6px">');
     p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:6px;font-weight:700;color:#fff;margin-bottom:2px">BTC STOCH K/D</div>');
     p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:13px;font-weight:700;line-height:1;color:' + stochVal + '">' + sK.toFixed(0) + '/' + sD.toFixed(0) + '</div>');
     p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:6px;font-weight:700;padding:1px 3px;border-radius:2px;display:inline-block;color:' + stochPillCol + ';background:' + stochPillBg + ';border:1px solid ' + stochPillCol + '44;margin-top:2px">' + stochPillTxt + '</div>');
     p.push('</div>');
-    // Cell 3 — ADX
+    // Cell 3 â ADX
     p.push('<div style="flex:1;background:' + heroBg + ';border:' + heroBor + ';border-radius:4px;padding:5px 6px">');
     p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:6px;font-weight:700;color:#fff;margin-bottom:2px">BTC ADX</div>');
     p.push('<div style="font-family:\'JetBrains Mono\',monospace;font-size:13px;font-weight:700;line-height:1;color:' + adxCol2 + '">' + adx.toFixed(0) + '</div>');
@@ -1795,7 +1884,7 @@ function openPairOverlay(sym) {
   pn.style.cssText = 'width:340px;flex-shrink:0;max-height:85vh;background:#0d0d0d;border:1px solid #2a2a2a;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 60px rgba(0,0,0,0.8),inset 0 1px 0 rgba(255,255,255,0.05)';
   pn.dataset.sym   = sym;
   pn.dataset.state = '';
-  pn.innerHTML = `<div class="pov-loading">Loading ${sym}…</div>`;
+  pn.innerHTML = `<div class="pov-loading">Loading ${sym}â¦</div>`;
   bd.appendChild(pn);
   const _btcForRegime = (STATE?.pair_states||[]).find(p => p.symbol==='BTC');
   const _corrVal = BTC_CORRELATION[sym] ?? 0.75;
@@ -1808,7 +1897,7 @@ function openPairOverlay(sym) {
     const _regimeCorr = BTC_CORRELATION[sym] ?? 0.75;
     const _exemptState = _regimeCorr < 0.65;
     rn.className = _exemptState ? 'exempt' : (_regimeResult?.cls || 'exempt');
-    rn.innerHTML = _btcRegimeCardHtml(sym, _btcForRegime, _exemptState ? {state:'EXEMPT',cls:'exempt',color:'#fff',label:'⚪ EXEMPT'} : _regimeResult, _regimeCorr);
+    rn.innerHTML = _btcRegimeCardHtml(sym, _btcForRegime, _exemptState ? {state:'EXEMPT',cls:'exempt',color:'#fff',label:'âª EXEMPT'} : _regimeResult, _regimeCorr);
     bd.appendChild(rn);
   }
   document.body.appendChild(bd);
@@ -1836,7 +1925,7 @@ async function _ovFetch(sym, isFirst) {
   } catch (e) { /* network blip */ }
 }
 
-// ── State helpers ─────────────────────────────────────────────────────────────
+// ââ State helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   function _ovState(d) {
     if (d.in_trade_long || d.in_trade_short) return 'IN_TRADE';
     if (d.alert && d.alert_state !== 'STALE')  return 'READY';
@@ -1869,7 +1958,7 @@ async function _ovFetch(sym, isFirst) {
     return '#aaa';
   }
 
-  // ── HTML builders ─────────────────────────────────────────────────────────────
+  // ââ HTML builders âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   function _ovStatePillHtml(state, dir) {
     const labels = { IN_TRADE:'IN TRADE', READY:'READY', NEAR:'NEAR', SCANNING:'SCANNING', WATCHING:'WATCHING' };
     const styles = {
@@ -1886,7 +1975,7 @@ async function _ovFetch(sym, isFirst) {
     return `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;letter-spacing:0.06em;${style}">${label}</span>`;
   }
 
-  // ── New gate builders ─────────────────────────────────────────────────────────
+  // ââ New gate builders âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   function _ovPassIcon(pass) {
     return pass
       ? '<span style="color:#00e676;font-size:14px;line-height:1">\u2705</span>'
@@ -1917,13 +2006,13 @@ async function _ovFetch(sym, isFirst) {
       const _hardBlocked  = _btcStop && _isHardGate;
       const _softWarning  = _btcCaution && (_isHardGate || _isAdvisory);
       if (_hardBlocked && isL)
-        return `<div id="pov-verdict" style="${base};background:rgba(255,82,82,0.12);border-top:1px solid rgba(255,82,82,0.2);border-bottom:1px solid rgba(255,82,82,0.2);color:#ff4646">🚫 LONG BLOCKED — BTC J1H in STOP zone</div>`;
-      const _btcSuffix = _softWarning ? ' · ⚠️ BTC caution' : (_btcConfirmed && !_isExemptG) ? ' · ✅ BTC confirmed' : '';
+        return `<div id="pov-verdict" style="${base};background:rgba(255,82,82,0.12);border-top:1px solid rgba(255,82,82,0.2);border-bottom:1px solid rgba(255,82,82,0.2);color:#ff4646">ð« LONG BLOCKED â BTC J1H in STOP zone</div>`;
+      const _btcSuffix = _softWarning ? ' Â· â ï¸ BTC caution' : (_btcConfirmed && !_isExemptG) ? ' Â· â BTC confirmed' : '';
       if (score === 4)
-        return `<div id="pov-verdict" style="${base};background:rgba(0,230,118,0.1);border-top:1px solid rgba(0,230,118,0.1);border-bottom:1px solid rgba(0,230,118,0.1);color:#00e676">✅ SIGNAL READY — all ${isL ? 'LONG' : 'SHORT'} gates passing${_btcSuffix}</div>`;
+        return `<div id="pov-verdict" style="${base};background:rgba(0,230,118,0.1);border-top:1px solid rgba(0,230,118,0.1);border-bottom:1px solid rgba(0,230,118,0.1);color:#00e676">â SIGNAL READY â all ${isL ? 'LONG' : 'SHORT'} gates passing${_btcSuffix}</div>`;
       if (score === 3)
-        return `<div id="pov-verdict" style="${base};background:rgba(255,179,0,0.08);border-top:1px solid rgba(255,179,0,0.1);border-bottom:1px solid rgba(255,179,0,0.1);color:#ffb300">⏳ ALMOST READY — waiting for ${failing[0]}${_btcSuffix}</div>`;
-      return `<div id="pov-verdict" style="${base};background:rgba(255,82,82,0.07);border-top:1px solid rgba(255,82,82,0.1);border-bottom:1px solid rgba(255,82,82,0.1);color:#ff5252">❌ NOT READY — ${failing.join(', ')}${_btcSuffix}</div>`;
+        return `<div id="pov-verdict" style="${base};background:rgba(255,179,0,0.08);border-top:1px solid rgba(255,179,0,0.1);border-bottom:1px solid rgba(255,179,0,0.1);color:#ffb300">â³ ALMOST READY â waiting for ${failing[0]}${_btcSuffix}</div>`;
+      return `<div id="pov-verdict" style="${base};background:rgba(255,82,82,0.07);border-top:1px solid rgba(255,82,82,0.1);border-bottom:1px solid rgba(255,82,82,0.1);color:#ff5252">â NOT READY â ${failing.join(', ')}${_btcSuffix}</div>`;
     }
 
   function _ovGateRowHtml(idPfx, name, passHtml, bodyHtml) {
@@ -2056,7 +2145,7 @@ async function _ovFetch(sym, isFirst) {
       <div style="display:flex;justify-content:space-between;font-size:8px;color:#2a2a2a;font-family:'JetBrains Mono',monospace;margin:2px 0 4px">
         <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
       </div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${txtCol}">≥55% ${label} depth needed, currently <span id="pov-depth-val" style="color:${txtCol};font-weight:700">${v.toFixed(0)}%</span></div>`;
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${txtCol}">â¥55% ${label} depth needed, currently <span id="pov-depth-val" style="color:${txtCol};font-weight:700">${v.toFixed(0)}%</span></div>`;
     return _ovGateRowHtml('depth', 'BID/ASK DEPTH', _ovPassIcon(pass), body);
   }
 
@@ -2094,7 +2183,7 @@ async function _ovFetch(sym, isFirst) {
     }).join('');
   }
 
-  // ── Actions (kept) ────────────────────────────────────────────────────────────
+  // ââ Actions (kept) ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   function _ovActionsHtml(d, state, dir, trade) {
       const sym = d.symbol;
       const _btcG  = (STATE?.pair_states||[]).find(p => p.symbol === 'BTC');
@@ -2148,7 +2237,7 @@ async function _ovFetch(sym, isFirst) {
       return watchBtn;
     }
 
-  // ── Full render ───────────────────────────────────────────────────────────────
+  // ââ Full render âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
   function _ovRender(pn, d) {
       const state = _ovState(d);
       const dir   = _ovDir(d);
@@ -2243,7 +2332,7 @@ async function _ovFetch(sym, isFirst) {
       _ovPrevGates = gates;
     }
 
-  // ── Targeted update (no full re-render) ───────────────────────────────────────
+  // ââ Targeted update (no full re-render) âââââââââââââââââââââââââââââââââââââââ
   function _ovUpdate(pn, d) {
       const state     = _ovState(d);
       const dir       = _ovDir(d);
@@ -2253,7 +2342,7 @@ async function _ovFetch(sym, isFirst) {
       if (prevState === 'IN_TRADE' && state !== 'IN_TRADE') { _ovExit(pn, d); return; }
       if (prevState !== state) { _ovRender(pn, d); return; }
 
-      // Regime-change detection — full re-render if BTC J1H zone changed
+      // Regime-change detection â full re-render if BTC J1H zone changed
       const _hb = document.getElementById('pov-hdr-btns');
       if (_hb) {
         const _sym3 = document.getElementById('pair-ov-pn')?.dataset?.sym || '';
@@ -2333,20 +2422,20 @@ async function _ovFetch(sym, isFirst) {
         if (_sym && _sym !== 'BTC') {
           const _cr = BTC_CORRELATION[_sym] ?? 0.75;
           const _ex = _cr < 0.65;
-          const _rg = _ex ? {state:'EXEMPT',cls:'exempt',color:'#fff',label:'⚪ EXEMPT'} : _btcRegime(_btcNow);
+          const _rg = _ex ? {state:'EXEMPT',cls:'exempt',color:'#fff',label:'âª EXEMPT'} : _btcRegime(_btcNow);
           _rnEl.className = _rg.cls;
           _rnEl.innerHTML = _btcRegimeCardHtml(_sym, _btcNow, _rg, _cr);
         }
       }
     }
   
-// ── Exit banner (3 s auto-close) ──────────────────────────────────────────────
+// ââ Exit banner (3 s auto-close) ââââââââââââââââââââââââââââââââââââââââââââââ
 function _ovExit(pn, d) {
   clearInterval(_ovPollId);
   const last   = d.recent_alerts?.[0];
   const reason = last?.exit_reason || 'CLOSED';
   const pnl    = last?.pnl_usd;
-  const pnlStr = pnl != null ? ` · ${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}` : '';
+  const pnlStr = pnl != null ? ` Â· ${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}` : '';
   const col    = reason === 'SL' ? '#ff3d57' : '#00e676';
   const banner = document.createElement('div');
   banner.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:10px;z-index:10;gap:10px';
@@ -2358,7 +2447,7 @@ function _ovExit(pn, d) {
   setTimeout(() => closePairOverlay(), 3000);
 }
 
-// ── Trade actions (overlay) ───────────────────────────────────────────────────
+// ââ Trade actions (overlay) âââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function _ovOpen(sym, dir, exchange, lev) {
   try {
     const r = await fetch('/api/trade/open', {
@@ -2381,7 +2470,7 @@ async function _ovCloseTrade(sym, dir) {
   } catch (e) { alert('Request failed'); }
 }
 
-// ── Reset Session ──────────────────────────────────────────────────────────────────────
+// ââ Reset Session ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function renderResetSessionBtn() {
   if (document.getElementById('reset-session-btn')) return;
   const mb = document.getElementById('mode-badge');
@@ -2501,13 +2590,15 @@ async function confirmResetSession() {
     '.rdec.caut{background:#1a1200;border:1px solid #ffb30044;}',
     '.rdec.stop{background:#1a0808;border:1px solid #ff525266;}',
     '.rdec.exempt{background:#0d0d0d;border:1px solid #2a2a2a;}',
+    '@keyframes stopPulse{0%,100%{box-shadow:0 0 24px rgba(255,82,82,0.30),0 0 48px rgba(255,82,82,0.12)}50%{box-shadow:0 0 32px rgba(255,82,82,0.50),0 0 64px rgba(255,82,82,0.20)}}',
+    '#btc-regime-pill:hover{transform:scale(1.02)}',
   ].join('');
   document.head.appendChild(s);
 })();
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ââ Helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function fmtPrice(p) {
-  if (!p) return '—';
+  if (!p) return 'â';
   if (p >= 1000) return p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (p >= 1)    return p.toFixed(4);
   return p.toFixed(6);
