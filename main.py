@@ -484,6 +484,8 @@ def _append_trade_log(trade: dict, exit_price: float, reason: str, pnl: float, r
                 "rsi_entry":        trade.get("rsi15m"),
                 "depth_pct_entry":  trade.get("bid_pct") if not is_short else trade.get("ask_pct"),
                 "chg24h_entry":     trade.get("chg24h"),
+                "score":            trade.get("score"),
+                "adx1h":            trade.get("adx1h"),
                 "mae_r":            _mae_r,
                 "mfe_r":            _mfe_r,
             }).execute()
@@ -573,6 +575,8 @@ async def _open_trade_log_row(trade: dict):
       ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS session_opened   text;
       ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS mae_r            float;
       ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS mfe_r            float;
+      ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS score           integer;
+      ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS adx1h           float;
     """
     sb = _get_supabase()
     if not sb:
@@ -600,6 +604,8 @@ async def _open_trade_log_row(trade: dict):
             "rsi_entry":       trade.get("rsi15m"),
             "depth_pct_entry": trade.get("bid_pct") if not is_short else trade.get("ask_pct"),
             "chg24h_entry":    trade.get("chg24h"),
+            "score":           trade.get("score"),
+            "adx1h":           trade.get("adx1h"),
         }).execute()
         print(f"[TRADE LOG OPEN] {trade['symbol']} {trade['direction']} open-row written to hl_trade_log")
     except Exception as _e:
@@ -1315,6 +1321,8 @@ async def lifespan(app: FastAPI):
     print("  ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS session_opened   text;")
     print("  ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS mae_r            float;")
     print("  ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS mfe_r            float;")
+    print("  ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS score           integer;")
+    print("  ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS adx1h           float;")
 
     # ── Mode log ──────────────────────────────────────────────────────────────
     if PAPER_MODE:
