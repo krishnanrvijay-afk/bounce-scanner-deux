@@ -75,7 +75,7 @@ function setNav(el) {
 
 //  HyperLiquid Account Pill & Overlay 
 let _hlAccFetched = false;
-let _hlAccMasked  = false;
+let _hlAccMasked  = true;
 let _hlAccData    = null;
 
 function hlAccOpenCard() {
@@ -89,15 +89,13 @@ function hlAccCloseCard() {
 }
 
 function hlAccToggleMask(e) {
-  e.stopPropagation();
-  _hlAccMasked = !_hlAccMasked;
-  const icon = _hlAccMasked ? '' : '';
-  const eye1 = document.getElementById('hl-acc-pill-eye');
-  const eye2 = document.getElementById('hl-acc-card-eye');
-  if (eye1) eye1.textContent = icon;
-  if (eye2) eye2.textContent = icon;
-  _hlAccRender();
-}
+    e.stopPropagation();
+    _hlAccMasked = !_hlAccMasked;
+    const icon = _hlAccMasked ? '&#x1F576;' : '&#x1F441;';
+    const eye1 = document.getElementById('hl-acc-pill-eye');
+    if (eye1) eye1.innerHTML = icon;
+    _hlAccRender();
+  }
 
 async function hlAccFetch() {
   const btn = document.getElementById('hl-acc-refresh');
@@ -133,33 +131,32 @@ async function hlAccFetch() {
 }
 
 function _hlAccRender() {
-  if (!_hlAccData) return;
-  const d   = _hlAccData;
-  const msk = _hlAccMasked;
-  const fmt = v => msk ? '' : '$' + v.toFixed(2);
-  // Pill equity value
-  const pv = document.getElementById('hl-acc-pill-val');
-  if (pv) {
-    pv.style.fontSize   = '12px';
-    pv.style.fontWeight = '700';
-    pv.style.color      = msk ? '#333' : '#fff';
-    pv.textContent      = msk ? '' : '$' + d.equity.toFixed(2);
+    if (!_hlAccData) return;
+    const d   = _hlAccData;
+    const msk = _hlAccMasked;
+    // Sync eye icon with current mask state
+    const eye1 = document.getElementById('hl-acc-pill-eye');
+    if (eye1) eye1.innerHTML = msk ? '&#x1F576;' : '&#x1F441;';
+    // Pill equity value -- respects mask
+    const pv = document.getElementById('hl-acc-pill-val');
+    if (pv) {
+      pv.style.fontSize   = '12px';
+      pv.style.fontWeight = '700';
+      pv.style.color      = msk ? '#333' : '#fff';
+      pv.textContent      = msk ? '' : '$' + d.equity.toFixed(2);
+    }
+    // Card values -- always full, never masked
+    const eq = document.getElementById('hl-acc-equity');
+    const av = document.getElementById('hl-acc-avail');
+    const mg = document.getElementById('hl-acc-margin');
+    const pn = document.getElementById('hl-acc-pnl');
+    const ps = document.getElementById('hl-acc-pos');
+    if (eq) { eq.textContent = '$' + d.equity.toFixed(2);      eq.style.color = '#ffffff'; }
+    if (av) { av.textContent = '$' + d.available.toFixed(2);   av.style.color = '#00e676'; }
+    if (mg) { mg.textContent = '$' + d.margin_used.toFixed(2); mg.style.color = '#b388ff'; }
+    if (pn) { pn.textContent = (d.unrealized_pnl >= 0 ? '+' : '') + '$' + d.unrealized_pnl.toFixed(2); pn.style.color = d.unrealized_pnl >= 0 ? '#00e676' : '#ff5252'; }
+    if (ps) { ps.textContent = d.open_positions; ps.style.color = '#ffffff'; }
   }
-  // Card values
-  const eq = document.getElementById('hl-acc-equity');
-  const av = document.getElementById('hl-acc-avail');
-  const mg = document.getElementById('hl-acc-margin');
-  const pn = document.getElementById('hl-acc-pnl');
-  const ps = document.getElementById('hl-acc-pos');
-  if (eq) { eq.textContent = fmt(d.equity);      eq.style.color = msk ? '#2a2a2a' : '#ffffff'; }
-  if (av) { av.textContent = fmt(d.available);   av.style.color = msk ? '#2a2a2a' : '#00e676'; }
-  if (mg) { mg.textContent = fmt(d.margin_used); mg.style.color = msk ? '#2a2a2a' : '#b388ff'; }
-  if (pn) {
-    if (msk) { pn.textContent = ''; pn.style.color = '#2a2a2a'; }
-    else { pn.textContent = (d.unrealized_pnl >= 0 ? '+' : '') + '$' + d.unrealized_pnl.toFixed(2); pn.style.color = d.unrealized_pnl >= 0 ? '#00e676' : '#ff5252'; }
-  }
-  if (ps) { ps.textContent = d.open_positions; ps.style.color = '#ffffff'; }
-}
 
 function toggleMarket(e) {
   e.stopPropagation();
