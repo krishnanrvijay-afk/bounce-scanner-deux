@@ -6,6 +6,14 @@ from typing import Optional
 from config import HL_API_URL, PAPER_MODE
 
 
+COIN_SIZE_DECIMALS = {
+    "BTC": 5, "ETH": 4, "SOL": 2, "XRP": 1,
+    "DOGE": 0, "SUI": 1, "NEAR": 1, "LINK": 2,
+    "WIF": 0, "AVAX": 2, "HYPE": 1, "ZEC": 3,
+    "TON": 1, "@107": 2, "@8": 2, "@1": 1,
+}
+
+
 class HLClient:
     def __init__(self):
         self._http = httpx.AsyncClient(timeout=15.0)
@@ -309,10 +317,12 @@ class HLClient:
 
             is_buy = direction.upper() == "SHORT"
             price = await self.get_price(symbol) or 0.0
+            decimals = COIN_SIZE_DECIMALS.get(symbol, 4)
+            sz = round(abs(size), decimals)
             order_result = self._exchange.order(
                 symbol,
                 is_buy,
-                abs(size),
+                sz,
                 price,
                 {"limit": {"tif": "Ioc"}},
             )
