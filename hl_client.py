@@ -29,9 +29,12 @@ class HLClient:
                 raise ValueError("HL_PRIVATE_KEY not set — required for live trading")
 
             acct = Account.from_key(private_key)
-            self._wallet_address = acct.address
+            account_address = os.getenv("HL_WALLET_ADDRESS", "")
+            if not account_address:
+                raise ValueError("HL_WALLET_ADDRESS not set -- required for live trading")
+            self._wallet_address = account_address
             self._info = Info(HL_API_URL)
-            self._exchange = Exchange(acct, HL_API_URL)
+            self._exchange = Exchange(acct, HL_API_URL, account_address=account_address)
         except Exception as e:
             print(f"[HLClient] Failed to init live client: {e}")
 
