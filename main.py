@@ -958,9 +958,12 @@ async def _price_loop():
     while True:
         try:
             all_prices = await hl_client.get_all_prices()
-            for sym in PAIRS:
-                if sym in all_prices:
-                    app_state.prices[sym] = all_prices[sym]
+            if not all_prices:
+                print("[PRICE] get_all_prices returned empty -- skipping price update")
+            else:
+                for sym in PAIRS:
+                    if sym in all_prices:
+                        app_state.prices[sym] = all_prices[sym]
 
             # Fetch 24h changes every 5 price ticks (~40s) to avoid extra rate pressure
             _chg_tick += 1
