@@ -27,7 +27,7 @@
   .scans-pill-lbl { font-family:'JetBrains Mono',ui-monospace,Menlo,monospace; font-size:8px; font-weight:600; color:#555; letter-spacing:0.08em; text-transform:uppercase; }
   .scans-pill-val { font-family:'Bebas Neue',Impact,sans-serif; font-size:15px; font-weight:400; color:#fff; line-height:1; }
   .hdr-line2 { display: flex; gap: 6px; }
-  .hdr-stat-pill { flex: 1; display: flex; align-items: center; justify-content: space-between; background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 8px; padding: 6px 10px; cursor: pointer; transition: border-color 0.15s; min-width: 0; overflow: hidden; }
+  .hdr-stat-pill { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 8px; padding: 6px 10px; cursor: pointer; transition: border-color 0.15s; }
   .hdr-stat-pill:hover { border-color: #2e2e2e; }
   .hdr-stat-lbl { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 9px; font-weight: 600; color: #555; letter-spacing: 0.08em; white-space: nowrap; text-transform: uppercase; }
   .hdr-stat-val { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 16px; font-weight: 400; color: #fff; white-space: nowrap; }
@@ -598,7 +598,6 @@
   <div class="nav-pills">
     <div class="fp active"  data-tab="grid"   data-filter="ALL"      onclick="setNav(this)">ALL</div>
     <div class="fp tab-pos" data-tab="pos"    data-filter=""         onclick="setNav(this)">POSITIONS <span class="fp-count" id="nav-pos-count">0</span></div>
-    <div class="fp"         data-tab="grid"   data-filter="COOLDOWN" onclick="setNav(this)">COOLDOWN</div>
     <div class="fp tab-log" data-tab="log"    data-filter=""         onclick="setNav(this)">LOG <span class="fp-count fp-count-log" id="nav-log-count">0</span></div>
     <div class="hl-alert-pill" data-tab="alerts" data-filter=""      onclick="setNav(this)">&#x1F514; <span id="nav-alert-count" style="color:#ffb300;font-size:13px;font-weight:700;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace">0</span></div>
   </div>
