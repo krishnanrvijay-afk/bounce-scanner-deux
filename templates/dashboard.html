@@ -24,13 +24,13 @@
   .priv-btn::after { content:''; display:none; position:absolute; width:2px; height:140%; background:#ff4444; top:50%; left:50%; transform:translate(-50%,-50%) rotate(45deg); border-radius:1px; pointer-events:none; }
   .priv-btn.masked::after { display:block; }
   .scans-pill { display:flex; align-items:center; gap:4px; background:#0d0d0d; border:1px solid #1e1e1e; border-radius:5px; padding:3px 8px; }
-  .scans-pill-lbl { font-family:'JetBrains Mono',ui-monospace,Menlo,monospace; font-size:8px; font-weight:600; color:#555; letter-spacing:0.08em; text-transform:uppercase; }
-  .scans-pill-val { font-family:'Bebas Neue',Impact,sans-serif; font-size:15px; font-weight:400; color:#fff; line-height:1; }
+  .scans-pill-lbl { font-family:'JetBrains Mono',ui-monospace,Menlo,monospace; font-size:8px; font-weight:600; color:#fff; letter-spacing:0.08em; text-transform:uppercase; }
+  .scans-pill-val { font-family:'Bebas Neue',Impact,sans-serif; font-size:17px; font-weight:400; color:#fff; line-height:1; }
   .hdr-line2 { display: flex; gap: 6px; }
   .hdr-stat-pill { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 8px; padding: 6px 10px; cursor: pointer; transition: border-color 0.15s; }
   .hdr-stat-pill:hover { border-color: #2e2e2e; }
-  .hdr-stat-lbl { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 9px; font-weight: 600; color: #555; letter-spacing: 0.08em; white-space: nowrap; text-transform: uppercase; }
-  .hdr-stat-val { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 16px; font-weight: 400; color: #fff; white-space: nowrap; }
+  .hdr-stat-lbl { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 9px; font-weight: 600; color: #fff; letter-spacing: 0.08em; white-space: nowrap; text-transform: uppercase; }
+  .hdr-stat-val { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 18px; font-weight: 400; color: #fff; white-space: nowrap; }
   .hdr-stat-val.green { color: #00e676; }
   .hdr-stat-val.red   { color: #ff4444; }
   .sep { width: 1px; height: 20px; background: #1a1a1a; }
@@ -51,11 +51,11 @@
   /* ── NAV BAR ── */
   .nav-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; border-bottom: 1px solid #111; background: #0a0a0a; gap: 12px; flex-wrap: wrap; }
   .nav-pills { display: flex; gap: 5px; flex-wrap: wrap; }
-  .fp { padding: 6px 12px; border-radius: 20px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; font-weight: 600; letter-spacing: 0.8px; cursor: pointer; background: #111; color: #aaa; border: 1px solid #1a1a1a; transition: all 0.15s; }
+  .fp { padding: 6px 12px; border-radius: 20px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; font-weight: 600; letter-spacing: 0.8px; cursor: pointer; background: #111; color: #fff; border: 1px solid #1a1a1a; transition: all 0.15s; }
   /* Always-visible accent colors per tab type */
   .fp.tab-alerts { color: #cc8800; border-color: rgba(204,136,0,0.4); }
-  .fp.tab-pos    { color: #4488cc; border-color: rgba(68,136,204,0.4); }
-  .fp.tab-log    { color: #228855; border-color: rgba(34,136,85,0.4); }
+  .fp.tab-pos    { color: #fff; border-color: rgba(68,136,204,0.4); }
+  .fp.tab-log    { color: #fff; border-color: rgba(34,136,85,0.4); }
   .fp.fp-short   { color: #994444; border-color: rgba(150,60,60,0.4); }
   .fp.fp-long    { color: #338855; border-color: rgba(50,130,80,0.4); }
   /* Active state: bright fill */
@@ -65,8 +65,8 @@
   .fp.tab-log.active        { background: #ffaa00; color: #000; border-color: #ffaa00; }
   .fp.fp-short.active       { background: #00ff88; color: #000; border-color: #00ff88; }
   .fp.fp-long.active        { background: #00ff88; color: #000; border-color: #00ff88; }
-  .fp-count { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 0 5px; margin-left: 3px; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 22px; font-weight: 400; vertical-align: middle; line-height: 1; }
-    .fp-count-log { font-size: 14px; }
+  .fp-count { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 0 5px; margin-left: 3px; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 24px; font-weight: 400; vertical-align: middle; line-height: 1; }
+    .fp-count-log { font-size: 16px; }
   .hl-alert-pill { display:inline-flex;align-items:center;gap:4px;background:#1a1400;border:1px solid rgba(255,179,0,0.27);border-radius:20px;padding:4px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:13px;user-select:none; }
   .hl-alert-pill:hover { opacity:0.85; }
   /* ── HL Account Pill & Overlay ── */
@@ -599,7 +599,7 @@
     <div class="fp active"  data-tab="grid"   data-filter="ALL"      onclick="setNav(this)">ALL</div>
     <div class="fp tab-pos" data-tab="pos"    data-filter=""         onclick="setNav(this)">POSITIONS <span class="fp-count" id="nav-pos-count">0</span></div>
     <div class="fp tab-log" data-tab="log"    data-filter=""         onclick="setNav(this)">LOG <span class="fp-count fp-count-log" id="nav-log-count">0</span></div>
-    <div class="hl-alert-pill" data-tab="alerts" data-filter=""      onclick="setNav(this)">&#x1F514; <span id="nav-alert-count" style="color:#ffb300;font-size:13px;font-weight:700;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace">0</span></div>
+    <div class="hl-alert-pill" data-tab="alerts" data-filter=""      onclick="setNav(this)">&#x1F514; <span id="nav-alert-count" style="color:#ffb300;font-size:15px;font-weight:700;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace">0</span></div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
     <div id="btc-regime-pill" style="display:none"></div>
