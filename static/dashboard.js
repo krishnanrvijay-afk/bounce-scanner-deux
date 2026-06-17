@@ -89,13 +89,18 @@ function hlAccCloseCard() {
 }
 
 function hlAccToggleMask(e) {
-    e.stopPropagation();
+    if (e) e.stopPropagation();
     _hlAccMasked = !_hlAccMasked;
     const icon = _hlAccMasked ? '&#x1F576;' : '&#x1F441;';
-    const eye1 = document.getElementById('hl-acc-pill-eye');
+    const eye1 = document.getElementById('hl-priv-toggle');
     if (eye1) eye1.innerHTML = icon;
+    const eye2 = document.getElementById('hl-acc-pill-eye');
+    if (eye2) eye2.innerHTML = icon;
     _hlAccRender();
+    if (STATE) renderHeader();
   }
+
+function privToggle(e) { hlAccToggleMask(e); }
 
 async function hlAccFetch() {
   const btn = document.getElementById('hl-acc-refresh');
@@ -135,15 +140,23 @@ function _hlAccRender() {
     const d   = _hlAccData;
     const msk = _hlAccMasked;
     // Sync eye icon with current mask state
-    const eye1 = document.getElementById('hl-acc-pill-eye');
+    const eye1 = document.getElementById('hl-priv-toggle');
     if (eye1) eye1.innerHTML = msk ? '&#x1F576;' : '&#x1F441;';
-    // Pill equity value -- respects mask
+    const eye2 = document.getElementById('hl-acc-pill-eye');
+    if (eye2) eye2.innerHTML = msk ? '&#x1F576;' : '&#x1F441;';
+    // Pill equity value -- respects mask (legacy hidden element)
     const pv = document.getElementById('hl-acc-pill-val');
     if (pv) {
       pv.style.fontSize   = '12px';
       pv.style.fontWeight = '700';
       pv.style.color      = msk ? '#333' : '#fff';
       pv.textContent      = msk ? '' : '$' + d.equity.toFixed(2);
+    }
+    // Header balance pill
+    const hbEl = document.getElementById('h-balance');
+    if (hbEl) {
+      hbEl.textContent = msk ? '\u2022\u2022\u2022\u2022' : '$' + d.equity.toFixed(2);
+      hbEl.className   = 'hdr-stat-val';
     }
     // Card values -- always full, never masked
     const eq = document.getElementById('hl-acc-equity');
@@ -398,18 +411,35 @@ function updateNavCounts() {
   const { daily, account, circuit_breaker, scan_count } = STATE;
 
   const pnlEl = document.getElementById('h-pnl');
-  pnlEl.textContent = `$${(daily?.pnl || 0).toFixed(2)}`;
-  pnlEl.className   = 'hstat-value ' + ((daily?.pnl || 0) >= 0 ? 'green' : 'red');
+  const _msk    = _hlAccMasked;
+  const _masked = '\u2022\u2022\u2022\u2022';
+  const pnlEl = document.getElementById('h-pnl');
+  if (pnlEl) {
+    if (_msk) {
+      pnlEl.textContent = _masked;
+      pnlEl.className   = 'hdr-stat-val';
+    } else {
+      const _pnl = daily?.pnl || 0;
+      pnlEl.textContent = '$' + Math.abs(_pnl).toFixed(2);
+      pnlEl.className   = 'hdr-stat-val' + (_pnl > 0 ? ' green' : _pnl < 0 ? ' red' : '');
+    }
+  }
 
   const _upnl   = STATE?.unrealized_pnl || 0;
   const _upnlEl = document.getElementById('h-unrealized');
   if (_upnlEl) {
-    _upnlEl.textContent = (_upnl > 0 ? '+' : _upnl < 0 ? '-' : '') + '$' + Math.abs(_upnl).toFixed(2);
-    _upnlEl.className   = 'hstat-value ' + (_upnl > 0 ? 'green' : _upnl < 0 ? 'red' : '');
+    if (_msk) {
+      _upnlEl.textContent = _masked;
+      _upnlEl.className   = 'hdr-stat-val';
+    } else {
+      _upnlEl.textContent = '$' + Math.abs(_upnl).toFixed(2);
+      _upnlEl.className   = 'hdr-stat-val' + (_upnl > 0 ? ' green' : _upnl < 0 ? ' red' : '');
+    }
   }
-  document.getElementById('h-positions').textContent = account?.slots_used || 0;
-  document.getElementById('h-scans').textContent     = scan_count || 0;
-
+  const _posEl   = document.getElementById('h-positions');
+  if (_posEl)   _posEl.textContent   = account?.slots_used || 0;
+  const _scansEl = document.getElementById('h-scans');
+  if (_scansEl) _scansEl.textContent = scan_count || 0;
   const modeBadge = document.getElementById('mode-badge');
   if (modeBadge) {
     if (account?.paper_mode) {

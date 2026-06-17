@@ -5,25 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BOUNCE SCANNER II</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;700&family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;600;700&family=Inter:wght@300;400;600;800&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #080808; color: #fff; font-family: 'Inter', sans-serif; font-size: 13px; overflow-x: hidden; }
 
-  /* ── HEADER ── */
-  .header { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 52px; border-bottom: 1px solid #1a1a1a; background: #0a0a0a; position: sticky; top: 0; z-index: 200; }
-  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 3px; }
-  .logo span { color: #00ff88; }
-  .header-right { display: flex; align-items: center; gap: 14px; }
-  .hstat { display: flex; flex-direction: column; align-items: flex-end; }
-  .hstat-label { font-size: 8px; font-weight: 800; color: #fff; letter-spacing: 1px; text-transform: uppercase; }
-  .hstat-value { font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 700; }
-  .sep { width: 1px; height: 28px; background: #1a1a1a; }
-  .mode-badge { font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px; }
-  .mode-badge-paper       { background: rgba(100,160,255,0.1);  color: #66aaff; border: 1px solid rgba(100,160,255,0.25); }
+  /* -- HEADER V2 -- */
+  .header { display: flex; flex-direction: column; align-items: stretch; padding: 10px 16px 8px; gap: 8px; border-bottom: 1px solid #1a1a1a; background: #0a0a0a; position: sticky; top: 0; z-index: 200; }
+  .hdr-line1 { display: flex; align-items: center; justify-content: space-between; }
+  .logo { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 20px; font-weight: 400; letter-spacing: 2.5px; display: flex; align-items: center; }
+  .hdr-line1-right { display: flex; align-items: center; gap: 8px; }
+  .mode-badge { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.5px; }
+  .mode-badge-paper       { background: rgba(100,160,255,0.1);  color: #66aaff; border: 1px solid rgba(100,160,255,0.35); }
   .mode-badge-live-safe   { background: rgba(0,230,118,0.1);    color: #00e676; border: 1px solid rgba(0,230,118,0.3); }
   .mode-badge-live-danger { background: rgba(255,61,87,0.15);   color: #ff3d57; border: 1px solid rgba(255,61,87,0.45); animation: danger-pulse 1.2s ease-in-out infinite; }
   @keyframes danger-pulse { 0%,100% { box-shadow: none } 50% { box-shadow: 0 0 8px rgba(255,61,87,0.5) } }
-  .paper-badge { background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); font-family: 'JetBrains Mono', monospace; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 1px; }
+  .hdr-line2 { display: flex; gap: 6px; }
+  .hdr-stat-pill { flex: 1; display: flex; align-items: center; justify-content: space-between; background: #0d0d0d; border: 1px solid #1e1e1e; border-radius: 8px; padding: 6px 10px; cursor: pointer; transition: border-color 0.15s; min-width: 0; overflow: hidden; }
+  .hdr-stat-pill:hover { border-color: #2e2e2e; }
+  .hdr-stat-lbl { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 9px; font-weight: 600; color: #555; letter-spacing: 0.08em; white-space: nowrap; text-transform: uppercase; }
+  .hdr-stat-val { font-family: 'Bebas Neue', Impact, sans-serif; font-size: 16px; font-weight: 400; color: #fff; white-space: nowrap; }
+  .hdr-stat-val.green { color: #00e676; }
+  .hdr-stat-val.red   { color: #ff4444; }
+  .sep { width: 1px; height: 20px; background: #1a1a1a; }
+  .paper-badge { background: rgba(100,160,255,0.1); color: #66aaff; border: 1px solid rgba(100,160,255,0.25); font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 4px; letter-spacing: 1px; }
 
   /* Market popover */
   .mkt-btn-wrap { position: relative; }
@@ -40,7 +44,7 @@
   /* ── NAV BAR ── */
   .nav-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; border-bottom: 1px solid #111; background: #0a0a0a; gap: 12px; flex-wrap: wrap; }
   .nav-pills { display: flex; gap: 5px; flex-wrap: wrap; }
-  .fp { padding: 8px 16px; border-radius: 20px; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 800; letter-spacing: 1px; cursor: pointer; background: #111; color: #aaa; border: 1px solid #1a1a1a; transition: all 0.15s; }
+  .fp { padding: 6px 12px; border-radius: 20px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 10.5px; font-weight: 600; letter-spacing: 0.8px; cursor: pointer; background: #111; color: #aaa; border: 1px solid #1a1a1a; transition: all 0.15s; }
   /* Always-visible accent colors per tab type */
   .fp.tab-alerts { color: #cc8800; border-color: rgba(204,136,0,0.4); }
   .fp.tab-pos    { color: #4488cc; border-color: rgba(68,136,204,0.4); }
@@ -54,7 +58,8 @@
   .fp.tab-log.active        { background: #ffaa00; color: #000; border-color: #ffaa00; }
   .fp.fp-short.active       { background: #00ff88; color: #000; border-color: #00ff88; }
   .fp.fp-long.active        { background: #00ff88; color: #000; border-color: #00ff88; }
-  .fp-count { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 0 5px; margin-left: 3px; font-size: 11px; font-weight: 800; }
+  .fp-count { display: inline-block; background: rgba(255,255,255,0.15); border-radius: 8px; padding: 0 5px; margin-left: 3px; font-family: 'Bebas Neue', Impact, sans-serif; font-size: 22px; font-weight: 400; vertical-align: middle; line-height: 1; }
+    .fp-count-log { font-size: 14px; }
   .hl-alert-pill { display:inline-flex;align-items:center;gap:4px;background:#1a1400;border:1px solid rgba(255,179,0,0.27);border-radius:20px;padding:4px 10px;cursor:pointer;font-family:'JetBrains Mono',monospace;font-size:13px;user-select:none; }
   .hl-alert-pill:hover { opacity:0.85; }
   /* ── HL Account Pill & Overlay ── */
@@ -91,9 +96,9 @@
   @keyframes conf-long-glow  { 0%,100% { box-shadow: 0 0 18px rgba(0,230,118,0.15),0 2px 8px rgba(0,0,0,0.6); } 50% { box-shadow: 0 0 32px rgba(0,230,118,0.3),0 2px 8px rgba(0,0,0,0.6); } }
   @keyframes conf-short-glow { 0%,100% { box-shadow: 0 0 18px rgba(255,61,87,0.15),0 2px 8px rgba(0,0,0,0.6); }  50% { box-shadow: 0 0 32px rgba(255,61,87,0.3),0 2px 8px rgba(0,0,0,0.6); } }
   @keyframes conf-sym-pulse  { 0%,100% { text-shadow: 0 0 6px currentColor; } 50% { text-shadow: 0 0 16px currentColor; } }
-  #j15m-banner { background: #0d0d0d; border-bottom: 1px solid #1a1a1a; padding: 8px 12px 14px; }
+  #j15m-banner { background: #0d0d0d; border: 1.5px solid rgba(168,85,247,0.35); border-radius: 8px; padding: 8px 12px 14px; margin: 6px 12px 0; }
   .jb-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-  .jb-title { font-size: 8px; font-weight: 800; color: #fff; letter-spacing: 2px; text-transform: uppercase; }
+  .jb-title { font-size: 8px; font-weight: 800; color: #a855f7; letter-spacing: 2px; text-transform: uppercase; }
   .jb-header-right { display: flex; align-items: center; gap: 12px; }
   .jb-legend { display: flex; gap: 10px; align-items: center; }
   .jb-leg { display: flex; align-items: center; gap: 3px; font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 800; white-space: nowrap; }
@@ -552,20 +557,47 @@
 <body>
 
 <div class="header">
-  <div class="logo"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:4px;background:#0d1a12;border:1px solid #00ff88;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:800;color:#00ff88;vertical-align:middle;margin-right:8px;letter-spacing:0;flex-shrink:0">HL</span>BOUNCE SCANNER <span>II</span></div>
-  <div class="header-right">
-    <div class="hstat">
-      <div class="hstat-label">DAILY P&L</div>
-      <div class="hstat-value" id="h-pnl">$0.00</div>
+  <div class="hdr-line1">
+    <div class="logo"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#a855f7;margin-right:10px;flex-shrink:0"></span>BOUNCE SCANNER <span style="color:#a855f7">II</span></div>
+    <div class="hdr-line1-right">
+      <div id="mode-badge" class="mode-badge" style="display:none;"></div>
+      <div id="cb-badge" style="display:none;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace;font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;background:rgba(255,68,68,0.1);color:#ff4444;border:1px solid rgba(255,68,68,0.3);">&#9889; CB</div>
+      <button id="hl-priv-toggle" onclick="hlAccToggleMask(event)" style="background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:0 2px;opacity:0.7;transition:opacity 0.15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">&#x1F576;</button>
+      <button id="settings-gear-pill" onclick="openSettingsSheet()" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;color:#a855f7;padding:0 3px;flex-shrink:0;opacity:0.85;transition:opacity 0.15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">&#9881;</button>
     </div>
-    <div class="sep"></div>
-    <div class="hstat">
-      <div class="hstat-label">UNREALIZED</div>
-      <div class="hstat-value" id="h-unrealized">$0.00</div>
+  </div>
+  <div class="hdr-line2">
+    <div class="hdr-stat-pill" onclick="hlAccOpenCard()">
+      <span class="hdr-stat-lbl">DAILY P&amp;L</span>
+      <span class="hdr-stat-val" id="h-pnl">&#8226;&#8226;&#8226;&#8226;</span>
     </div>
-    <div class="sep"></div>
+    <div class="hdr-stat-pill" onclick="hlAccOpenCard()">
+      <span class="hdr-stat-lbl">UNREALIZED</span>
+      <span class="hdr-stat-val" id="h-unrealized">&#8226;&#8226;&#8226;&#8226;</span>
+    </div>
+    <div class="hdr-stat-pill" onclick="hlAccOpenCard()">
+      <span class="hdr-stat-lbl">BALANCE</span>
+      <span class="hdr-stat-val" id="h-balance">&#8226;&#8226;&#8226;&#8226;</span>
+    </div>
+  </div>
+  <span id="h-positions" style="display:none">0</span>
+  <span id="h-scans" style="display:none">0</span>
+  <div id="hl-acc-pill" style="display:none" onclick="hlAccOpenCard()"><span id="hl-acc-pill-val"></span></div>
+  <button id="hl-acc-pill-eye" style="display:none" onclick="hlAccToggleMask(event)">&#x1F576;</button>
+</div>
+
+<div class="nav-row">
+  <div class="nav-pills">
+    <div class="fp active"  data-tab="grid"   data-filter="ALL"      onclick="setNav(this)">ALL</div>
+    <div class="fp tab-pos" data-tab="pos"    data-filter=""         onclick="setNav(this)">POSITIONS <span class="fp-count" id="nav-pos-count">0</span></div>
+    <div class="fp"         data-tab="grid"   data-filter="COOLDOWN" onclick="setNav(this)">COOLDOWN</div>
+    <div class="fp tab-log" data-tab="log"    data-filter=""         onclick="setNav(this)">LOG <span class="fp-count fp-count-log" id="nav-log-count">0</span></div>
+    <div class="hl-alert-pill" data-tab="alerts" data-filter=""      onclick="setNav(this)">&#x1F514; <span id="nav-alert-count" style="color:#ffb300;font-size:13px;font-weight:700;font-family:'JetBrains Mono',ui-monospace,Menlo,monospace">0</span></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <div id="btc-regime-pill" style="display:none"></div>
     <div class="mkt-btn-wrap">
-      <div class="mkt-btn" id="mkt-btn" onclick="toggleMarket(event)">MARKET ▾</div>
+      <div class="mkt-btn" id="mkt-btn" onclick="toggleMarket(event)">MARKET &#9662;</div>
       <div class="mkt-popover" id="mkt-popover">
         <div class="mkt-title">MARKET SNAPSHOT</div>
         <div class="mkt-row"><span class="mkt-label">BULL TREND 1H</span><div class="mkt-chips" id="mkt-bull"></div></div>
@@ -574,48 +606,8 @@
         <div class="mkt-row"><span class="mkt-label">J15M OVERSOLD</span><div class="mkt-chips" id="mkt-os"></div></div>
       </div>
     </div>
-    <div class="sep"></div>
-    <div style="display:flex;align-items:center;gap:5px;">
-        <div class="mh-chip mh-chip-caution" id="mhc-short" onclick="openMhOverlay()" title="Short market health — tap for details">S <span class="mhc-dot mhc-dot-caution" id="mhc-short-dot"></span></div>
-        <div class="mh-chip mh-chip-caution" id="mhc-long"  onclick="openMhOverlay()" title="Long market health — tap for details">L <span class="mhc-dot mhc-dot-caution" id="mhc-long-dot"></span></div>
-      </div>
-      <div class="sep"></div>
-      <div class="hstat">
-        <div class="hstat-label">POSITIONS</div>
-        <div class="hstat-value blue" id="h-positions">0</div>
-      </div>
-    <div class="sep"></div>
-    <div class="hstat">
-      <div class="hstat-label">SCANS</div>
-      <div class="hstat-value" id="h-scans">0</div>
-    </div>
-    <div class="sep"></div>
-    <div id="mode-badge" class="mode-badge" style="display:none;"></div>
-    <div id="cb-badge" style="display:none; font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700; padding:3px 8px; border-radius:4px; background:rgba(255,68,68,0.1); color:#ff4444; border:1px solid rgba(255,68,68,0.3);">⚡ CB ACTIVE</div>
-    <div class="sep"></div>
-    <div id="btc-regime-pill" style="display:none"></div>
-    <div class="sep"></div>
-    <div class="hl-acc-wrap" style="display:flex;align-items:center;gap:6px">
-        <div class="hl-acc-pill" id="hl-acc-pill" onclick="hlAccOpenCard()">
-          <span class="hl-acc-badge">HL</span>
-          <span class="hl-acc-val" id="hl-acc-pill-val" style="color:#444;font-size:10px;font-weight:700">TAP FOR BALANCE</span>
-        </div>
-        <button class="hl-acc-eye-standalone" id="hl-acc-pill-eye" onclick="hlAccToggleMask(event)" style="background:none;border:none;cursor:pointer;font-size:14px;padding:0">&#x1F576;</button>
-      </div>
-    <div class="sep"></div>
-    <button id="settings-gear-pill" onclick="openSettingsSheet()" style="background:none;border:none;cursor:pointer;font-size:22px;line-height:1;color:#a855f7;padding:0 3px;flex-shrink:0;opacity:0.85;transition:opacity 0.15s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">&#9881;</button>
+    <div class="scan-status" id="scan-status">waiting for scan&#x2026;</div>
   </div>
-</div>
-
-<div class="nav-row">
-  <div class="nav-pills">
-    <div class="fp active"  data-tab="grid"   data-filter="ALL"      onclick="setNav(this)">ALL</div>
-    <div class="fp tab-pos" data-tab="pos"    data-filter=""         onclick="setNav(this)">POSITIONS <span class="fp-count" id="nav-pos-count">0</span></div>
-    <div class="fp"         data-tab="grid"   data-filter="COOLDOWN" onclick="setNav(this)">COOLDOWN</div>
-    <div class="fp tab-log" data-tab="log"    data-filter=""         onclick="setNav(this)">LOG <span class="fp-count" id="nav-log-count">0</span></div>
-    <div class="hl-alert-pill" data-tab="alerts" data-filter=""      onclick="setNav(this)">🔔 <span id="nav-alert-count" style="color:#ffb300;font-size:12px;font-weight:700">0</span></div>
-  </div>
-  <div class="scan-status" id="scan-status">waiting for scan…</div>
 </div>
 
 
