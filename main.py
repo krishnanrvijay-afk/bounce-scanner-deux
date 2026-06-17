@@ -1842,4 +1842,12 @@ async def diagnostic_tg_test():
         return {**_meta, "http_status": _r.status_code, "response_body": _r.json()}
     except Exception as _e:
         return {**_meta, "error": str(_e)}
+@app.get("/api/diagnostic/tg-getme")
+async def diagnostic_tg_getme():
+    """TEMPORARY: verify bot token via getMe. Remove after use."""
+    try:
+        _r = requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe", timeout=10)
+        return {"TELEGRAM_BOT_TOKEN_present": bool(TELEGRAM_BOT_TOKEN), "http_status": _r.status_code, "response_body": _r.json()}
+    except Exception as _e:
+        return {"TELEGRAM_BOT_TOKEN_present": bool(TELEGRAM_BOT_TOKEN), "error": str(_e)}
 # -- END TEMPORARY DIAGNOSTIC ------------------------------------------------
