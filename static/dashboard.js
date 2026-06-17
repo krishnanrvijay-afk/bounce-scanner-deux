@@ -413,7 +413,6 @@ function updateNavCounts() {
   const pnlEl = document.getElementById('h-pnl');
   const _msk    = _hlAccMasked;
   const _masked = '\u2022\u2022\u2022\u2022';
-  const pnlEl = document.getElementById('h-pnl');
   if (pnlEl) {
     if (_msk) {
       pnlEl.textContent = _masked;
