@@ -1826,28 +1826,3 @@ async def clear_tradelog(
     return {"status": "ok", "trades_force_closed": count}
 
 
-# -- TEMPORARY DIAGNOSTIC - remove after tg-test confirmed ------------------
-@app.get("/api/diagnostic/tg-test")
-async def diagnostic_tg_test():
-    """TEMPORARY: one-shot Telegram credential check. No side effects. Remove after use."""
-    _url  = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    _data = {"chat_id": TELEGRAM_CHAT_ID, "text": "HL DIAGNOSTIC TEST - ignore", "parse_mode": ""}
-    _meta = {
-        "TELEGRAM_ENABLED":           TELEGRAM_ENABLED,
-        "TELEGRAM_BOT_TOKEN_present": bool(TELEGRAM_BOT_TOKEN),
-        "TELEGRAM_CHAT_ID":           TELEGRAM_CHAT_ID,
-    }
-    try:
-        _r = requests.post(_url, json=_data, timeout=10)
-        return {**_meta, "http_status": _r.status_code, "response_body": _r.json()}
-    except Exception as _e:
-        return {**_meta, "error": str(_e)}
-@app.get("/api/diagnostic/tg-getme")
-async def diagnostic_tg_getme():
-    """TEMPORARY: verify bot token via getMe. Remove after use."""
-    try:
-        _r = requests.get(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe", timeout=10)
-        return {"TELEGRAM_BOT_TOKEN_present": bool(TELEGRAM_BOT_TOKEN), "http_status": _r.status_code, "response_body": _r.json()}
-    except Exception as _e:
-        return {"TELEGRAM_BOT_TOKEN_present": bool(TELEGRAM_BOT_TOKEN), "error": str(_e)}
-# -- END TEMPORARY DIAGNOSTIC ------------------------------------------------
