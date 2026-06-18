@@ -58,6 +58,7 @@ _session_halted:    set[str]         = set() # "SYMBOL_DIRECTION_SESSION" halted
 _large_sl_cooldowns: dict[str, float] = {}   # "SYMBOLDIR" -> expiry ts for 90-min cooldowns
 _peak_shadow: dict = {}   # trade_key -> shadow tracking state (observation only)
 _adverse_shadow: dict = {}  # trade_key -> adverse-cut shadow state (observation only)
+_sign_shadow:   dict = {}  # trade_key -> PnL-sign transition history (observation only)
 _prev_session:      str              = ""
 
 # ── Global safety state ────────────────────────────────────────────────────────
@@ -1159,6 +1160,41 @@ async def _write_adverse_shadow_row(key: str, trade: dict, reason: str,
         print("[ADVERSE SHADOW] write error: " + str(_ash_e))
 
 
+async def _write_sign_shadow_rows(key: str, trade: dict, reason: str,
+                                   final_pnl: float) -> None:
+    try:
+        ss = _sign_shadow.pop(key, None)
+        if not ss or not ss.get("transitions"):
+            return
+        sb = _get_supabase()
+        if sb is None:
+            return
+        opened_at = trade.get("opened_at")
+        open_iso  = (datetime.fromtimestamp(opened_at, tz=timezone.utc).isoformat()
+                     if opened_at else None)
+        close_iso = datetime.now(timezone.utc).isoformat()
+        rows = []
+        for _i, _ev in enumerate(ss["transitions"], start=1):
+            rows.append({
+                "venue":                    "hl",
+                "pair":                     trade.get("symbol", ""),
+                "direction":                trade.get("direction", ""),
+                "open_time":                open_iso,
+                "trade_close_time":         close_iso,
+                "transition_timestamp":     _ev["ts"],
+                "sign":                     _ev["sign"],
+                "pnl_usd_at_transition":    _ev["pnl"],
+                "transition_sequence_number": _i,
+                "total_transitions":        len(ss["transitions"]),
+            })
+        sb.table("pnl_sign_transitions").insert(rows).execute()
+        print("[SIGN SHADOW] wrote " + str(len(rows)) + " sign-transition rows for " +
+              str(trade.get("symbol")) + " " + str(trade.get("direction")) +
+              " reason=" + reason + " final_pnl=$" + str(round(final_pnl, 2)))
+    except Exception as _ss_e:
+        print("[SIGN SHADOW] write error: " + str(_ss_e))
+
+
 def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
     """Synchronous internal close — no exchange call, price already known."""
     if not exit_price or exit_price <= 0:
@@ -1199,6 +1235,7 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
         asyncio.create_task(_update_paper_trade_close(trade, exit_price, reason, pnl))
     asyncio.create_task(_write_peak_shadow_row(key, trade, reason))
     asyncio.create_task(_write_adverse_shadow_row(key, trade, reason, pnl, r))
+    asyncio.create_task(_write_sign_shadow_rows(key, trade, reason, pnl))
     _save_state()
 
 
@@ -1283,6 +1320,7 @@ def _do_trailblazer_close(key: str, trade: dict, exit_price: float,
         threading.Thread(target=_trail_tg, daemon=True).start()
     asyncio.create_task(_write_peak_shadow_row(key, trade, "TRAILBLAZER"))
     asyncio.create_task(_write_adverse_shadow_row(key, trade, "TRAILBLAZER", pnl, r))
+    asyncio.create_task(_write_sign_shadow_rows(key, trade, "TRAILBLAZER", pnl))
     _save_state()
 
 
@@ -1394,6 +1432,31 @@ async def _exit_monitor_loop():
                 except Exception as _ash_e:
                     print("[ADVERSE SHADOW] poll error: " + str(_ash_e))
 
+                # -- PnL sign shadow (observation only, no exit logic) ----------
+                try:
+                    _ss_sz   = trade.get("remaining_size", trade.get("size", 0)) or 0
+                    _ss_ent  = trade.get("entry_price", 0) or 0
+                    _ss_pnl  = ((current - _ss_ent) * _ss_sz if not is_short
+                                else (_ss_ent - current) * _ss_sz)
+                    _ss_sign = ("positive"  if _ss_pnl >  0.01
+                                else "negative" if _ss_pnl < -0.01
+                                else "breakeven")
+                    _ssb = _sign_shadow.setdefault(key, {
+                        "last_sign": None, "transitions": [],
+                    })
+                    if _ssb["last_sign"] != _ss_sign:
+                        _ssb["transitions"].append({
+                            "ts":   datetime.now(timezone.utc).isoformat(),
+                            "sign": _ss_sign,
+                            "pnl":  round(_ss_pnl, 2),
+                        })
+                        print("[SIGN SHADOW] " + sym + " " + direction +
+                              " sign: " + str(_ssb["last_sign"]) +
+                              " -> " + _ss_sign +
+                              " pnl=$" + str(round(_ss_pnl, 2)))
+                        _ssb["last_sign"] = _ss_sign
+                except Exception as _sse:
+                    print("[SIGN SHADOW] poll error: " + str(_sse))
                 # ── SL breach ──────────────────────────────────────────────────
                 # SHORT: SL triggers when price RISES above sl_price
                 # LONG : SL triggers when price FALLS below sl_price
