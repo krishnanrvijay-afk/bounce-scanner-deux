@@ -57,6 +57,7 @@ _session_sl_counts: dict[str, int]   = {}    # "SYMBOL_DIRECTION_SESSION" -> SL 
 _session_halted:    set[str]         = set() # "SYMBOL_DIRECTION_SESSION" halted for session
 _large_sl_cooldowns: dict[str, float] = {}   # "SYMBOLDIR" -> expiry ts for 90-min cooldowns
 _peak_shadow: dict = {}   # trade_key -> shadow tracking state (observation only)
+_adverse_shadow: dict = {}  # trade_key -> adverse-cut shadow state (observation only)
 _prev_session:      str              = ""
 
 # ── Global safety state ────────────────────────────────────────────────────────
@@ -1101,6 +1102,63 @@ async def _write_peak_shadow_row(key: str, trade: dict, reason: str) -> None:
         print(f"[SHADOW] write error: {_psh_e}")
 
 
+async def _write_adverse_shadow_row(key: str, trade: dict, reason: str,
+                                     final_pnl: float, final_r: float) -> None:
+    try:
+        sh = _adverse_shadow.pop(key, None)
+        if sh is None:
+            return
+        sb = _get_supabase()
+        if sb is None:
+            return
+        opened_at = trade.get("opened_at")
+        open_iso  = (datetime.fromtimestamp(opened_at, tz=timezone.utc).isoformat()
+                     if opened_at else None)
+        _session_w = trade.get("session") or (_get_session(opened_at) if opened_at else None)
+        _ent_w     = trade.get("entry_price") or 0
+        _sl_d_w    = trade.get("sl_dist") or 0
+        _ap_w      = trade.get("adverse_price")
+        _is_sh_w   = trade.get("direction") == "SHORT"
+        _mae_r_w   = None
+        if _ap_w is not None and _sl_d_w and _ent_w:
+            _adv_w = (_ent_w - _ap_w) if not _is_sh_w else (_ap_w - _ent_w)
+            _mae_r_w = round(_adv_w / _sl_d_w, 2)
+        sb.table("adverse_cut_shadow").insert({
+            "venue":                   "hl",
+            "pair":                    trade.get("symbol", ""),
+            "direction":               trade.get("direction", ""),
+            "open_time":               open_iso,
+            "exit_reason":             reason,
+            "final_pnl_dollars":       round(final_pnl, 2),
+            "final_r_value":           round(final_r,   2),
+            "mae_r":                   _mae_r_w,
+            "pair_family":             _pair_family(trade.get("symbol", "")),
+            "session_opened":          _session_w,
+            "ever_recovered":          sh.get("ever_recovered", False),
+            "ruleA_triggered_at":      sh.get("ruleA_at"),
+            "ruleA_elapsed_min":       sh.get("ruleA_min"),
+            "ruleA_sl_pct_at_trigger": sh.get("ruleA_pct"),
+            "ruleA_pnl_at_trigger":    sh.get("ruleA_pnl"),
+            "ruleB_triggered_at":      sh.get("ruleB_at"),
+            "ruleB_elapsed_min":       sh.get("ruleB_min"),
+            "ruleB_sl_pct_at_trigger": sh.get("ruleB_pct"),
+            "ruleB_pnl_at_trigger":    sh.get("ruleB_pnl"),
+            "ruleC_triggered_at":      sh.get("ruleC_at"),
+            "ruleC_elapsed_min":       sh.get("ruleC_min"),
+            "ruleC_sl_pct_at_trigger": sh.get("ruleC_pct"),
+            "ruleC_pnl_at_trigger":    sh.get("ruleC_pnl"),
+            "ruleD_triggered_at":      sh.get("ruleD_at"),
+            "ruleD_elapsed_min":       sh.get("ruleD_min"),
+            "ruleD_sl_pct_at_trigger": sh.get("ruleD_pct"),
+            "ruleD_pnl_at_trigger":    sh.get("ruleD_pnl"),
+        }).execute()
+        print("[ADVERSE SHADOW] wrote adverse_cut_shadow " + str(trade.get("symbol")) +
+              " " + str(trade.get("direction")) + " reason=" + reason +
+              " pnl=$" + str(round(final_pnl, 2)))
+    except Exception as _ash_e:
+        print("[ADVERSE SHADOW] write error: " + str(_ash_e))
+
+
 def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
     """Synchronous internal close — no exchange call, price already known."""
     if not exit_price or exit_price <= 0:
@@ -1140,6 +1198,7 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
     if PAPER_MODE:
         asyncio.create_task(_update_paper_trade_close(trade, exit_price, reason, pnl))
     asyncio.create_task(_write_peak_shadow_row(key, trade, reason))
+    asyncio.create_task(_write_adverse_shadow_row(key, trade, reason, pnl, r))
     _save_state()
 
 
@@ -1223,6 +1282,7 @@ def _do_trailblazer_close(key: str, trade: dict, exit_price: float,
                      + "\n+$" + f"{p:.2f}" + " \u00B7 trade total " + ("+" if tp >= 0 else "-") + "$" + f"{abs(tp):.2f}")
         threading.Thread(target=_trail_tg, daemon=True).start()
     asyncio.create_task(_write_peak_shadow_row(key, trade, "TRAILBLAZER"))
+    asyncio.create_task(_write_adverse_shadow_row(key, trade, "TRAILBLAZER", pnl, r))
     _save_state()
 
 
@@ -1284,6 +1344,55 @@ async def _exit_monitor_loop():
                                 _sh[_psh_phk] = _psh_phase
                 except Exception as _psh_e:
                     print(f"[SHADOW] poll error: {_psh_e}")
+
+                # -- Adverse cut shadow (observation only, no exit logic) ------
+                try:
+                    _ent_a  = trade.get("entry_price", 0) or 0
+                    _sl_d_a = (trade.get("sl_dist") or
+                               abs(_ent_a - (trade.get("sl_price") or _ent_a)))
+                    _sz_a   = trade.get("remaining_size", trade.get("size", 0)) or 0
+                    _cpnl_a = ((current - _ent_a) * _sz_a if not is_short
+                               else (_ent_a - current) * _sz_a)
+                    if _cpnl_a < 0 and _sl_d_a and _ent_a:
+                        _toward_sl_a = (_ent_a - current) if not is_short else (current - _ent_a)
+                        _sl_pct_a    = min(_toward_sl_a / _sl_d_a, 1.0)
+                        if _sl_pct_a > 0:
+                            _ash = _adverse_shadow.setdefault(key, {
+                                "ruleA_at": None, "ruleA_min": None,
+                                "ruleA_pct": None, "ruleA_pnl": None,
+                                "ruleB_at": None, "ruleB_min": None,
+                                "ruleB_pct": None, "ruleB_pnl": None,
+                                "ruleC_at": None, "ruleC_min": None,
+                                "ruleC_pct": None, "ruleC_pnl": None,
+                                "ruleD_at": None, "ruleD_min": None,
+                                "ruleD_pct": None, "ruleD_pnl": None,
+                                "ever_recovered": False,
+                            })
+                            _ash_now = datetime.now(timezone.utc).isoformat()
+                            _ash_ela = (int(time.time()) - trade.get("opened_at", int(time.time()))) / 60.0
+                            _ash_pnl = round(_cpnl_a, 2)
+                            for _rname, _rtmin, _rspct, _rk_at, _rk_min, _rk_pct, _rk_pnl in (
+                                ("A", 60,  0.80, "ruleA_at", "ruleA_min", "ruleA_pct", "ruleA_pnl"),
+                                ("B", 90,  0.75, "ruleB_at", "ruleB_min", "ruleB_pct", "ruleB_pnl"),
+                                ("C", 120, 0.70, "ruleC_at", "ruleC_min", "ruleC_pct", "ruleC_pnl"),
+                                ("D", 45,  0.85, "ruleD_at", "ruleD_min", "ruleD_pct", "ruleD_pnl"),
+                            ):
+                                if (_ash[_rk_at] is None
+                                        and _ash_ela  >= _rtmin
+                                        and _sl_pct_a >= _rspct):
+                                    _ash[_rk_at]  = _ash_now
+                                    _ash[_rk_min] = round(_ash_ela, 1)
+                                    _ash[_rk_pct] = round(_sl_pct_a, 4)
+                                    _ash[_rk_pnl] = _ash_pnl
+                                    print("[ADVERSE SHADOW] rule " + _rname + " triggered: " +
+                                          sym + " " + direction +
+                                          " elapsed=" + str(round(_ash_ela, 1)) + "m" +
+                                          " sl_pct=" + str(round(_sl_pct_a * 100, 1)) + "%" +
+                                          " pnl=$" + str(_ash_pnl))
+                    elif key in _adverse_shadow and not _adverse_shadow[key]["ever_recovered"]:
+                        _adverse_shadow[key]["ever_recovered"] = True
+                except Exception as _ash_e:
+                    print("[ADVERSE SHADOW] poll error: " + str(_ash_e))
 
                 # ── SL breach ──────────────────────────────────────────────────
                 # SHORT: SL triggers when price RISES above sl_price
