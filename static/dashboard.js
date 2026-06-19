@@ -366,9 +366,9 @@ function updateNavCounts() {
     const dot = r.cls === 'stop'
       ? 'background:' + r.color + ';box-shadow:0 0 6px ' + r.color + ';animation:stopPulse 2s infinite'
       : 'background:' + r.color + ';box-shadow:0 0 4px ' + r.color;
-    el.style.cssText = 'display:flex;align-items:center;gap:5px;background:' + r.color + '11;border:1px solid ' + r.color + '44;border-radius:4px;padding:3px 9px;cursor:default;flex-shrink:0';
-    el.innerHTML = '<div style="width:7px;height:7px;border-radius:50%;' + dot + ';flex-shrink:0"></div>'
-      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:9px;font-weight:700;color:' + r.color + ';letter-spacing:0.05em;white-space:nowrap">BTC J1H ' + r.j1h.toFixed(0) + '  ' + r.label.trim() + '</span>';
+    el.style.cssText = 'display:flex;align-items:center;gap:5px;background:' + r.color + '11;border:1px solid ' + r.color + '44;border-radius:4px;padding:4px 11px;cursor:default;flex-shrink:0';
+    el.innerHTML = '<div style="width:8px;height:8px;border-radius:50%;' + dot + ';flex-shrink:0"></div>'
+      + '<span style="font-family:\'JetBrains Mono\',monospace;font-size:11px;font-weight:700;color:' + r.color + ';letter-spacing:0.05em;white-space:nowrap">BTC J1H ' + r.j1h.toFixed(0) + '  ' + r.label.trim() + '</span>';
   }
 
   function _renderJmapRegimeBadge() {
