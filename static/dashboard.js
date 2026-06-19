@@ -882,7 +882,6 @@ function buildAlertCard(a, trades, pairMap) {
     : `<button class="ac-btn btn-hl" ${dis} onclick="openTrade('${sym}','${a.direction}','HL',${a.leverage})">OPEN HL</button>
        <button class="ac-btn ac-btn-live" ${dis} onclick="openLiveOverlay('${sym}','${a.direction}')"><span style=\"display:inline-block;width:7px;height:7px;background:#000;border-radius:50%;margin-right:5px;animation:liveDot 1.2s ease-in-out infinite\"></span>OPEN LIVE</button>
        <button class="ac-btn ac-btn-dismiss" onclick="dismissAlert('${sym}','${a.direction}')">DISMISS</button>`;
-       <button class="ac-btn ac-btn-dismiss" onclick="dismissAlert('${sym}','${a.direction}')">DISMISS</button>`;
 
   return `<div class="alert-card ${dirClass}" style="${isStale ? 'opacity:0.6;' : ''}">
     ${isStale ? '<div class="ac2-stale-overlay">STALE</div>' : ''}
@@ -2709,10 +2708,10 @@ async function _ovCloseTrade(sym, dir) {
     if (useType) {
       const expected = sym + ' ' + dir;
       confEl.innerHTML = '<div style="font-family:JetBrains Mono,monospace;font-size:9px;font-weight:700;color:#fff;margin-bottom:6px">Type <span style=color:#a855f7>' + expected + '</span> to confirm</div>' +
-        '<input class="lt-confirm-input" id="lt-confirm-input" placeholder="' + expected + '" autocomplete="off" oninput="_ltOnTypeInput(this,'' + expected + '')">' +
-        '<button class="lt-arm-btn idle" id="lt-submit-btn" disabled onclick="_ltSubmit('' + sym + '','' + dir + '')">SUBMIT LIVE ORDER</button>';
+        '<input class="lt-confirm-input" id="lt-confirm-input" placeholder="' + expected + '" autocomplete="off" oninput="_ltOnTypeInput(this,\'' + expected + '\')">' +
+        '<button class="lt-arm-btn idle" id="lt-submit-btn" disabled onclick="_ltSubmit(\'' + sym + '\',\'' + dir + '\')">SUBMIT LIVE ORDER</button>';
     } else {
-      confEl.innerHTML = '<button class="lt-arm-btn idle" id="lt-arm-btn" onclick="_ltArm('' + sym + '','' + dir + '',' + margin + ')">ARM ORDER</button>';
+      confEl.innerHTML = '<button class="lt-arm-btn idle" id="lt-arm-btn" onclick="_ltArm(\'' + sym + '\',\'' + dir + '\',' + margin + ')">ARM ORDER</button>';
     }
   }
 
@@ -2841,7 +2840,7 @@ async function _ovCloseTrade(sym, dir) {
       '</div>' +
       '<div class="pcv2-narr" style="padding:0 14px 8px;color:#fff;font-weight:700">'+narr+'</div>' +
       '<div class="pcv2-actions" style="padding:8px 14px 12px">' +
-      '<button class="lpc-close-btn" onclick="closeLiveTrade(''+sym+'',''+t.direction+'')"><span style="display:inline-block;width:7px;height:7px;background:#000;border-radius:50%;animation:liveDot 1.2s ease-in-out infinite"></span> CLOSE LIVE</button>' +
+      '<button class="lpc-close-btn" onclick="closeLiveTrade(\'' + sym + '\',\'' + t.direction + '\')"><span style="display:inline-block;width:7px;height:7px;background:#000;border-radius:50%;animation:liveDot 1.2s ease-in-out infinite"></span> CLOSE LIVE</button>' +
       '</div></div>';
   }
 
