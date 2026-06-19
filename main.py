@@ -244,6 +244,8 @@ def _save_state():
             "consecutive_losses":     consecutive_losses,
             "circuit_breaker_active": circuit_breaker_active,
             "cooldowns":              dict(_scanner_mod._cooldowns),
+            "peak_shadow":            dict(_peak_shadow),
+            "adverse_shadow":         dict(_adverse_shadow),
             "updated_at":             datetime.now(timezone.utc).isoformat(),
         }
         sb.table("hl_scanner_state").upsert(data).execute()
@@ -331,6 +333,15 @@ def _load_state():
             print(f"[RESTORE] {trade.get('symbol')} {trade.get('direction')} "
                   f"entry={trade.get('entry_price')} sl={trade.get('sl_price')} "
                   f"tp1={trade.get('tp1_price')} restored")
+
+        # ── Restore shadow dicts (peak + adverse) ────────────────────────────
+        for key, sh in (data.get("peak_shadow") or {}).items():
+            if key in app_state.open_trades:
+                _peak_shadow[key] = sh
+        for key, sh in (data.get("adverse_shadow") or {}).items():
+            if key in app_state.open_trades:
+                _adverse_shadow[key] = sh
+        print(f"[RESTORE] shadow dicts — peak={len(_peak_shadow)} adverse={len(_adverse_shadow)}")
 
         # ── Restore cooldowns (filter expired) ────────────────────────────────
         now     = time.time()
@@ -661,7 +672,9 @@ async def _do_open_trade(
         "paper":      result.get("paper", True),
         "exchange":   exchange,
         "sl_price":   alert_data.get("sl_price")  if alert_data else None,
-        "sl_dist":    alert_data.get("sl_dist")   if alert_data else None,
+        "sl_dist":    ((alert_data.get("sl_dist") or
+                        abs(entry - (alert_data.get("sl_price") or entry)))
+                       if alert_data else None),
         "tp1_price":  alert_data.get("tp1_price") if alert_data else None,
         "tp2_price":  alert_data.get("tp2_price") if alert_data else None,
         "score":      alert_data.get("score")     if alert_data else None,
@@ -1393,6 +1406,9 @@ async def _exit_monitor_loop():
                 # -- Adverse cut shadow (observation only, no exit logic) ------
                 try:
                     _ent_a  = trade.get("entry_price", 0) or 0
+                    # sl_dist is stored once at trade open (immutable original
+                    # distance). The abs(...) fallback is defensive dead code
+                    # after FIX 1 — kept only as a guard against legacy rows.
                     _sl_d_a = (trade.get("sl_dist") or
                                abs(_ent_a - (trade.get("sl_price") or _ent_a)))
                     _sz_a   = trade.get("remaining_size", trade.get("size", 0)) or 0
