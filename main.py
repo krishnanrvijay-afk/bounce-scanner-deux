@@ -60,9 +60,9 @@ _peak_shadow: dict = {}   # trade_key -> shadow tracking state (observation only
 _adverse_shadow: dict = {}  # trade_key -> adverse-cut shadow state (observation only)
 _sign_shadow:   dict = {}  # trade_key -> PnL-sign transition history (observation only)
 
-  # ── Bot identity ──────────────────────────────────────────────────────────────────────────────
-  BOT_INSTANCE_ID: str        = "default"
-  _BOT_IDENTITY_COMMITTED: bool = False
+# ── Bot identity ──────────────────────────────────────────────────────────────────────────────
+BOT_INSTANCE_ID: str        = "default"
+_BOT_IDENTITY_COMMITTED: bool = False
 _prev_session:      str              = ""
 
 # ── Global safety state ────────────────────────────────────────────────────────
@@ -604,7 +604,7 @@ async def _resolve_bot_identity(exchange: str) -> None:
       print(f"[BOT IDENTITY] Auto-derived (not committed): {BOT_INSTANCE_ID}")
 
 
-  async def _open_trade_log_row(trade: dict):
+async def _open_trade_log_row(trade: dict):
     """Insert an entry-analytics snapshot into hl_trade_log at trade-open time.
 
     If any column is missing, run once in Supabase SQL editor:
@@ -2216,16 +2216,16 @@ async def post_settings(request: Request):
     return await get_settings()
 
 
-  # ── Bot identity ──────────────────────────────────────────────────────────────────────────────
+# ── Bot identity ──────────────────────────────────────────────────────────────────────────────
 
-  @app.get("/api/bot-identity")
-  async def get_bot_identity():
+@app.get("/api/bot-identity")
+async def get_bot_identity():
       """Return current bot identity and whether it has been committed to Supabase."""
       return {"bot_instance_id": BOT_INSTANCE_ID, "committed": _BOT_IDENTITY_COMMITTED}
 
 
-  @app.post("/api/bot-identity/set")
-  async def set_bot_identity(request: Request):
+@app.post("/api/bot-identity/set")
+async def set_bot_identity(request: Request):
       """Commit or update the bot instance name.  No restart required."""
       global BOT_INSTANCE_ID, _BOT_IDENTITY_COMMITTED
       body = await request.json()
@@ -2250,7 +2250,7 @@ async def post_settings(request: Request):
       return {"bot_instance_id": BOT_INSTANCE_ID, "committed": _BOT_IDENTITY_COMMITTED}
 
 
-  # ── Daily reset ───────────────────────────────────────────────────────────────
+# ── Daily reset ───────────────────────────────────────────────────────────────
 
 @app.post("/api/reset-day")
 async def reset_day():
