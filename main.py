@@ -1891,155 +1891,155 @@ async def close_trade(req: CloseTradeRequest):
 
 
 
-  @app.get("/api/live-brief/{symbol}/{direction}")
-  async def live_brief(symbol: str, direction: str):
-      """Pre-flight data for the OPEN LIVE overlay. In-memory only except pair_stats."""
-      sess_key = f"{symbol}_{direction}_{get_session_name()}"
-      sess_halted = sess_key in _session_halted
-      large_sl_cd_key = f"{symbol}{direction}"
-      large_sl_cd_rem = max(0, int(_large_sl_cooldowns.get(large_sl_cd_key, 0) - time.time()))
-      margin_cap = app_state.margin_deployed + MARGIN_PER_TRADE > MARGIN_HARD_CAP
+@app.get("/api/live-brief/{symbol}/{direction}")
+async def live_brief(symbol: str, direction: str):
+    """Pre-flight data for the OPEN LIVE overlay. In-memory only except pair_stats."""
+    sess_key = f"{symbol}_{direction}_{get_session_name()}"
+    sess_halted = sess_key in _session_halted
+    large_sl_cd_key = f"{symbol}{direction}"
+    large_sl_cd_rem = max(0, int(_large_sl_cooldowns.get(large_sl_cd_key, 0) - time.time()))
+    margin_cap = app_state.margin_deployed + MARGIN_PER_TRADE > MARGIN_HARD_CAP
 
-      gate_status = {
-          "session_halted":                     sess_halted,
-          "large_sl_cooldown_remaining_seconds": large_sl_cd_rem,
-          "circuit_breaker_active":             circuit_breaker_active,
-          "daily_halted":                       trading_halted_today,
-          "margin_cap_reached":                 margin_cap,
-      }
+    gate_status = {
+        "session_halted":                     sess_halted,
+        "large_sl_cooldown_remaining_seconds": large_sl_cd_rem,
+        "circuit_breaker_active":             circuit_breaker_active,
+        "daily_halted":                       trading_halted_today,
+        "margin_cap_reached":                 margin_cap,
+    }
 
-      ps = next((p for p in app_state.pair_states if p.get("symbol") == symbol), None)
-      depth_pct = None
-      if ps:
-          depth_pct = ps.get("bid_pct") if direction == "LONG" else ps.get("ask_pct")
+    ps = next((p for p in app_state.pair_states if p.get("symbol") == symbol), None)
+    depth_pct = None
+    if ps:
+        depth_pct = ps.get("bid_pct") if direction == "LONG" else ps.get("ask_pct")
 
-      btc_j1h = _scanner_mod._btc_j1h
-      if btc_j1h > 80.0:
-          btc_regime = "LONG_BLOCKED"
-      elif btc_j1h < 20.0:
-          btc_regime = "SHORT_BLOCKED"
-      elif 40.0 <= btc_j1h <= 60.0:
-          btc_regime = "NEUTRAL_BLOCK"
-      else:
-          btc_regime = "CLEAR"
+    btc_j1h = _scanner_mod._btc_j1h
+    if btc_j1h > 80.0:
+        btc_regime = "LONG_BLOCKED"
+    elif btc_j1h < 20.0:
+        btc_regime = "SHORT_BLOCKED"
+    elif 40.0 <= btc_j1h <= 60.0:
+        btc_regime = "NEUTRAL_BLOCK"
+    else:
+        btc_regime = "CLEAR"
 
-      std_cd = get_cooldown_remaining(symbol, direction)
+    std_cd = get_cooldown_remaining(symbol, direction)
 
-      informational_only = {
-          "depth_pct":                          depth_pct,
-          "btc_regime":                         btc_regime,
-          "standard_cooldown_remaining_seconds": std_cd,
-      }
+    informational_only = {
+        "depth_pct":                          depth_pct,
+        "btc_regime":                         btc_regime,
+        "standard_cooldown_remaining_seconds": std_cd,
+    }
 
-      daily_out = {
-          "pnl":    daily_pnl,
-          "limit":  DAILY_LOSS_LIMIT,
-          "halted": trading_halted_today,
-      }
+    daily_out = {
+        "pnl":    daily_pnl,
+        "limit":  DAILY_LOSS_LIMIT,
+        "halted": trading_halted_today,
+    }
 
-      cb_out = {
-          "active":             circuit_breaker_active,
-          "consecutive_losses": consecutive_losses,
-          "stop_at":            CONSECUTIVE_LOSS_STOP,
-      }
+    cb_out = {
+        "active":             circuit_breaker_active,
+        "consecutive_losses": consecutive_losses,
+        "stop_at":            CONSECUTIVE_LOSS_STOP,
+    }
 
-      open_positions = []
-      for t in app_state.open_trades.values():
-          cur = app_state.prices.get(t["symbol"], t["entry_price"])
-          sz  = t.get("remaining_size", t.get("size", 0))
-          raw = (cur - t["entry_price"]) * sz if t["direction"] == "LONG" \
-                else (t["entry_price"] - cur) * sz
-          open_positions.append({
-              "symbol":         t.get("symbol"),
-              "direction":      t.get("direction"),
-              "unrealized_pnl": round(raw, 2),
-          })
+    open_positions = []
+    for t in app_state.open_trades.values():
+        cur = app_state.prices.get(t["symbol"], t["entry_price"])
+        sz  = t.get("remaining_size", t.get("size", 0))
+        raw = (cur - t["entry_price"]) * sz if t["direction"] == "LONG" \
+              else (t["entry_price"] - cur) * sz
+        open_positions.append({
+            "symbol":         t.get("symbol"),
+            "direction":      t.get("direction"),
+            "unrealized_pnl": round(raw, 2),
+        })
 
-      alert = next(
-          (a for a in app_state.alerts
-           if a.get("symbol") == symbol and a.get("direction") == direction),
-          None,
-      )
-      alert_data = None
-      if alert:
-          alert_data = {
-              "entry_price": alert.get("entry_price"),
-              "sl_price":    alert.get("sl_price"),
-              "tp1_price":   alert.get("tp1_price"),
-              "score":       alert.get("score"),
-              "adx1h":       alert.get("adx1h"),
-              "j15m":        alert.get("j15m"),
-              "j1h":         alert.get("j1h"),
-              "stoch_k":     alert.get("stoch_k"),
-              "stoch_d":     alert.get("stoch_d"),
-              "session":     alert.get("session", ""),
-              "leverage":    alert.get("leverage", 5),
-              "tier":        alert.get("tier"),
-              "fired_at":    alert.get("fired_at"),
-          }
+    alert = next(
+        (a for a in app_state.alerts
+         if a.get("symbol") == symbol and a.get("direction") == direction),
+        None,
+    )
+    alert_data = None
+    if alert:
+        alert_data = {
+            "entry_price": alert.get("entry_price"),
+            "sl_price":    alert.get("sl_price"),
+            "tp1_price":   alert.get("tp1_price"),
+            "score":       alert.get("score"),
+            "adx1h":       alert.get("adx1h"),
+            "j15m":        alert.get("j15m"),
+            "j1h":         alert.get("j1h"),
+            "stoch_k":     alert.get("stoch_k"),
+            "stoch_d":     alert.get("stoch_d"),
+            "session":     alert.get("session", ""),
+            "leverage":    alert.get("leverage", 5),
+            "tier":        alert.get("tier"),
+            "fired_at":    alert.get("fired_at"),
+        }
 
-      pair_stats = None
-      sb = _get_supabase()
-      if sb:
-          try:
-              cutoff_7d = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-              rows_all = (
-                  sb.table("hl_trade_log")
-                  .select("pnl_dollars,mfe_r,mae_r,open_time")
-                  .eq("pair", symbol)
-                  .eq("direction", direction)
-                  .execute()
-                  .data or []
-              )
+    pair_stats = None
+    sb = _get_supabase()
+    if sb:
+        try:
+            cutoff_7d = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+            rows_all = (
+                sb.table("hl_trade_log")
+                .select("pnl_dollars,mfe_r,mae_r,open_time")
+                .eq("pair", symbol)
+                .eq("direction", direction)
+                .execute()
+                .data or []
+            )
 
-              def _ps_stats(rows):
-                  if not rows:
-                      return {"wr": None, "trades": 0, "wins": 0, "losses": 0,
-                              "avg_best_peak": None, "avg_worst_dip": None}
-                  wins  = sum(1 for r in rows if (r.get("pnl_dollars") or 0) > 0)
-                  mfe_v = [r["mfe_r"] for r in rows if r.get("mfe_r") is not None]
-                  mae_v = [r["mae_r"] for r in rows if r.get("mae_r") is not None]
-                  return {
-                      "wr":            round(wins / len(rows) * 100, 1),
-                      "trades":        len(rows),
-                      "wins":          wins,
-                      "losses":        len(rows) - wins,
-                      "avg_best_peak": round(sum(mfe_v) / len(mfe_v), 2) if mfe_v else None,
-                      "avg_worst_dip": round(sum(mae_v) / len(mae_v), 2) if mae_v else None,
-                  }
+            def _ps_stats(rows):
+                if not rows:
+                    return {"wr": None, "trades": 0, "wins": 0, "losses": 0,
+                            "avg_best_peak": None, "avg_worst_dip": None}
+                wins  = sum(1 for r in rows if (r.get("pnl_dollars") or 0) > 0)
+                mfe_v = [r["mfe_r"] for r in rows if r.get("mfe_r") is not None]
+                mae_v = [r["mae_r"] for r in rows if r.get("mae_r") is not None]
+                return {
+                    "wr":            round(wins / len(rows) * 100, 1),
+                    "trades":        len(rows),
+                    "wins":          wins,
+                    "losses":        len(rows) - wins,
+                    "avg_best_peak": round(sum(mfe_v) / len(mfe_v), 2) if mfe_v else None,
+                    "avg_worst_dip": round(sum(mae_v) / len(mae_v), 2) if mae_v else None,
+                }
 
-              rows_7d = [r for r in rows_all if (r.get("open_time") or "") >= cutoff_7d]
-              at = _ps_stats(rows_all)
-              d7 = _ps_stats(rows_7d)
-              pair_stats = {
-                  "7d_wr":                 d7["wr"],
-                  "7d_trades":             d7["trades"],
-                  "7d_wins":               d7["wins"],
-                  "7d_losses":             d7["losses"],
-                  "7d_avg_best_peak":      d7["avg_best_peak"],
-                  "7d_avg_worst_dip":      d7["avg_worst_dip"],
-                  "alltime_wr":            at["wr"],
-                  "alltime_trades":        at["trades"],
-                  "alltime_wins":          at["wins"],
-                  "alltime_losses":        at["losses"],
-                  "alltime_avg_best_peak": at["avg_best_peak"],
-                  "alltime_avg_worst_dip": at["avg_worst_dip"],
-              }
-          except Exception as _ps_e:
-              print(f"[LIVE BRIEF] pair_stats error: {_ps_e}")
+            rows_7d = [r for r in rows_all if (r.get("open_time") or "") >= cutoff_7d]
+            at = _ps_stats(rows_all)
+            d7 = _ps_stats(rows_7d)
+            pair_stats = {
+                "7d_wr":                 d7["wr"],
+                "7d_trades":             d7["trades"],
+                "7d_wins":               d7["wins"],
+                "7d_losses":             d7["losses"],
+                "7d_avg_best_peak":      d7["avg_best_peak"],
+                "7d_avg_worst_dip":      d7["avg_worst_dip"],
+                "alltime_wr":            at["wr"],
+                "alltime_trades":        at["trades"],
+                "alltime_wins":          at["wins"],
+                "alltime_losses":        at["losses"],
+                "alltime_avg_best_peak": at["avg_best_peak"],
+                "alltime_avg_worst_dip": at["avg_worst_dip"],
+            }
+        except Exception as _ps_e:
+            print(f"[LIVE BRIEF] pair_stats error: {_ps_e}")
 
-      return {
-          "symbol":             symbol,
-          "direction":          direction,
-          "gate_status":        gate_status,
-          "informational_only": informational_only,
-          "daily":              daily_out,
-          "circuit_breaker":    cb_out,
-          "open_positions":     open_positions,
-          "alert_data":         alert_data,
-          "pair_stats":         pair_stats,
-      }
-  
+    return {
+        "symbol":             symbol,
+        "direction":          direction,
+        "gate_status":        gate_status,
+        "informational_only": informational_only,
+        "daily":              daily_out,
+        "circuit_breaker":    cb_out,
+        "open_positions":     open_positions,
+        "alert_data":         alert_data,
+        "pair_stats":         pair_stats,
+    }
+
 # ── Circuit breaker ───────────────────────────────────────────────────────────
 
 @app.post("/api/circuit-breaker/reset")
