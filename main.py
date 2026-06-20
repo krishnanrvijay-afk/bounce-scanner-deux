@@ -1292,11 +1292,18 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
     print(f"[EXIT] {sym} {direction} closed at {exit_price} reason={reason} "
           f"pnl=${pnl:.2f} r={r:+.2f}R")
     if TELEGRAM_ENABLED:
-        def _exit_tg(r=reason, s=sym, d=direction, ep=exit_price, p=pnl, dp=daily_pnl):
+        _pd_peak_tg = _peak_shadow.get(key, {}).get("peak_pnl_usd", 0.0)
+        def _exit_tg(r=reason, s=sym, d=direction, ep=exit_price, p=pnl, dp=daily_pnl, pk=_pd_peak_tg):
             sl_lbl = "S" if d == "SHORT" else "L"
             if r == "SL":
                 _tg_post("\u274C " + s + " " + sl_lbl + " \u00B7 SL at " + _fmt_p(ep)
                          + "\n\u2212$" + f"{abs(p):.2f}" + " \u00B7 day " + ("+" if dp >= 0 else "-") + "$" + f"{abs(dp):.2f}")
+            elif r == "PEAK_DECAY_20":
+                _pct_given_back = round((1 - (p / pk)) * 100, 1) if pk else 0
+                _tg_post("\U0001F6E1\uFE0F SENTINEL \u2014 " + s + " " + sl_lbl + " \u00B7 peak-decay exit at " + _fmt_p(ep)
+                         + "\nPeaked +$" + f"{pk:.2f}" + " \u2192 locked +$" + f"{p:.2f}"
+                         + " (" + f"{_pct_given_back}" + "% given back)"
+                         + "\nProtected capital before further decay")
             else:
                 _tg_post("\U0001F535 " + s + " " + sl_lbl + " \u00B7 closed (" + r + ") at " + _fmt_p(ep)
                          + "\n" + ("+" if p >= 0 else "-") + "$" + f"{abs(p):.2f}")
@@ -1584,6 +1591,19 @@ async def _exit_monitor_loop():
                     if _pp_hit:
                         _do_hc_partial_close(key, trade, current)
                         continue
+
+                # ── NEAR peak-decay real exit (Sentinel) ──────────────
+                if sym == "NEAR" and not tp1_hit:
+                    _pd_sh   = _peak_shadow.get(key, {})
+                    _pd_peak = _pd_sh.get("peak_pnl_usd", 0.0)
+                    if _pd_peak > 20:
+                        _pd_sz   = trade.get("remaining_size", trade.get("size", 0)) or 0
+                        _pd_ent  = trade.get("entry_price", 0) or 0
+                        _pd_pnl  = ((current - _pd_ent) * _pd_sz if not is_short
+                                    else (_pd_ent - current) * _pd_sz)
+                        if _pd_pnl < _pd_peak * 0.80:
+                            _do_close_trade(key, trade, current, "PEAK_DECAY_20")
+                            continue
 
                 # ── TP1 (always checked first — partial close, half position) ────
                 if not tp1_hit and tp1_price:
