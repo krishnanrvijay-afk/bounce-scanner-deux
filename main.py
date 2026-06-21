@@ -219,7 +219,8 @@ def _retire_alert(symbol: str, direction: str):
 
 # ── Supabase client ────────────────────────────────────────────────────────────
 
-_supabase: Optional[Client] = None
+_supabase:             Optional[Client]   = None
+_last_save_fail_alert: Optional[datetime] = None
 
 
 def _get_supabase() -> Optional[Client]:
@@ -233,6 +234,22 @@ def _get_supabase() -> Optional[Client]:
         else:
             print("[PERSIST] SUPABASE_URL/KEY not set — persistence disabled")
     return _supabase
+
+
+def _alert_save_failure(error_msg: str) -> None:
+    """Telegram alert on _save_state() failure — at most once per 5 min (cooldown)."""
+    global _last_save_fail_alert
+    now = datetime.now(timezone.utc)
+    if _last_save_fail_alert and (now - _last_save_fail_alert) < timedelta(minutes=5):
+        return
+    _last_save_fail_alert = now
+    msg = (
+        "⚠️ HL PERSIST FAILURE — _save_state() raised:\n"
+        + error_msg
+        + "\n\nCheck hl_scanner_state immediately. State is NOT being saved."
+    )
+    if TELEGRAM_ENABLED:
+        threading.Thread(target=lambda m=msg: _tg_post(m), daemon=True).start()
 
 
 def _save_state():
@@ -259,6 +276,7 @@ def _save_state():
         sb.table("hl_scanner_state").upsert(data).execute()
     except Exception as _e:
         print(f"[PERSIST] save error: {_e}")
+        _alert_save_failure(str(_e))
 
 
 def _load_state():
