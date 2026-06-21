@@ -1076,7 +1076,7 @@ async def _price_loop():
                 if changes:
                     app_state.price_changes.update(changes)
 
-            # Auto-reset daily PnL at UTC midnight
+            # Auto-reset daily PnL at ET midnight
             global daily_pnl, trading_halted_today, _last_midnight_day
             today = datetime.now(ET).day
             if today != _last_midnight_day:
