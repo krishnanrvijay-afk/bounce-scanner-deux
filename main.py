@@ -8,12 +8,14 @@ import threading
 import requests
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from typing import Optional
 
 from dotenv import load_dotenv
 load_dotenv()
 
 _EDT = timezone(timedelta(hours=-4))
+ET   = ZoneInfo("America/New_York")
 DEPLOY_TIME = datetime.now(_EDT).strftime("%Y-%m-%d %H:%M EDT")
 
 _scanner_log = logging.getLogger("scanner")
@@ -70,7 +72,7 @@ consecutive_losses:     int   = 0
 circuit_breaker_active: bool  = False
 daily_pnl:              float = 0.0
 trading_halted_today:   bool  = False
-_last_midnight_day:     int   = datetime.now(timezone.utc).day
+_last_midnight_day:     int   = datetime.now(ET).day
 
 
 # ── App state ─────────────────────────────────────────────────────────────────
@@ -240,7 +242,7 @@ def _save_state():
     try:
         data = {
             "id":                     1,
-            "saved_date":             datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "saved_date":             datetime.now(ET).strftime("%Y-%m-%d"),
             "open_trades":            app_state.open_trades,
             "margin_deployed":        app_state.margin_deployed,
             "daily_pnl":              daily_pnl,
@@ -313,7 +315,7 @@ def _load_state():
         data = result.data[0]
 
         # ── New-day check ──────────────────────────────────────────────────────
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today_str = datetime.now(ET).strftime("%Y-%m-%d")
         if data.get("saved_date") != today_str:
             saved = data.get("saved_date", "unknown")
             print(f"[DAILY RESET] New trading day ({saved} → {today_str}) — P&L reset to $0")
@@ -1050,7 +1052,7 @@ async def _price_loop():
 
             # Auto-reset daily PnL at UTC midnight
             global daily_pnl, trading_halted_today, _last_midnight_day
-            today = datetime.now(timezone.utc).day
+            today = datetime.now(ET).day
             if today != _last_midnight_day:
                 daily_pnl            = 0.0
                 trading_halted_today = False
