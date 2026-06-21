@@ -1615,7 +1615,7 @@ async def _exit_monitor_loop():
                         continue
 
                 # ── NEAR_USDT peak-decay real exit (Sentinel) ─────────────────
-                if sym == "NEAR_USDT" and not tp1_hit and _sh["peak_pnl_usd"] > 20:
+                if sym == "NEAR" and not tp1_hit and _sh["peak_pnl_usd"] > 20:
                     if _cpnl < _sh["peak_pnl_usd"] * 0.80:
                         # NOTE: PAPER_MODE-only as of this build. If PAPER_MODE is ever
                         # set to False, this exit MUST also call
