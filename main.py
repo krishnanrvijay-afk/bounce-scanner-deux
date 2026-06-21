@@ -1519,6 +1519,7 @@ async def _exit_monitor_loop():
                     _sh = _peak_shadow.setdefault(key, {
                         "peak_pnl_usd":    0.0,
                         "peak_reached_at": None,
+                        "be_armed":        False,
                         "d20_at": None, "d20_pnl": None, "d20_phase": None,
                         "d30_at": None, "d30_pnl": None, "d30_phase": None,
                         "d40_at": None, "d40_pnl": None, "d40_phase": None,
@@ -1527,13 +1528,19 @@ async def _exit_monitor_loop():
                     _ent  = trade.get("entry_price", 0) or 0
                     _cpnl = ((current - _ent) * _sz if not is_short
                              else (_ent - current) * _sz)
-                    if _cpnl > 0 and _cpnl > _sh["peak_pnl_usd"]:
+                    _be_p = trade.get("be_price") or 0
+                    _be_crossed = ((current >= _be_p) if (not is_short and _be_p)
+                                   else (current <= _be_p) if (is_short and _be_p)
+                                   else False)
+                    if _be_crossed:
+                        _sh["be_armed"] = True
+                    if _sh["be_armed"] and _cpnl > _sh["peak_pnl_usd"]:
                         _sh["peak_pnl_usd"]    = _cpnl
                         _sh["peak_reached_at"] = datetime.now(timezone.utc).isoformat()
                         _sh["d20_at"] = _sh["d20_pnl"] = _sh["d20_phase"] = None
                         _sh["d30_at"] = _sh["d30_pnl"] = _sh["d30_phase"] = None
                         _sh["d40_at"] = _sh["d40_pnl"] = _sh["d40_phase"] = None
-                    if _sh["peak_pnl_usd"] > 20:
+                    if _sh["be_armed"]:
                         _psh_now   = datetime.now(timezone.utc).isoformat()
                         _psh_phase = "post_tp1" if trade.get("tp1_hit") else "pre_tp1"
                         for _psh_th, _psh_dk, _psh_pk, _psh_phk in (
@@ -1768,7 +1775,7 @@ async def _exit_monitor_loop():
                         continue
 
                 # ── NEAR_USDT peak-decay real exit (Sentinel) ─────────────────
-                if sym == "NEAR" and not tp1_hit and _sh["peak_pnl_usd"] > 20:
+                if sym == "NEAR" and not tp1_hit and _sh["be_armed"]:
                     if _cpnl < _sh["peak_pnl_usd"] * 0.80:
                         # NOTE: PAPER_MODE-only as of this build. If PAPER_MODE is ever
                         # set to False, this exit MUST also call
