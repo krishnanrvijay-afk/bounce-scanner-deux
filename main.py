@@ -1603,19 +1603,6 @@ async def _exit_monitor_loop():
                         _do_hc_partial_close(key, trade, current)
                         continue
 
-                # ── NEAR peak-decay real exit (Sentinel) ──────────────
-                if sym == "NEAR" and not tp1_hit:
-                    _pd_sh   = _peak_shadow.get(key, {})
-                    _pd_peak = _pd_sh.get("peak_pnl_usd", 0.0)
-                    if _pd_peak > 20:
-                        _pd_sz   = trade.get("remaining_size", trade.get("size", 0)) or 0
-                        _pd_ent  = trade.get("entry_price", 0) or 0
-                        _pd_pnl  = ((current - _pd_ent) * _pd_sz if not is_short
-                                    else (_pd_ent - current) * _pd_sz)
-                        if _pd_pnl < _pd_peak * 0.80:
-                            _do_close_trade(key, trade, current, "PEAK_DECAY_20")
-                            continue
-
                 # ── TP1 (always checked first — partial close, half position) ────
                 if not tp1_hit and tp1_price:
                     tp1_reached = (is_short and current <= tp1_price) or \
@@ -1625,6 +1612,18 @@ async def _exit_monitor_loop():
                           f"{'TP1 TRIGGERED → partial close' if tp1_reached else 'watching tp1'}")
                     if tp1_reached:
                         _do_partial_close_tp1(key, trade, current)
+                        continue
+
+                # ── NEAR_USDT peak-decay real exit (Sentinel) ─────────────────
+                if sym == "NEAR_USDT" and not tp1_hit and _sh["peak_pnl_usd"] > 20:
+                    if _cpnl < _sh["peak_pnl_usd"] * 0.80:
+                        # NOTE: PAPER_MODE-only as of this build. If PAPER_MODE is ever
+                        # set to False, this exit MUST also call
+                        # await mexc_client.close_position(sym, direction, trade.get("remaining_size", trade.get("size", 0)))
+                        # BEFORE _do_close_trade below — otherwise the real exchange
+                        # position stays open while internal state shows it closed.
+                        # The /close_trade endpoint shows the correct pattern.
+                        _do_close_trade(key, trade, current, "PEAK_DECAY_20")
                         continue
 
                 # ── TRAILBLAZER: ATR trailing stop after tp1_hit ──────────────
