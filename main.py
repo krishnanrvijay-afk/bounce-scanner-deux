@@ -1794,7 +1794,8 @@ async def _exit_monitor_loop():
 
                 # ── NEAR_USDT peak-decay real exit (Sentinel) ─────────────────
                 if not tp1_hit and _sh["be_armed"]:
-                    if _cpnl < _sh["peak_pnl_usd"] * 0.80:
+                    _decay_threshold = 0.70 if sym in ("@107",) else 0.80
+                    if _cpnl < _sh["peak_pnl_usd"] * _decay_threshold:
                         # NOTE: PAPER_MODE-only as of this build. If PAPER_MODE is ever
                         # set to False, this exit MUST also call
                         # await mexc_client.close_position(sym, direction, trade.get("remaining_size", trade.get("size", 0)))
