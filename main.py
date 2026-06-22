@@ -60,7 +60,7 @@ _session_sl_counts: dict[str, int]   = {}    # "SYMBOL_DIRECTION_SESSION" -> SL 
 _session_halted:    set[str]         = set() # "SYMBOL_DIRECTION_SESSION" halted for session
 _large_sl_cooldowns: dict[str, float] = {}   # "SYMBOLDIR" -> expiry ts for 90-min cooldowns
 _peak_shadow: dict = {}   # trade_key -> shadow tracking state (observation only)
-_sentinel_sweep: list = []   # deferred PEAK_DECAY_20 exits — flushed once per scan cycle
+_sentinel_sweep: list = []   # deferred protective exits (PEAK_DECAY_20 / RUNNER_DECAY_10) — flushed once per scan cycle
 _adverse_shadow: dict = {}  # trade_key -> adverse-cut shadow state (observation only)
 _sign_shadow:   dict = {}  # trade_key -> PnL-sign transition history (observation only)
 _signal_shadow: dict = {}  # trade_key -> signal invalidation shadow state (observation only)
@@ -1185,7 +1185,7 @@ async def _write_peak_shadow_row(key: str, trade: dict, reason: str,
         open_iso  = (datetime.fromtimestamp(opened_at, tz=timezone.utc).isoformat()
                      if opened_at else None)
         session   = trade.get("session") or (_get_session(opened_at) if opened_at else None)
-        sb.table("peak_protection_shadow").insert({
+        _psh_row = {
             "venue":                  "hl",
             "pair":                   trade.get("symbol", ""),
             "direction":              trade.get("direction", ""),
@@ -1205,7 +1205,12 @@ async def _write_peak_shadow_row(key: str, trade: dict, reason: str,
             "decay40_phase":          sh.get("d40_phase"),
             "pnl_dollars":            round(final_pnl, 2),
             "session_opened":         session,
-        }).execute()
+        }
+        if reason == "RUNNER_DECAY_10":
+            _psh_row["runner_peak_pnl"]            = round(sh.get("runner_peak_pnl", 0.0), 2)
+            _psh_row["runner_decay_triggered_at"]  = datetime.now(timezone.utc).isoformat()
+            _psh_row["runner_decay_pnl_at_trigger"] = round(final_pnl, 2)
+        sb.table("peak_protection_shadow").insert(_psh_row).execute()
         print(f"[SHADOW] wrote peak_protection_shadow {trade.get('symbol')} "
               f"{trade.get('direction')} peak=${sh['peak_pnl_usd']:.2f} reason={reason}")
     except Exception as _psh_e:
@@ -1381,9 +1386,13 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
           f"pnl=${pnl:.2f} r={r:+.2f}R")
     if TELEGRAM_ENABLED:
         _pd_peak_tg = _peak_shadow.get(key, {}).get("peak_pnl_usd", 0.0)
-        if reason == "PEAK_DECAY_20":
-            _pct = round((1 - (pnl / _pd_peak_tg)) * 100, 1) if _pd_peak_tg else 0
-            _sentinel_sweep.append((sym, direction, pnl, _pd_peak_tg, round(pnl, 2), _pct))
+        if reason in ("PEAK_DECAY_20", "RUNNER_DECAY_10"):
+            if reason == "RUNNER_DECAY_10":
+                _sweep_peak = _peak_shadow.get(key, {}).get("runner_peak_pnl", 0.0)
+            else:
+                _sweep_peak = _pd_peak_tg
+            _pct = round((1 - (pnl / _sweep_peak)) * 100, 1) if _sweep_peak else 0
+            _sentinel_sweep.append((reason, sym, direction, pnl, _sweep_peak, round(pnl, 2), _pct))
         else:
             def _exit_tg(r=reason, s=sym, d=direction, ep=exit_price, p=pnl, dp=daily_pnl, pk=_pd_peak_tg):
                 sl_lbl = "S" if d == "SHORT" else "L"
@@ -1434,6 +1443,10 @@ def _do_partial_close_tp1(key: str, trade: dict, exit_price: float):
     # Update trade in-place — keep 30% runner open for Trailblazer
     trade["remaining_size"]   = rem_size
     trade["tp1_hit"]          = True
+    _peak_shadow.setdefault(key, {}).update({
+        "runner_peak_pnl": 0.0,
+        "runner_armed":    True,
+    })
     trade["extreme_price"]    = exit_price
     trade["trail_best_price"] = exit_price
     trade["trail_anchor"]     = exit_price
@@ -1508,28 +1521,44 @@ def _do_trailblazer_close(key: str, trade: dict, exit_price: float,
 # ── Exit monitor loop ─────────────────────────────────────────────────────────────
 
 def _flush_sentinel_sweep() -> None:
-    """Send one consolidated Telegram message per scan cycle for PEAK_DECAY_20 exits."""
+    """Send one consolidated Telegram message per scan cycle for protective exits (PEAK_DECAY_20 / RUNNER_DECAY_10)."""
     global _sentinel_sweep
     exits = list(_sentinel_sweep)
     _sentinel_sweep.clear()
     if not exits:
         return
+    has_sentinel = any(e[0] == "PEAK_DECAY_20"  for e in exits)
+    has_runner   = any(e[0] == "RUNNER_DECAY_10" for e in exits)
     if len(exits) == 1:
-        sym, direction, pnl, peak, locked, pct = exits[0]
+        reason, sym, direction, pnl, peak, locked, pct = exits[0]
         sl_lbl = "S" if direction == "SHORT" else "L"
-        _tg_post("\U0001F6E1\uFE0F SENTINEL \u2014 " + sym + " " + sl_lbl
-                 + " \u00B7 peak-decay exit"
-                 + "\nPeaked +$" + f"{peak:.2f}" + " \u2192 locked +$" + f"{locked:.2f}"
-                 + " (" + f"{pct}" + "% given back)"
-                 + "\nProtected capital before further decay")
+        if reason == "PEAK_DECAY_20":
+            _tg_post("\U0001F6E1\uFE0F SENTINEL \u2014 " + sym + " " + sl_lbl
+                     + " \u00B7 peak-decay exit"
+                     + "\nPeaked +$" + f"{peak:.2f}" + " \u2192 locked +$" + f"{locked:.2f}"
+                     + " (" + f"{pct}" + "% given back)"
+                     + "\nProtected capital before further decay")
+        else:
+            _tg_post("\U0001F3C3 RUNNER PROTECTED \u2014 " + sym + " " + sl_lbl
+                     + " \u00B7 10% decay on runner"
+                     + "\nRunner peaked +$" + f"{peak:.2f}" + " \u2192 locking +$" + f"{locked:.2f}"
+                     + " (" + f"{pct}" + "% given back)"
+                     + "\nBanking runner before reversal deepens")
     else:
-        net   = sum(e[2] for e in exits)
+        net   = sum(e[3] for e in exits)
         parts = []
-        for sym, direction, pnl, peak, locked, pct in exits:
+        for reason, sym, direction, pnl, peak, locked, pct in exits:
             sl_lbl = "S" if direction == "SHORT" else "L"
             sign   = "+" if locked >= 0 else "-"
-            parts.append(sym + " " + sl_lbl + " " + sign + "$" + f"{abs(locked):.2f}")
-        _tg_post("\U0001F6E1\uFE0F SENTINEL SWEEP \u00B7 " + str(len(exits)) + " exits \u00B7 HL"
+            tag    = "\U0001F3C3" if reason == "RUNNER_DECAY_10" else "\U0001F6E1"
+            parts.append(tag + " " + sym + " " + sl_lbl + " " + sign + "$" + f"{abs(locked):.2f}")
+        if has_sentinel and has_runner:
+            header = "\u26A1 PROTECTION SWEEP"
+        elif has_runner:
+            header = "\U0001F3C3 RUNNER SWEEP"
+        else:
+            header = "\U0001F6E1\uFE0F SENTINEL SWEEP"
+        _tg_post(header + " \u00B7 " + str(len(exits)) + " exits \u00B7 HL"
                  + "\n" + " \u00B7 ".join(parts)
                  + "\n" + "\u2500" * 32
                  + "\nNet locked: " + ("+" if net >= 0 else "-") + "$" + f"{abs(net):.2f}")
@@ -1836,6 +1865,15 @@ async def _exit_monitor_loop():
 
                 # ── TRAILBLAZER: ATR trailing stop after tp1_hit ──────────────
                 if tp1_hit:
+                    # ── RUNNER_DECAY_10: 10% peak-decay on post-TP1 runner ─────────
+                    _sh_r = _peak_shadow.setdefault(key, {})
+                    if _sh_r.get("runner_armed"):
+                        if _cpnl > _sh_r.get("runner_peak_pnl", 0.0):
+                            _sh_r["runner_peak_pnl"] = _cpnl
+                        _rpeak = _sh_r["runner_peak_pnl"]
+                        if _rpeak > 0 and _cpnl < _rpeak * 0.90:
+                            _do_close_trade(key, trade, current, "RUNNER_DECAY_10")
+                            continue
                     _ps   = next((p for p in app_state.pair_states if p.get("symbol") == sym), None)
                     _atr  = (_ps.get("atr15m") or 0) if _ps else 0
                     if _atr > 0:
