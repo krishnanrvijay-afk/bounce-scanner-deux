@@ -78,6 +78,8 @@ ADVERSE_CUT_USD: dict[str, float] = {
     "AVAX":  60.0,
     "SOL":   65.0,
     "XRP":   65.0,
+    "LTC":   50.0,
+    "ADA":   55.0,
 }
 ADVERSE_CUT_DEFAULT_USD: float = 60.0
 
