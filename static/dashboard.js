@@ -520,9 +520,10 @@ function buildCard(p, alerts, trades, changes) {
                  : adx1h >= 25 ? '#ffaa00'
                  : '#ffffff';
 
-  // Gate counts
-  const shortGates = [j15m > 80, j1h > 60, stochK > 75 && stochK < stochD, askPct >= 55];
-  const longGates  = [j15m < 20, j1h < 40, stochK < 25 && stochK > stochD, bidPct >= 55];
+  // Gate counts — (1) guard zero-init false positives (2) stoch: add prev crossover freshness check
+  const dataReady  = !(j15m === 0 && j1h === 0 && stochK === 0);
+  const shortGates = dataReady ? [j15m > 80, j1h > 60, stochK > 75 && stochKPrev >= stochDPrev && stochK < stochD, askPct >= 55] : [false, false, false, false];
+  const longGates  = dataReady ? [j15m < 20, j1h < 40, stochK < 25 && stochKPrev <= stochDPrev && stochK > stochD, bidPct >= 55] : [false, false, false, false];
   const shortCount = shortGates.filter(Boolean).length;
   const longCount  = longGates.filter(Boolean).length;
   const shortFull  = shortCount === 4;
@@ -589,16 +590,16 @@ function buildCard(p, alerts, trades, changes) {
 
   //  Gate rows: RSI + DEPTH only (J moved to symbol line) 
   let rows = '';
-  if (showShort) rows += dirRow('SHORT', stochK, stochD, rsi15m, askPct);
-  if (showLong)  rows += dirRow('LONG',  stochK, stochD, rsi15m, bidPct);
+  if (showShort && dataReady) rows += dirRow('SHORT', stochK, stochD, rsi15m, askPct);
+  if (showLong  && dataReady) rows += dirRow('LONG',  stochK, stochD, rsi15m, bidPct);
 
   //  Confluence mini bars (RSI + Depth)  shown only on confluence cards 
   let confBars = '';
-  if (isConf) {
+  if (isConf && dataReady) {
     const depthPct   = confIsLong ? bidPct : askPct;
     const depthLabel = confIsLong ? 'BID' : 'ASK';
     const depthPass  = depthPct >= 55;
-    const stochPass   = confIsLong ? (stochK < 25 && stochK > stochD) : (stochK > 75 && stochK < stochD);
+    const stochPass   = confIsLong ? (stochK < 25 && stochKPrev <= stochDPrev && stochK > stochD) : (stochK > 75 && stochKPrev >= stochDPrev && stochK < stochD);
     const stochPct    = Math.min(100, Math.max(0, stochK));
     const stochCurCol = confIsLong ? (stochK < 25 ? '#00e676' : '#555') : (stochK > 75 ? '#ff3d57' : '#555');
     const stochDotCls = stochPass ? (confIsLong ? 'long-pass' : 'short-pass') : (confIsLong ? 'long-fail' : 'short-fail');
