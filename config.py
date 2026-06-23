@@ -41,7 +41,7 @@ TP2_R                = 1.5         # still used for tp2_price alert calc; exit r
 TRAIL_ATR_MULTIPLIER = 0.5         # trail_stop = trail_best  (atr15m  TRAIL_ATR_MULTIPLIER)
 
 LEVERAGE_HIGH = 10
-LEVERAGE_MID  = 7
+LEVERAGE_MID  = 5
 LEVERAGE_LOW  = 5
 
 COOLDOWN_SECONDS      = 1800
