@@ -1,11 +1,11 @@
 import asyncio
 import time
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from config import (
-    PAIRS, J15M_SHORT_GATE, J15M_LONG_GATE, J1H_SHORT_MIN, J1H_LONG_MAX,
+    PAIRS, J15M_SHORT_GATE, J15M_LONG_GATE, J1H_SHORT_MIN, J1H_SHORT_MAX, J1H_LONG_MAX, J1H_LONG_MIN,
     RSI15M_SHORT_MIN, RSI15M_LONG_MAX, DEPTH_GATE_PCT, ATR_SL_MULTIPLIER,
     TP1_R, TP2_R, LEVERAGE_HIGH, LEVERAGE_MID, LEVERAGE_LOW,
     COOLDOWN_SECONDS, ADX_FADE_MAX, PAPER_MODE, CONSECUTIVE_LOSS_STOP,
@@ -19,6 +19,7 @@ log = logging.getLogger("scanner")
 _last_stoch:  dict[str, tuple] = {}   # keyed symbol -> (stoch_k, stoch_d) from previous scan
 _last_stoch_fast: dict[str, tuple] = {}   # keyed symbol -> (stoch_k_fast, stoch_d_fast) 8,3,3
 _adverse_cluster: dict = {"long": [], "short": []}  # rolling adverse exit timestamps per direction
+_adverse_cooldown_until: dict = {"long": None, "short": None}  # graduated adverse cooldown expiry per direction
 _cooldowns:   dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" → expiry ts
 _scan_count:  int              = 0
 _stale_prices: set[str]        = set()  # symbols with 2 consecutive missing prices
@@ -211,7 +212,7 @@ def score_bounce_short(j15m, j1h, rsi15m, ask_pct, adx,
                        stoch_k_prev: float = 50.0, stoch_d_prev: float = 50.0) -> tuple[int, str, int]:
     tier, lev = _leverage_tier(adx)
     stoch_gate = stoch_k > 75 and stoch_k < stoch_d and stoch_k_prev >= stoch_d_prev
-    if not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN
+    if not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN and j1h <= J1H_SHORT_MAX
             and stoch_gate and ask_pct >= DEPTH_GATE_PCT):
         return 0, tier, lev
     score = 4
@@ -229,7 +230,7 @@ def score_bounce_long(j15m, j1h, rsi15m, bid_pct, adx,
                       stoch_k_prev: float = 50.0, stoch_d_prev: float = 50.0) -> tuple[int, str, int]:
     tier, lev = _leverage_tier(adx)
     stoch_gate = stoch_k < 25 and stoch_k > stoch_d and stoch_k_prev <= stoch_d_prev
-    if not (j15m < J15M_LONG_GATE and j1h < J1H_LONG_MAX
+    if not (j15m < J15M_LONG_GATE and j1h < J1H_LONG_MAX and j1h >= J1H_LONG_MIN
             and stoch_gate and bid_pct >= DEPTH_GATE_PCT):
         return 0, tier, lev
     score = 4
@@ -425,6 +426,14 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             # ── Component B: Adverse cluster directional halt ─────────────────────
             if len(_adverse_cluster.get("long",  [])) >= 3: _regime_block_long  = True
             if len(_adverse_cluster.get("short", [])) >= 3: _regime_block_short = True
+            # -- Graduated adverse cooldown check --------------------------------
+            _now_utc = datetime.now(timezone.utc)
+            if (_adverse_cooldown_until.get("long") and
+                    _now_utc < _adverse_cooldown_until["long"]):
+                _regime_block_long = True
+            if (_adverse_cooldown_until.get("short") and
+                    _now_utc < _adverse_cooldown_until["short"]):
+                _regime_block_short = True
 
             # ── Score both directions ─────────────────────────────────────────
             for direction in ("SHORT", "LONG"):
