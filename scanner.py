@@ -3,6 +3,7 @@ import time
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Optional
+import os as _os
 
 from config import (
     PAIRS, J15M_SHORT_GATE, J15M_LONG_GATE, J1H_SHORT_MIN, J1H_SHORT_MAX, J1H_LONG_MAX, J1H_LONG_MIN,
@@ -13,6 +14,30 @@ from config import (
 )
 
 log = logging.getLogger("scanner")
+
+# -- Supabase gate logging (fire-and-forget, never blocks entry) --
+_SB_URL: str = _os.environ.get("SUPABASE_URL", "").rstrip("/")
+_SB_KEY: str = _os.environ.get("SUPABASE_KEY", "")
+
+async def _log_gate(venue: str, pair: str, gate_type: str, direction: str, reason: str) -> None:
+    if not _SB_URL or not _SB_KEY:
+        return
+    try:
+        import httpx as _httpx
+        async with _httpx.AsyncClient(timeout=3.0) as _c:
+            await _c.post(
+                f"{_SB_URL}/rest/v1/gate_activity_log",
+                headers={
+                    "apikey": _SB_KEY,
+                    "Authorization": f"Bearer {_SB_KEY}",
+                    "Content-Type": "application/json",
+                    "Prefer": "return=minimal",
+                },
+                json={"venue": venue, "pair": pair, "gate_type": gate_type,
+                      "direction": direction, "reason": reason},
+            )
+    except Exception:
+        pass
 
 # ── Module-level state ────────────────────────────────────────────────────────
 
@@ -420,9 +445,13 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             if _btc_fast_margin < -15:
                 _regime_block_long  = True
                 log.info(f"[FAST_STOCH_BLOCK] BTC fast K-D={_btc_fast_margin:.1f} → LONG entries blocked")
+                asyncio.create_task(_log_gate("HL", "BTC", "FAST_STOCH_BLOCK", "LONG",
+                    f"BTC fast K-D={_btc_fast_margin:.1f}"))
             if _btc_fast_margin > 15:
                 _regime_block_short = True
                 log.info(f"[FAST_STOCH_BLOCK] BTC fast K-D={_btc_fast_margin:.1f} → SHORT entries blocked")
+                asyncio.create_task(_log_gate("HL", "BTC", "FAST_STOCH_BLOCK", "SHORT",
+                    f"BTC fast K-D={_btc_fast_margin:.1f}"))
             # ── Component B: Adverse cluster directional halt ─────────────────────
             if len(_adverse_cluster.get("long",  [])) >= 3: _regime_block_long  = True
             if len(_adverse_cluster.get("short", [])) >= 3: _regime_block_short = True
@@ -439,7 +468,10 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             for direction in ("SHORT", "LONG"):
                 key = f"{symbol}{direction}"
 
-                if get_cooldown_remaining(symbol, direction) > 0:
+                _cd = get_cooldown_remaining(symbol, direction)
+                if _cd > 0:
+                    asyncio.create_task(_log_gate("HL", symbol, "COOLDOWN", direction,
+                        f"cooldown {_cd:.0f}s remaining"))
                     continue
 
                 if direction == "SHORT":
@@ -500,11 +532,25 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                 if score >= 4:
                     log.info(f"[SCORE] {symbol} {direction} gates=PASS score={score} {log_gates}")
                 else:
+                    if adx1h < ADX_MIN:
+                        asyncio.create_task(_log_gate("HL", symbol, "ADX_GATE", direction,
+                            f"ADX {adx1h:.1f} < ADX_MIN {ADX_MIN}"))
+                    elif direction == "SHORT" and not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN):
+                        asyncio.create_task(_log_gate("HL", symbol, "J1H_GATE", direction,
+                            f"j1h={j1h:.1f} j15m={j15m:.1f}"))
+                    elif direction == "LONG" and not (j15m < J15M_LONG_GATE and j1h < J1H_LONG_MAX):
+                        asyncio.create_task(_log_gate("HL", symbol, "J1H_GATE", direction,
+                            f"j1h={j1h:.1f} j15m={j15m:.1f}"))
+                    else:
+                        asyncio.create_task(_log_gate("HL", symbol, "STOCH_BLOCK", direction,
+                            f"stoch_k={stoch_k:.1f} stoch_d={stoch_d:.1f}"))
                     continue
 
 
                 if adx1h > ADX_FADE_MAX:
                     log.info(f"[SKIP] {symbol} {direction} adx={adx1h:.1f} exceeds fade max {ADX_FADE_MAX} — trend too strong to fade")
+                    asyncio.create_task(_log_gate("HL", symbol, "ADX_FADE", direction,
+                        f"ADX {adx1h:.1f} > ADX_FADE_MAX {ADX_FADE_MAX}"))
                     continue
 
                 # Compute SL / TP prices (HC score-10: 2.5R TP1, 3.5R TP2)
