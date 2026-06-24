@@ -1912,7 +1912,7 @@ async def _exit_monitor_loop():
                         _do_partial_close_tp1(key, trade, current)
                         continue
 
-                # ── NEAR_USDT peak-decay real exit (Sentinel) ─────────────────
+                # ── fleet-wide Sentinel (PEAK_DECAY_20) ───────────────────────
                 _session      = get_session_name()
                 _sentinel_min = SENTINEL_MIN_PEAK_USD.get(
                     (sym, _session), SENTINEL_MIN_PEAK_USD_DEFAULT)
