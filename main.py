@@ -1410,6 +1410,17 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
             print(f"[CLUSTER_HALT] {_dir_key.upper()} entries halted"
                   f" — {len(_scanner_mod._adverse_cluster[_dir_key])} adverse exits"
                   f" in 10min window")
+        _now_cd  = datetime.now(timezone.utc)
+        _recent_5min = [t for t in _scanner_mod._adverse_cluster[_dir_key]
+                        if (_now_cd - t).total_seconds() < 300]
+        if len(_recent_5min) >= 2:
+            _scanner_mod._adverse_cooldown_until[_dir_key] = _now_cd + timedelta(minutes=15)
+            print(f"[COOLDOWN_15] {_dir_key.upper()} cooled 15min")
+        else:
+            _cur_cd = _scanner_mod._adverse_cooldown_until.get(_dir_key)
+            if _cur_cd is None or _now_cd >= _cur_cd:
+                _scanner_mod._adverse_cooldown_until[_dir_key] = _now_cd + timedelta(minutes=3)
+                print(f"[COOLDOWN_3] {_dir_key.upper()} cooled 3min")
 
     _append_trade_log(trade, exit_price, reason, pnl, r)
     _update_daily_pnl(pnl)
