@@ -8,7 +8,7 @@ from config import (
     PAIRS, J15M_SHORT_GATE, J15M_LONG_GATE, J1H_SHORT_MIN, J1H_SHORT_MAX, J1H_LONG_MAX, J1H_LONG_MIN,
     RSI15M_SHORT_MIN, RSI15M_LONG_MAX, DEPTH_GATE_PCT, ATR_SL_MULTIPLIER,
     TP1_R, TP2_R, LEVERAGE_HIGH, LEVERAGE_MID, LEVERAGE_LOW,
-    COOLDOWN_SECONDS, ADX_FADE_MAX, PAPER_MODE, CONSECUTIVE_LOSS_STOP,
+    COOLDOWN_SECONDS, ADX_FADE_MAX, ADX_MIN, PAPER_MODE, CONSECUTIVE_LOSS_STOP,
     MIN_SL_PCT, MIN_SL_PCT_DEFAULT, MARGIN_PER_TRADE,
 )
 
@@ -213,7 +213,7 @@ def score_bounce_short(j15m, j1h, rsi15m, ask_pct, adx,
     tier, lev = _leverage_tier(adx)
     stoch_gate = stoch_k > 75 and stoch_k < stoch_d and stoch_k_prev >= stoch_d_prev
     if not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN and j1h <= J1H_SHORT_MAX
-            and stoch_gate and ask_pct >= DEPTH_GATE_PCT):
+            and stoch_gate and ask_pct >= DEPTH_GATE_PCT and adx >= ADX_MIN):
         return 0, tier, lev
     score = 4
     if j5m  > 80:              score += 2
@@ -231,7 +231,7 @@ def score_bounce_long(j15m, j1h, rsi15m, bid_pct, adx,
     tier, lev = _leverage_tier(adx)
     stoch_gate = stoch_k < 25 and stoch_k > stoch_d and stoch_k_prev <= stoch_d_prev
     if not (j15m < J15M_LONG_GATE and j1h < J1H_LONG_MAX and j1h >= J1H_LONG_MIN
-            and stoch_gate and bid_pct >= DEPTH_GATE_PCT):
+            and stoch_gate and bid_pct >= DEPTH_GATE_PCT and adx >= ADX_MIN):
         return 0, tier, lev
     score = 4
     if j5m  < 20:              score += 2
