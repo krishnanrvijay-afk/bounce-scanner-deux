@@ -2947,7 +2947,6 @@ async function cfgFetch() {
     document.getElementById('cfg-j15m-os').value    = d.j15m_short_gate ?? 80;
     document.getElementById('cfg-j15m-ob').value    = d.j15m_long_gate ?? 20;
     document.getElementById('cfg-j1h-os').value     = d.j1h_short_min ?? 60;
-    document.getElementById('cfg-j1h-ob').value     = d.j1h_long_max ?? 40;
     cfgUpdatePaperLabel();
     cfgUpdateTgLabel();
     cfgFetchIdentity();
@@ -2982,7 +2981,6 @@ async function cfgSave() {
     j15m_short_gate:       Number(document.getElementById('cfg-j15m-os').value),
     j15m_long_gate:        Number(document.getElementById('cfg-j15m-ob').value),
     j1h_short_min:         Number(document.getElementById('cfg-j1h-os').value),
-    j1h_long_max:          Number(document.getElementById('cfg-j1h-ob').value),
   };
   try {
     var r = await fetch('/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
