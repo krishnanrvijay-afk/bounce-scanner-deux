@@ -485,8 +485,8 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     g_depth = ask_pct >= DEPTH_GATE_PCT
                     score, tier, lev = score_bounce_short(
                         j15m, j1h, rsi15m, ask_pct, adx1h, j5m=j5m, trend=trend,
-                        stoch_k=stoch_k, stoch_d=stoch_d,
-                        stoch_k_prev=stoch_k_prev, stoch_d_prev=stoch_d_prev)
+                        stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
+                        stoch_k_prev=stoch_k_prev_fast, stoch_d_prev=stoch_d_prev_fast)
                     log_gates = (f"j15m={j15m:.1f}(need>{J15M_SHORT_GATE}) "
                                  f"j1h={j1h:.1f}(need>{J1H_SHORT_MIN}) "
                                  f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need>75,k<d) "
@@ -502,8 +502,8 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     g_depth = bid_pct >= DEPTH_GATE_PCT
                     score, tier, lev = score_bounce_long(
                         j15m, j1h, rsi15m, bid_pct, adx1h, j5m=j5m, trend=trend,
-                        stoch_k=stoch_k, stoch_d=stoch_d,
-                        stoch_k_prev=stoch_k_prev, stoch_d_prev=stoch_d_prev)
+                        stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
+                        stoch_k_prev=stoch_k_prev_fast, stoch_d_prev=stoch_d_prev_fast)
                     log_gates = (f"j15m={j15m:.1f}(need<{J15M_LONG_GATE}) "
                                  f"j1h={j1h:.1f}(need<{J1H_LONG_MAX}) "
                                  f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need<25,k>d) "
@@ -598,6 +598,8 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     "rsi15m":       round(rsi15m, 2),
                     "stoch_k":      round(stoch_k, 2),
                     "stoch_d":      round(stoch_d, 2),
+                    "stoch_k_entry": round(stoch_k_fast, 2),
+                    "stoch_d_entry": round(stoch_d_fast, 2),
                     "rsi1h":        round(rsi1h, 2),
                     "atr15m":       round(atr15m, 6),
                     "adx1h":        round(adx1h, 2),
