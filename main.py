@@ -288,6 +288,7 @@ def _save_state():
             "consecutive_losses":     consecutive_losses,
             "circuit_breaker_active": circuit_breaker_active,
             "cooldowns":              dict(_scanner_mod._cooldowns),
+            "cooldown_seconds":       _scanner_mod.COOLDOWN_SECONDS,
             "peak_shadow":            dict(_peak_shadow),
             "adverse_shadow":         dict(_adverse_shadow),
             "signal_shadow":          dict(_signal_shadow),
@@ -402,6 +403,8 @@ def _load_state():
                 print(f"[RESTORE] cooldown {key} expired — dropped")
         if dropped:
             print(f"[RESTORE] {dropped} expired cooldown(s) dropped")
+        if "cooldown_seconds" in data and data["cooldown_seconds"] is not None:
+            _scanner_mod.COOLDOWN_SECONDS = int(data["cooldown_seconds"])
 
         # -- Sanitize phantom trade-log entries (null/zero exit_price or |R| > 10) --
         _keep_log = []
@@ -2546,6 +2549,14 @@ async def post_settings(request: Request):
         TELEGRAM_ENABLED = bool(body["telegram_enabled"])
     if "cooldown_seconds" in body:
         _scanner_mod.COOLDOWN_SECONDS = int(body["cooldown_seconds"])
+        _sb = _get_supabase()
+        if _sb is not None:
+            try:
+                _sb.table("hl_scanner_state").update(
+                    {"cooldown_seconds": _scanner_mod.COOLDOWN_SECONDS}
+                ).eq("id", 1).execute()
+            except Exception:
+                pass
     if "depth_gate_pct" in body:
         _scanner_mod.DEPTH_GATE_PCT = float(body["depth_gate_pct"])
     if "adx_fade_max" in body:
