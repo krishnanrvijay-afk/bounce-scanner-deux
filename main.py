@@ -2539,7 +2539,6 @@ async def get_settings():
         "j15m_short_gate":       _scanner_mod.J15M_SHORT_GATE,
         "j15m_long_gate":        _scanner_mod.J15M_LONG_GATE,
         "j1h_short_min":         _scanner_mod.J1H_SHORT_MIN,
-        "j1h_long_max":          _scanner_mod.J1H_LONG_MAX,
     }
 
 
@@ -2581,8 +2580,6 @@ async def post_settings(request: Request):
         _scanner_mod.J15M_LONG_GATE = float(body["j15m_long_gate"])
     if "j1h_short_min" in body:
         _scanner_mod.J1H_SHORT_MIN = float(body["j1h_short_min"])
-    if "j1h_long_max" in body:
-        _scanner_mod.J1H_LONG_MAX = float(body["j1h_long_max"])
     return await get_settings()
 
 
