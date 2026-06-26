@@ -1976,17 +1976,17 @@ async def _exit_monitor_loop():
                         if is_short:
                             _do_close_trade(key, trade, current, "PEAK_DECAY_20")
                             continue
-                        # LONG: PEAK_DECAY suppressed except ANCHORS
-                        if sym in _anchor_pairs:
-                            _anchor_decay = 0.90
-                            if _cpnl < _sh["peak_pnl_usd"] * _anchor_decay:
-                                print(f"[PEAK_DECAY_10] {sym} LONG "
-                                      f"peak={_sh['peak_pnl_usd']:.2f} "
-                                      f"cpnl={_cpnl:.2f} -- "
-                                      f"anchor 10pct decay, exiting")
-                                _do_close_trade(key, trade, current,
-                                                "PEAK_DECAY_10")
-                                continue
+                    # LONG: PEAK_DECAY suppressed except ANCHORS (10% decay)
+                    if not is_short and sym in _anchor_pairs:
+                        _anchor_decay = 0.90
+                        if _cpnl < _sh["peak_pnl_usd"] * _anchor_decay:
+                            print(f"[PEAK_DECAY_10] {sym} LONG "
+                                  f"peak={_sh['peak_pnl_usd']:.2f} "
+                                  f"cpnl={_cpnl:.2f} -- "
+                                  f"anchor 10pct decay, exiting")
+                            _do_close_trade(key, trade, current,
+                                            "PEAK_DECAY_10")
+                            continue
 
                 # ── TRAILBLAZER: ATR trailing stop after tp1_hit ──────────────
                 if tp1_hit:
