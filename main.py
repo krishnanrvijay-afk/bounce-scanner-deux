@@ -1669,6 +1669,14 @@ async def _exit_monitor_loop():
                           f"never started, cutting")
                     _do_close_trade(key, trade, current, "DOA_CUT")
                     continue
+                # -- BE_CUT: was profitable, now at zero or below
+                if _mfe_pnl >= 10.0 and _cpnl <= 0.0:
+                    print(f"[BE_CUT] {sym} {direction} "
+                          f"mfe={_mfe_pnl:.2f} "
+                          f"cpnl={_cpnl:.2f} -- "
+                          f"was profitable, now zero, cutting")
+                    _do_close_trade(key, trade, current, "BE_CUT")
+                    continue
                 if _adv_pnl <= -_cut_usd and _mfe_pnl < 10.0:
                     print(f"[ADVERSE_CUT] {sym} {direction} adv_pnl={_adv_pnl:.2f} cut={_cut_usd} mfe={_mfe_pnl:.2f} — closing")
                     _do_close_trade(key, trade, current, "ADVERSE_CUT")
