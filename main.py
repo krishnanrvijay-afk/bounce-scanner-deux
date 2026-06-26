@@ -1669,6 +1669,13 @@ async def _exit_monitor_loop():
                           f"never started, cutting")
                     _do_close_trade(key, trade, current, "DOA_CUT")
                     continue
+                # -- MFE fade: trade peaked above $5 but fully reversed to zero or below
+                if _mfe_pnl >= 5.0 and _cpnl <= 0.0:
+                    print(f"[MFE_FADE_CUT] {sym} {direction} "
+                          f"mfe={_mfe_pnl:.2f} cpnl={_cpnl:.2f} -- "
+                          f"peaked but returned, cutting")
+                    _do_close_trade(key, trade, current, "MFE_FADE_CUT")
+                    continue
                 if _adv_pnl <= -_cut_usd and _mfe_pnl < 10.0:
                     print(f"[ADVERSE_CUT] {sym} {direction} adv_pnl={_adv_pnl:.2f} cut={_cut_usd} mfe={_mfe_pnl:.2f} — closing")
                     _do_close_trade(key, trade, current, "ADVERSE_CUT")
