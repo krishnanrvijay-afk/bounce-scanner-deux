@@ -1661,11 +1661,13 @@ async def _exit_monitor_loop():
                 _adv_pnl    = ((_adv_price - _entry) * _size) if not is_short else ((_entry - _adv_price) * _size)
                 _mfe_pnl    = ((_ext_price - _entry) * _size) if not is_short else ((_entry - _ext_price) * _size)
                 _cut_usd    = ADVERSE_CUT_USD.get(sym, ADVERSE_CUT_DEFAULT_USD)
-                # -- Dead on arrival: price never confirmed direction
-                if _mfe_pnl <= 1.0 and _adv_pnl <= -(_cut_usd * 0.40):
-                    print(f"[ADVERSE_CUT] {sym} {direction} DEAD_ON_ARRIVAL "
-                          f"adv={_adv_pnl:.2f} mfe={_mfe_pnl:.2f} -- closing")
-                    _do_close_trade(key, trade, current, "ADVERSE_CUT")
+                # -- Dead on arrival: trade never moved >$1 favorably AND PnL at/below zero
+                if _mfe_pnl <= 1.0 and _cpnl <= 0.0:
+                    print(f"[DOA_CUT] {sym} {direction} "
+                          f"mfe={_mfe_pnl:.2f} "
+                          f"cpnl={_cpnl:.2f} -- "
+                          f"never started, cutting")
+                    _do_close_trade(key, trade, current, "DOA_CUT")
                     continue
                 if _adv_pnl <= -_cut_usd and _mfe_pnl < 10.0:
                     print(f"[ADVERSE_CUT] {sym} {direction} adv_pnl={_adv_pnl:.2f} cut={_cut_usd} mfe={_mfe_pnl:.2f} — closing")
