@@ -51,12 +51,15 @@ _btc_flash_tg_pending = [False]                                 # set True when 
 _cooldowns:   dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" → expiry ts
 _scan_count:  int              = 0
 _stale_prices: set[str]        = set()  # symbols with 2 consecutive missing prices
+_stale_counts: dict             = {}     # consecutive no-price count per symbol
 _btc_j1h: float = 50.0   # cached BTC J1H — updated each scan when BTC is processed
 
 BTC_CORRELATION: dict[str, float] = {
     "ETH": 0.94, "SOL": 0.86, "XRP": 0.84, "DOGE": 0.87,
     "LINK": 0.82, "AVAX": 0.80, "SUI": 0.82, "NEAR": 0.78,
     "WIF": 0.65, "HYPE": 0.50, "ZEC": 0.40,
+    "@107": 0.50,  # HYPE perp on HL
+    "@8":   0.40,  # ZEC perp on HL
 }
 
 
@@ -234,7 +237,7 @@ def _leverage_tier(adx: float) -> tuple[str, int]:
     return "REGULAR", LEVERAGE_LOW
 
 
-def score_bounce_short(j15m, j1h, rsi15m, ask_pct, adx,
+def score_bounce_short(j15m, j1h, ask_pct, adx,
                        j5m: float = 50.0, trend: str = "Neutral",
                        stoch_k: float = 50.0, stoch_d: float = 50.0,
                        stoch_k_prev: float = 50.0, stoch_d_prev: float = 50.0) -> tuple[int, str, int]:
@@ -252,7 +255,7 @@ def score_bounce_short(j15m, j1h, rsi15m, ask_pct, adx,
     return score, tier, lev
 
 
-def score_bounce_long(j15m, j1h, rsi15m, bid_pct, adx,
+def score_bounce_long(j15m, j1h, bid_pct, adx,
                       j5m: float = 50.0, trend: str = "Neutral",
                       stoch_k: float = 50.0, stoch_d: float = 50.0,
                       stoch_k_prev: float = 50.0, stoch_d_prev: float = 50.0) -> tuple[int, str, int]:
@@ -379,16 +382,20 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             candles_5m, candles_15m, candles_1h, book, price = await _fetch_pair_data(hl_client, symbol)
 
             if not price or price == 0:
-                log.warning(f"[SCAN] {symbol} — no price, retrying in 2s...")
-                await asyncio.sleep(2)
-                price = await hl_client.get_price(symbol)
-                if not price or price == 0:
-                    log.warning(f"[PRICE STALE] {symbol} — two consecutive no price responses")
+                _stale_counts[symbol] = \
+                    _stale_counts.get(symbol, 0) + 1
+                if _stale_counts[symbol] >= 5:
+                    log.warning(f"[PRICE STALE] {symbol} - "
+                        f"{_stale_counts[symbol]} consecutive "
+                        f"scans with no price")
                     _stale_prices.add(symbol)
-                    continue
-                _stale_prices.discard(symbol)
-            else:
-                _stale_prices.discard(symbol)
+                else:
+                    log.warning(f"[PRICE STALE] {symbol} - "
+                        f"{_stale_counts[symbol]}/5 "
+                        f"consecutive no-price scans")
+                continue
+            _stale_counts[symbol] = 0
+            _stale_prices.discard(symbol)
 
             # ── Indicators ────────────────────────────────────────────────────
             _, _, j5m  = _compute_kdj(candles_5m)
@@ -516,7 +523,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
 
                     g_depth = ask_pct >= DEPTH_GATE_PCT
                     score, tier, lev = score_bounce_short(
-                        j15m, j1h, rsi15m, ask_pct, adx1h, j5m=j5m, trend=trend,
+                        j15m, j1h, ask_pct, adx1h, j5m=j5m, trend=trend,
                         stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
                         stoch_k_prev=stoch_k_prev_fast, stoch_d_prev=stoch_d_prev_fast)
                     log_gates = (f"j15m={j15m:.1f}(need>{J15M_SHORT_GATE}) "
@@ -533,21 +540,13 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
 
                     g_depth = bid_pct >= DEPTH_GATE_PCT
                     score, tier, lev = score_bounce_long(
-                        j15m, j1h, rsi15m, bid_pct, adx1h, j5m=j5m, trend=trend,
+                        j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
                         stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
                         stoch_k_prev=stoch_k_prev_fast, stoch_d_prev=stoch_d_prev_fast)
                     log_gates = (f"j15m={j15m:.1f}(need<{J15M_LONG_GATE}) "
                                  f"j1h={j1h:.1f}(need>={J1H_LONG_MIN}) "
                                  f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need<25,k>d) "
                                  f"bid={bid_pct:.1f}%(need>={DEPTH_GATE_PCT}%)")
-
-                if symbol == "ZEC":
-                    if direction == "SHORT" and j1h > 60 and adx1h > 35:
-                        log.info(f"[ZEC GATE] ZEC SHORT blocked -- J1H={j1h:.1f} > 60 AND ADX={adx1h:.1f} > 35")
-                        continue
-                    if direction == "LONG" and j1h < 40 and adx1h > 35:
-                        log.info(f"[ZEC GATE] ZEC LONG blocked -- J1H={j1h:.1f} < 40 AND ADX={adx1h:.1f} > 35")
-                        continue
 
                 # ── GATE3 log — every scan when >= 3 of 4 gates pass ────────────
                 _gate_list  = [g_j15m, g_j1h, g_stoch, g_depth]
@@ -707,11 +706,11 @@ async def scan_pair_state(hl_client) -> list[dict]:
             bid_pct, ask_pct = _depth_pcts(book)
 
             short_score, short_tier, short_lev = score_bounce_short(
-                j15m, j1h, rsi15m, ask_pct, adx1h, j5m=j5m, trend=trend,
+                j15m, j1h, ask_pct, adx1h, j5m=j5m, trend=trend,
                 stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
                 stoch_k_prev=stoch_k_prev_fast, stoch_d_prev=stoch_d_prev_fast)
             long_score,  long_tier,  long_lev  = score_bounce_long(
-                j15m, j1h, rsi15m, bid_pct, adx1h, j5m=j5m, trend=trend,
+                j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
                 stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
                 stoch_k_prev=stoch_k_prev_fast, stoch_d_prev=stoch_d_prev_fast)
 
