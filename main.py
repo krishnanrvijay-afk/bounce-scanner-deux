@@ -740,14 +740,47 @@ async def _do_open_trade(
                 "bot_instance_id": BOT_INSTANCE_ID,
             }).execute()
         except Exception as _lock_e:
-            _msg = (
-                f"\u26a0 DUPLICATE BLOCKED: {symbol} {direction} on {exchange} "
-                f"(bot: {BOT_INSTANCE_ID}) \u2014 another process already opened this signal"
+            _err_str = str(_lock_e).lower()
+            _is_duplicate = (
+                "duplicate" in _err_str or
+                "unique" in _err_str or
+                "conflict" in _err_str or
+                "23505" in _err_str
             )
-            if TELEGRAM_ENABLED:
-                threading.Thread(target=lambda m=_msg: _tg_post(m), daemon=True).start()
-            print(f"[LOCK CONFLICT] {lock_key} -- blocked duplicate open: {_lock_e}")
-            return None, "already_open"
+            if _is_duplicate:
+                _msg = (
+                    f"\u26a0 DUPLICATE BLOCKED: "
+                    f"{symbol} {direction} - "
+                    f"signal already open"
+                )
+            else:
+                _msg = (
+                    f"\u26a0 LOCK ERROR: "
+                    f"{symbol} {direction} - "
+                    f"Supabase unavailable, "
+                    f"allowing trade: {_lock_e}"
+                )
+                if TELEGRAM_ENABLED:
+                    threading.Thread(
+                        target=lambda m=_msg: _tg_post(m),
+                        daemon=True
+                    ).start()
+                print(f"[LOCK ERROR] {lock_key} - "
+                      f"infrastructure failure, "
+                      f"proceeding: {_lock_e}")
+                # Infrastructure failure - do not block
+                # the trade, just skip the lock
+                lock_key = None
+                # fall through to trade open
+            if _is_duplicate:
+                if TELEGRAM_ENABLED:
+                    threading.Thread(
+                        target=lambda m=_msg: _tg_post(m),
+                        daemon=True
+                    ).start()
+                print(f"[LOCK CONFLICT] {lock_key} - "
+                      f"blocked duplicate open: {_lock_e}")
+                return None, "already_open"
 
     _client = mexc_client if exchange == "MEXC" else hl_client
     sl_price = alert_data.get("sl_price") if alert_data else None
