@@ -94,7 +94,6 @@ circuit_breaker_active: bool  = False
 daily_pnl:              float = 0.0
 trading_halted_today:   bool  = False
 _last_midnight_day:     int   = datetime.now(ET).day
-_btc_flash_tg_expiry_sent = [None]  # mutable: last flash expiry for which TG was sent
 
 
 # ── App state ─────────────────────────────────────────────────────────────────
@@ -986,6 +985,17 @@ async def _scan_loop():
     while True:
         try:
             new_alerts = await run_full_scan(hl_client, market_health=app_state.market_health)
+            # -- BTC flash TG alert -- fires once per flash event when block arms --------
+            if _scanner_mod._btc_flash_tg_pending[0]:
+                _scanner_mod._btc_flash_tg_pending[0] = False
+                if TELEGRAM_ENABLED:
+                    _flash_tg = (
+                        "BTC FLASH CRASH DETECTED\n"
+                        f"Session: {get_session_name()}\n"
+                        "ALL LONG ENTRIES BLOCKED 5 MINUTES")
+                    threading.Thread(
+                        target=lambda m=_flash_tg: _tg_post(m),
+                        daemon=True).start()
             _check_stale_prices()
             # Session change detection — reset per-pair session halts when session rolls
             global _prev_session
@@ -1622,34 +1632,6 @@ async def _exit_monitor_loop():
     """Runs every PRICE_INTERVAL_SECONDS. Checks every open trade against SL/TP."""
     while True:
         try:
-            # -- BTC flash: force-close open LONGs -------------------------
-            _fbu = _scanner_mod._btc_flash_block_until.get("long")
-            if _fbu and datetime.now(timezone.utc) < _fbu:
-                if _fbu != _btc_flash_tg_expiry_sent[0]:
-                    _btc_flash_tg_expiry_sent[0] = _fbu
-                    _flash_msg = (
-                        "BTC FLASH CRASH DETECTED\n"
-                        f"Session: {get_session_name()}\n"
-                        "ALL LONG ENTRIES BLOCKED 5 MINUTES\n"
-                        "OPEN LONGS BEING FORCE-CLOSED")
-                    if TELEGRAM_ENABLED:
-                        threading.Thread(
-                            target=lambda m=_flash_msg: _tg_post(m),
-                            daemon=True).start()
-                for _fkey, _ftrade in list(app_state.open_trades.items()):
-                    if (_ftrade.get("direction") == "LONG"
-                            and _fkey not in _scanner_mod._flash_closed):
-                        _fsym = _ftrade.get("symbol", "")
-                        _fpx  = app_state.prices.get(_fsym)
-                        if _fpx:
-                            print(f"[BTC_FLASH_CLOSE] force-closing LONG "
-                                  f"{_fsym} @ {_fpx}")
-                            _scanner_mod._flash_closed.add(_fkey)
-                            _do_close_trade(_fkey, _ftrade, _fpx,
-                                            "BTC_FLASH_CLOSE")
-            elif not _fbu:
-                _scanner_mod._flash_closed.clear()
-                _btc_flash_tg_expiry_sent[0] = None
             for key, trade in list(app_state.open_trades.items()):
                 sym       = trade["symbol"]
                 direction = trade["direction"]
