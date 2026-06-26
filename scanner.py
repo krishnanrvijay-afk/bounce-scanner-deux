@@ -47,6 +47,7 @@ _adverse_cluster: dict = {"long": [], "short": []}  # rolling adverse exit times
 _adverse_cooldown_until: dict = {"long": None, "short": None}  # graduated adverse cooldown expiry per direction
 _btc_flash_block_until: dict = {"long": None}                  # expiry for BTC 1m flash crash LONG block
 _flash_closed: set = set()                                      # trade keys already force-closed this flash event
+_btc_flash_tg_pending = [False]                                 # set True when flash arms; cleared in main.py after TG sent
 _cooldowns:   dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" → expiry ts
 _scan_count:  int              = 0
 _stale_prices: set[str]        = set()  # symbols with 2 consecutive missing prices
@@ -471,6 +472,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                         _btc_flash_block_until["long"] = (
                             datetime.now(timezone.utc) + timedelta(minutes=5))
                         _flash_closed.clear()
+                        _btc_flash_tg_pending[0] = True
                         _regime_block_long = True
                         asyncio.create_task(_log_gate(
                             "HL", _btc_sym, "BTC_FLASH_BLOCK", "LONG",
