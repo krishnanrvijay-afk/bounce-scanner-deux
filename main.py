@@ -762,6 +762,20 @@ async def _do_open_trade(
         print(f"[TRADE BLOCKED] {symbol} {direction} null price rejected")
         return None, "null_price"
 
+    if not sl_price or sl_price <= 0:
+        print(f"[OPEN BLOCKED] {symbol} {direction} "
+              f"sl_price invalid: {sl_price} - "
+              f"refusing to open without valid SL")
+        if lock_key and _sb:
+            try:
+                _sb.table("trade_open_locks")\
+                   .delete()\
+                   .eq("lock_key", lock_key)\
+                   .execute()
+            except Exception:
+                pass
+        return None, "invalid_sl"
+
     size = result.get("size", (margin_usdc * leverage) / entry if entry else 0)
 
     trade = {
@@ -776,9 +790,12 @@ async def _do_open_trade(
         "paper":      result.get("paper", True),
         "exchange":   exchange,
         "sl_price":   alert_data.get("sl_price")  if alert_data else None,
-        "sl_dist":    ((alert_data.get("sl_dist") or
-                        abs(entry - (alert_data.get("sl_price") or entry)))
-                       if alert_data else None),
+        "sl_dist": (
+            max(
+                abs(entry - sl_price),
+                entry * 0.001
+            ) if sl_price else None
+        ),
         "tp1_price":  alert_data.get("tp1_price") if alert_data else None,
         "tp2_price":  alert_data.get("tp2_price") if alert_data else None,
         "score":      alert_data.get("score")     if alert_data else None,
@@ -797,8 +814,8 @@ async def _do_open_trade(
         "is_score10":    alert_data.get("is_score10", False) if alert_data else False,
         "partial_price": alert_data.get("partial_price")     if alert_data else None,
         "session":       alert_data.get("session", "")       if alert_data else "",
-        "extreme_price": None,
-        "adverse_price": None,
+        "extreme_price": entry,
+        "adverse_price": entry,
         "chg24h":        alert_data.get("chg24h") if alert_data else None,
         "_lock_key":     lock_key,
         "btc_regime_entry":  _get_btc_regime(),
