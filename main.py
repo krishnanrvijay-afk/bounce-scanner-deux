@@ -37,7 +37,7 @@ from config import (
     MARGIN_PER_TRADE, MARGIN_HARD_CAP, PAPER_MODE, LIVE_MANUAL_ENTRY_ONLY,
     CONSECUTIVE_LOSS_STOP, DAILY_LOSS_LIMIT, TP1_R, TP2_R, TP1_CLOSE_PCT, TRAIL_ATR_MULTIPLIER,
     SUPABASE_URL, SUPABASE_KEY,
-    SENTINEL_MIN_PEAK_USD, SENTINEL_MIN_PEAK_USD_DEFAULT,
+    SENTINEL_MIN_PEAK_PCT, SENTINEL_MIN_PEAK_PCT_DEFAULT,
 )
 from supabase import create_client, Client
 from hl_client import HLClient
@@ -2059,8 +2059,12 @@ async def _exit_monitor_loop():
 
                 # Ã¢ÂÂÃ¢ÂÂ fleet-wide Sentinel (PEAK_DECAY_20) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
                 _session      = get_session_name()
-                _sentinel_min = SENTINEL_MIN_PEAK_USD.get(
-                    (sym, _session), SENTINEL_MIN_PEAK_USD_DEFAULT)
+                _sentinel_pct = SENTINEL_MIN_PEAK_PCT.get(
+                    (sym, _session), SENTINEL_MIN_PEAK_PCT_DEFAULT)
+                _notional = (
+                    trade.get("margin", 2000)
+                    * trade.get("leverage", 5))
+                _sentinel_min = _notional * _sentinel_pct
                 if not tp1_hit and _sh["be_armed"] and _sh["peak_pnl_usd"] >= _sentinel_min:
                     _decay_threshold = 0.70 if sym in ("@107",) else 0.80
                     if _cpnl < _sh["peak_pnl_usd"] * _decay_threshold:
