@@ -7,6 +7,7 @@ import os as _os
 
 from config import (
     PAIRS, J15M_SHORT_GATE, J15M_LONG_GATE, J1H_SHORT_MIN, J1H_SHORT_MAX, J1H_LONG_MIN,
+    BTC_J1H_LONG_MAX, BTC_J1H_SHORT_MAX,
     RSI15M_SHORT_MIN, RSI15M_LONG_MAX, DEPTH_GATE_PCT, ATR_SL_MULTIPLIER,
     TP1_R, TP2_R, LEVERAGE_HIGH, LEVERAGE_MID, LEVERAGE_LOW,
     ADX_MIN_LONG, ADX_MIN_SHORT, PAPER_MODE, CONSECUTIVE_LOSS_STOP,
@@ -260,7 +261,6 @@ def score_bounce_long(j15m, j1h, bid_pct, adx,
     tier, lev = _leverage_tier(adx)
     stoch_gate = stoch_k < 25 and stoch_k > stoch_d and stoch_k_prev <= stoch_d_prev
     if not (j15m < J15M_LONG_GATE and j1h >= J1H_LONG_MIN
-            and j1h < J1H_LONG_MAX
             and stoch_gate and bid_pct >= DEPTH_GATE_PCT and adx >= ADX_MIN_LONG):
         return 0, tier, lev
     score = 4
@@ -437,9 +437,9 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             _regime_block_short = False
             _regime_block_long  = False
             if _pair_corr >= 0.65:
-                if _btc_j1h >= 60:
+                if _btc_j1h > BTC_J1H_LONG_MAX:
                     _regime_block_long  = True
-                if _btc_j1h >= 90:
+                if _btc_j1h >= BTC_J1H_SHORT_MAX:
                     _regime_block_short = True
 
             # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Component A: BTC fast stoch flash detector ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
