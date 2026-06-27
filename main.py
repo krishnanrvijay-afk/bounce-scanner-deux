@@ -2750,12 +2750,15 @@ async def post_settings(request: Request):
                 "consecutive_loss_stop":
                     CONSECUTIVE_LOSS_STOP,
             }
+            _settings_payload["id"] = 1
             _sb.table("hl_scanner_state")\
                .upsert(_settings_payload)\
-               .eq("id", 1).execute()
+               .execute()
         except Exception as _e:
             print(f"[SETTINGS] Supabase "
                   f"save failed: {_e}")
+            import traceback
+            traceback.print_exc()
 
     return await get_settings()
 
