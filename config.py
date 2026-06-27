@@ -29,18 +29,6 @@ J1H_SHORT_MIN    = 60
 J1H_SHORT_MAX    = 89   # Real trading ceiling — data: SHORT J1H 90-100 65.5% WR -$1,513
 J1H_LONG_MIN     = 0    # Bounds validator — guards negative J1H calculation edge cases. Not a trading gate.
 J1H_LONG_MAX     = 59   # No longer used as score gate — may be re-enabled via settings
-BTC_J1H_LONG_MAX  = 70
-# BTC regime gate — blocks ALL LONGs
-# when BTC J1H >= this value.
-# Lowered from 70 to 60 June 26 — too
-# aggressive, starved LONG signals.
-# Reverted to 70 June 27.
-
-BTC_J1H_SHORT_MAX = 90
-# BTC regime gate — blocks ALL SHORTs
-# when BTC J1H >= this value.
-# Data: SHORT J1H 90-100 65.5% WR
-# -$1,513.
 
 RSI15M_SHORT_MIN = 60
 RSI15M_LONG_MAX  = 40
