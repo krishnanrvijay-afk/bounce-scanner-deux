@@ -91,3 +91,11 @@ SENTINEL_MIN_PEAK_USD: dict = {
     ("ADA",   "ASIA"): 18.00, ("ADA",   "EU"): 30.00, ("ADA",   "US"): 23.00,
 }
 SENTINEL_MIN_PEAK_USD_DEFAULT: float = 18.00  # ASIA-safe default
+
+KILL_COOLDOWN_SECONDS: int = 1800
+# Post-KILL cooldown -- blocks re-entry
+# on same pair same direction for this
+# many seconds after a KILL exit.
+# Evidence: every re-entry within 30
+# min of a KILL was wrong in 11-trade
+# sample June 27.
