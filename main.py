@@ -2077,8 +2077,8 @@ async def _exit_monitor_loop():
                         if is_short:
                             _do_close_trade(key, trade, current, "PEAK_DECAY_20")
                             continue
-                    # LONG: PEAK_DECAY suppressed except ANCHORS (10% decay)
-                    if not is_short and sym in _anchor_pairs:
+                    # LONG: PEAK_DECAY_10 on all pairs
+                    if not is_short:
                         _anchor_decay = 0.90
                         if _cpnl < _sh["peak_pnl_usd"] * _anchor_decay:
                             print(f"[PEAK_DECAY_10] {sym} LONG "
