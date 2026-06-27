@@ -500,6 +500,10 @@ function buildCard(p, alerts, trades, changes) {
   const stochD     = p.stoch_d      || 0;
   const stochKPrev = p.stoch_k_prev != null ? +p.stoch_k_prev : stochK;
   const stochDPrev = p.stoch_d_prev != null ? +p.stoch_d_prev : stochD;
+  const kf    = +(p.stoch_k_fast      || 0);
+  const df    = +(p.stoch_d_fast      || 0);
+  const kfp   = +(p.stoch_k_prev_fast != null ? p.stoch_k_prev_fast : kf);
+  const dfp   = +(p.stoch_d_prev_fast != null ? p.stoch_d_prev_fast : df);
   const bidPct = p.bid_pct || 0;
   const askPct = p.ask_pct || 0;
   const adx1h  = p.adx1h   || 0;
@@ -522,8 +526,18 @@ function buildCard(p, alerts, trades, changes) {
 
   // Gate counts — (1) guard zero-init false positives (2) stoch: add prev crossover freshness check
   const dataReady  = !(j15m === 0 && j1h === 0 && stochK === 0);
-  const shortGates = dataReady ? [j15m > 80, j1h > 60, stochK > 75 && stochKPrev >= stochDPrev && stochK < stochD, askPct >= 55] : [false, false, false, false];
-  const longGates  = dataReady ? [j15m < 20, j1h < 40, stochK < 25 && stochKPrev <= stochDPrev && stochK > stochD, bidPct >= 55] : [false, false, false, false];
+  const shortGates = dataReady ? [
+    j15m > 80,
+    j1h > 60 && j1h <= 89,
+    kf > 75 && kf <= 84 && kf < df && kfp >= dfp,
+    askPct >= 55
+  ] : [false, false, false, false];
+  const longGates = dataReady ? [
+    j15m < 20,
+    j1h >= 0 && j1h < 59,
+    kf < 25 && kf > df && kfp <= dfp,
+    bidPct >= 55
+  ] : [false, false, false, false];
   const shortCount = shortGates.filter(Boolean).length;
   const longCount  = longGates.filter(Boolean).length;
   const shortFull  = shortCount === 4;
@@ -2079,7 +2093,7 @@ async function _ovFetch(sym, isFirst) {
   function _ovJ1hHtml(d, dir) {
     const isL    = dir !== 'SHORT';
     const v      = d.j1h || 0;
-    const pass   = isL ? v < 40 : v > 60;
+    const pass   = isL ? (v >= 0 && v < 59) : (v > 60 && v <= 89);
     const inZone = v <= 20 || v >= 80;
     const jCol   = inZone ? (v <= 20 ? '#00e676' : '#ff3d3d') : '#888';
     const jGlow  = inZone ? `box-shadow:0 0 6px ${jCol};` : '';
@@ -2097,26 +2111,39 @@ async function _ovFetch(sym, isFirst) {
       <div style="display:flex;justify-content:space-between;font-size:8px;color:#2a2a2a;font-family:'JetBrains Mono',monospace;margin:2px 0 4px">
         <span>0</span><span>20</span><span>40</span><span>60</span><span>80</span><span>100</span>
       </div>
-      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${txtCol}">needs ${isL ? '&lt;40' : '&gt;60'} for ${isL ? 'LONG' : 'SHORT'}, currently <span id="pov-j1h-val" style="color:${txtCol};font-weight:700">${v.toFixed(0)}</span></div>`;
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${txtCol}">needs ${isL ? '&lt;59' : '&gt;60 &amp;&amp; &lt;=89'} for ${isL ? 'LONG' : 'SHORT'}, currently <span id="pov-j1h-val" style="color:${txtCol};font-weight:700">${v.toFixed(0)}</span></div>`;
     return _ovGateRowHtml('j1h', 'J 1H', _ovPassIcon(pass), body);
   }
 
   function _ovStochHtml(d, dir) {
     const isL    = dir !== 'SHORT';
-    // PRIMARY: 8-3-3 (stoch_k_fast / stoch_d_fast)
+    // PRIMARY: 8-3-3 (stoch_k_fast / stoch_d_fast) — must match scanner gate logic
     const K      = Math.min(99, Math.max(0.5, d.stoch_k_fast || 0));
     const D      = Math.min(99, Math.max(0.5, d.stoch_d_fast || 0));
-    const inZone = isL ? K < 25 : K > 75;
-    const pass   = isL ? (K < 25 && K > D) : (K > 75 && K < D);
+    const Kp     = +(d.stoch_k_prev_fast != null ? d.stoch_k_prev_fast : K);
+    const Dp     = +(d.stoch_d_prev_fast != null ? d.stoch_d_prev_fast : D);
+    const inZone    = isL ? K < 25 : (K > 75 && K <= 84);
+    const freshCross = isL ? (K > D && Kp <= Dp) : (K < D && Kp >= Dp);
+    const pass   = inZone && freshCross;
     const dZone  = isL ? D < 25 : D > 75;
-    const desc1  = isL ? 'K needs to drop below 25 and cross above D' : 'K needs to rise above 75 and cross below D';
+    const desc1  = isL ? 'K needs to drop below 25 and cross above D' : 'K needs to rise above 75 (≤84) and cross below D';
     let crossNote;
     if (pass) {
-      crossNote = 'K ' + (isL ? 'above' : 'below') + ' D in zone - ' + (isL ? 'LONG' : 'SHORT') + ' crossover confirmed';
+      crossNote = 'K ' + (isL ? 'above' : 'below') + ' D in zone — fresh cross confirmed';
     } else if (isL) {
-      crossNote = inZone ? 'K is in zone but below D - needs to cross above D' : 'K is above 25 and above zone - needs to fall and cross';
+      if (inZone && !freshCross) {
+        crossNote = 'K in zone but cross is stale — waiting for K to reset above D then re-cross';
+      } else {
+        crossNote = 'K is above 25 and above zone — needs to fall and cross';
+      }
     } else {
-      crossNote = inZone ? 'K is in zone but above D - needs to cross below D' : 'K is below 75 - needs to rise and cross';
+      if (K > 84) {
+        crossNote = 'K above 84 ceiling — blocked';
+      } else if (inZone && !freshCross) {
+        crossNote = 'K in zone but cross is stale — waiting for K to reset below D then re-cross';
+      } else {
+        crossNote = 'K is below 75 — needs to rise and cross';
+      }
     }
     const noteCol  = pass ? '#00e676' : '#ff5252';
     const kColHex  = inZone ? (isL ? '#00e676' : '#ff4646') : '#888';
@@ -2152,7 +2179,8 @@ async function _ovFetch(sym, isFirst) {
       + '</div>';
     const body = '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:#ffffff">' + desc1 + ' for ' + (isL ? 'LONG' : 'SHORT') + '</div>'
       + '<div style="font-family:\'JetBrains Mono\',monospace;font-size:12px;font-weight:700;color:#ffffff;margin-top:2px">Currently <span id="pov-sk-val" style="color:#ffffff;font-weight:700">K=' + (d.stoch_k_fast||0).toFixed(1) + '</span> D=' + (d.stoch_d_fast||0).toFixed(1) + '</div>'
-      + '<div style="position:relative;height:10px;border-radius:4px;width:100%;margin:8px 0 0;background:linear-gradient(to right,' + gradGreen + ',' + gradGrey + ',' + gradRed + ')">' 
+      + '<div style="font-size:10px;color:#666;margin-top:2px">PREV K=' + Kp.toFixed(1) + ' D=' + Dp.toFixed(1) + ' — FRESH: ' + (freshCross ? '<span style="color:#00e676">✓</span>' : '<span style="color:#ff5252">✗ waiting for new cross</span>') + '</div>'
+      + '<div style="position:relative;height:10px;border-radius:4px;width:100%;margin:8px 0 0;background:linear-gradient(to right,' + gradGreen + ',' + gradGrey + ',' + gradRed + ')">'
       + '<div id="pov-stoch-d" style="position:absolute;top:50%;transform:translate(-50%,-50%);left:' + D.toFixed(1) + '%;width:12px;height:12px;border-radius:2px;border:1.5px solid ' + dColHex + ';background:#000;display:flex;align-items:center;justify-content:center;z-index:1">'
       + '<span style="font-size:7px;font-weight:700;color:' + dColHex + ';font-family:\'JetBrains Mono\',monospace;line-height:1">D</span>'
       + '</div>'
@@ -2161,8 +2189,9 @@ async function _ovFetch(sym, isFirst) {
       + '</div>'
       + '</div>'
       + ticksHtml
-      + '<div id="pov-stoch-note" style="font-size:9px;color:' + noteCol + ';font-family:\'JetBrains Mono\',monospace;margin-top:4px">' + crossNote + '</div>';
-    // REFERENCE: 14-3-3 (muted, no pass/fail)
+      + '<div id="pov-stoch-note" style="font-size:9px;color:' + noteCol + ';font-family:\'JetBrains Mono\',monospace;margin-top:4px">' + crossNote + '</div>'
+      + (!isL ? '<div style="font-size:10px;color:' + (K <= 84 ? '#00e676' : '#ff5252') + ';margin-top:2px">CEILING: K=' + K.toFixed(1) + (K <= 84 ? ' ≤ 84 ✓' : ' > 84 BLOCKED') + '</div>' : '');
+    // REFERENCE: 14-3-3 (muted, labeled, no pass/fail)
     const rK = Math.min(99, Math.max(0.5, d.stoch_k || 0));
     const rD = Math.min(99, Math.max(0.5, d.stoch_d || 0));
     const refRow = '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #1e1e1e;opacity:0.45">'
@@ -2203,7 +2232,7 @@ async function _ovFetch(sym, isFirst) {
   }
 
   function _ovScanConfHtml(d, dir, score) {
-    if (score < 3) return '';
+    return '';
     const isL   = dir !== 'SHORT';
     const scans = (d.last_scan_summaries || []).slice(0, 2);
     const passed = scans.reduce((n, s) => n + ((isL ? (s.score_long || 0) : (s.score_short || 0)) === 4 ? 1 : 0), 0);
