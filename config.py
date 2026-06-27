@@ -26,8 +26,9 @@ LIVE_MANUAL_ENTRY_ONLY = True
 J15M_SHORT_GATE  = 80
 J15M_LONG_GATE   = 20
 J1H_SHORT_MIN    = 60
-J1H_SHORT_MAX    = 100
-J1H_LONG_MIN     = 0
+J1H_SHORT_MAX    = 89   # Real trading ceiling — data: SHORT J1H 90-100 65.5% WR -$1,513
+J1H_LONG_MIN     = 0    # Bounds validator — guards negative J1H calculation edge cases. Not a trading gate.
+J1H_LONG_MAX     = 59   # Trading ceiling for LONGs — data: J1H 60+ LONG 10% WR -$399
 
 RSI15M_SHORT_MIN = 60
 RSI15M_LONG_MAX  = 40
@@ -38,22 +39,21 @@ ATR_SL_MULTIPLIER = 1.0
 
 TP1_R                = 1.0
 TP1_CLOSE_PCT        = 0.70        # Trailblazer: close 70% at TP1 (runner 30% stays open)
-TP2_R                = 1.5         # still used for tp2_price alert calc; exit replaced by Trailblazer
+TP2_R                = 1.2         # p75 MFE = 1.1-1.2R. 25% of winners reach 1.2R vs 10% reaching 1.5R.
 TRAIL_ATR_MULTIPLIER = 0.5         # trail_stop = trail_best  (atr15m  TRAIL_ATR_MULTIPLIER)
 
 LEVERAGE_HIGH = 10
 LEVERAGE_MID  = 5
 LEVERAGE_LOW  = 5
 
-COOLDOWN_SECONDS      = 300
 CONSECUTIVE_LOSS_STOP = 3
 DAILY_LOSS_LIMIT      = -800.0
 
 MARGIN_PER_TRADE = 2000.0
 MARGIN_HARD_CAP  = 25000.0
 
-ADX_FADE_MAX = 60
-ADX_MIN = 15  # minimum ADX for any entry -- below this market has no structure for bounce signals
+ADX_MIN_LONG  = 20  # data: LONG ADX 0-19: 119 trades -$2,391
+ADX_MIN_SHORT = 0   # data: SHORT ADX 0-14: 21 trades +$493. SHORTs profitable at all ADX levels
 
 SESSION_FILTER_ENABLED = False
 PLACE_EXCHANGE_SL      = True
