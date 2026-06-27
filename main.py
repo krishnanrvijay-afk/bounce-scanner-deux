@@ -457,12 +457,6 @@ def _load_state():
                 data["consecutive_loss_stop"])
             _scanner_mod.CONSECUTIVE_LOSS_STOP = \
                 CONSECUTIVE_LOSS_STOP
-        if data.get("btc_j1h_long_max") is not None:
-            _scanner_mod.BTC_J1H_LONG_MAX = float(
-                data["btc_j1h_long_max"])
-        if data.get("btc_j1h_short_max") is not None:
-            _scanner_mod.BTC_J1H_SHORT_MAX = float(
-                data["btc_j1h_short_max"])
         print(f"[RESTORE] settings restored "
               f"from Supabase")
 
@@ -555,6 +549,7 @@ def _append_trade_log(trade: dict, exit_price: float, reason: str, pnl: float, r
         "session_opened":   _session,
         "mae_r":            _mae_r,
         "mfe_r":            _mfe_r,
+                  "btc_j1h_entry":    trade.get("btc_j1h_entry"),
     }
     app_state.trade_log.append(entry)
 
@@ -900,6 +895,7 @@ async def _do_open_trade(
         "vwap_at_entry":     alert_data.get("vwap_at_entry") if alert_data else None,
         "vwap_pct_diff":     alert_data.get("vwap_pct_diff") if alert_data else None,
         "vwap_position":     alert_data.get("vwap_position") if alert_data else None,
+        "btc_j1h_entry":    _scanner_mod._btc_j1h,
     }
 
     app_state.open_trades[key] = trade
@@ -2223,10 +2219,8 @@ async def get_state():
     _state["btc_flash_active"]  = _flash_active
     _state["btc_flash_expires"] = _flash_exp.isoformat() if _flash_active else None
     _state["btc_j1h"]            = _scanner_mod._btc_j1h
-    _state["regime_block_long"]  = _scanner_mod._btc_j1h > _scanner_mod.BTC_J1H_LONG_MAX
-    _state["regime_block_short"] = _scanner_mod._btc_j1h >= _scanner_mod.BTC_J1H_SHORT_MAX
-    _state["btc_j1h_long_max"]   = _scanner_mod.BTC_J1H_LONG_MAX
-    _state["btc_j1h_short_max"]  = _scanner_mod.BTC_J1H_SHORT_MAX
+    _state["regime_block_long"]  = False
+    _state["regime_block_short"] = False
     return _state
 
 
@@ -2700,10 +2694,6 @@ async def get_settings():
             _scanner_mod.J1H_SHORT_MIN,
         "j1h_short_max":
             _scanner_mod.J1H_SHORT_MAX,
-        "btc_j1h_long_max":
-            _scanner_mod.BTC_J1H_LONG_MAX,
-        "btc_j1h_short_max":
-            _scanner_mod.BTC_J1H_SHORT_MAX,
         "atr_sl_multiplier":
             _scanner_mod.ATR_SL_MULTIPLIER,
         "tp1_close_pct":
@@ -2750,12 +2740,6 @@ async def post_settings(request: Request):
     if "j1h_short_max" in body:
         _scanner_mod.J1H_SHORT_MAX = float(
             body["j1h_short_max"])
-    if "btc_j1h_long_max" in body:
-        _scanner_mod.BTC_J1H_LONG_MAX = float(
-            body["btc_j1h_long_max"])
-    if "btc_j1h_short_max" in body:
-        _scanner_mod.BTC_J1H_SHORT_MAX = float(
-            body["btc_j1h_short_max"])
     if "atr_sl_multiplier" in body:
         _scanner_mod.ATR_SL_MULTIPLIER = float(
             body["atr_sl_multiplier"])
@@ -2801,10 +2785,6 @@ async def post_settings(request: Request):
                     _scanner_mod.J1H_SHORT_MIN,
                 "j1h_short_max":
                     _scanner_mod.J1H_SHORT_MAX,
-                "btc_j1h_long_max":
-                    _scanner_mod.BTC_J1H_LONG_MAX,
-                "btc_j1h_short_max":
-                    _scanner_mod.BTC_J1H_SHORT_MAX,
                 "atr_sl_multiplier":
                     _scanner_mod.ATR_SL_MULTIPLIER,
                 "tp1_close_pct":
