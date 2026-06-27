@@ -301,7 +301,7 @@ def _save_state():
 
 def _load_state():
     """On startup: restore all state from Supabase."""
-    global daily_pnl, trading_halted_today, consecutive_losses, circuit_breaker_active
+    global daily_pnl, trading_halted_today, consecutive_losses, circuit_breaker_active, PAPER_MODE, TELEGRAM_ENABLED, DAILY_LOSS_LIMIT, MARGIN_PER_TRADE, CONSECUTIVE_LOSS_STOP
     sb = _get_supabase()
     if sb is None:
         print("[RESTORE] No Supabase client Ã¢ÂÂ starting fresh")
@@ -409,6 +409,62 @@ def _load_state():
             app_state.trade_log = _keep_log
             print(f"[SANITIZE] {len(_drop_log)} phantom trade(s) removed from restored log")
             _save_state()
+
+        # ── Restore settings from Supabase
+        if data.get("paper_mode") is not None:
+            PAPER_MODE = bool(data["paper_mode"])
+            _scanner_mod.PAPER_MODE = PAPER_MODE
+        if data.get("telegram_enabled") is not None:
+            TELEGRAM_ENABLED = bool(
+                data["telegram_enabled"])
+        if data.get("depth_gate_pct") is not None:
+            _scanner_mod.DEPTH_GATE_PCT = float(
+                data["depth_gate_pct"])
+        if data.get("adx_min_long") is not None:
+            _scanner_mod.ADX_MIN_LONG = float(
+                data["adx_min_long"])
+        if data.get("j15m_short_gate") is not None:
+            _scanner_mod.J15M_SHORT_GATE = float(
+                data["j15m_short_gate"])
+        if data.get("j15m_long_gate") is not None:
+            _scanner_mod.J15M_LONG_GATE = float(
+                data["j15m_long_gate"])
+        if data.get("j1h_short_min") is not None:
+            _scanner_mod.J1H_SHORT_MIN = float(
+                data["j1h_short_min"])
+        if data.get("j1h_short_max") is not None:
+            _scanner_mod.J1H_SHORT_MAX = float(
+                data["j1h_short_max"])
+        if data.get("atr_sl_multiplier") is not None:
+            _scanner_mod.ATR_SL_MULTIPLIER = float(
+                data["atr_sl_multiplier"])
+        if data.get("tp1_close_pct") is not None:
+            _scanner_mod.TP1_CLOSE_PCT = float(
+                data["tp1_close_pct"])
+        if data.get("tp2_r") is not None:
+            _scanner_mod.TP2_R = float(
+                data["tp2_r"])
+        if data.get("margin_per_trade") is not None:
+            MARGIN_PER_TRADE = float(
+                data["margin_per_trade"])
+            _scanner_mod.MARGIN_PER_TRADE = \
+                MARGIN_PER_TRADE
+        if data.get("daily_loss_limit") is not None:
+            DAILY_LOSS_LIMIT = float(
+                data["daily_loss_limit"])
+        if data.get("consecutive_loss_stop") is not None:
+            CONSECUTIVE_LOSS_STOP = int(
+                data["consecutive_loss_stop"])
+            _scanner_mod.CONSECUTIVE_LOSS_STOP = \
+                CONSECUTIVE_LOSS_STOP
+        if data.get("btc_j1h_long_max") is not None:
+            _scanner_mod.BTC_J1H_LONG_MAX = float(
+                data["btc_j1h_long_max"])
+        if data.get("btc_j1h_short_max") is not None:
+            _scanner_mod.BTC_J1H_SHORT_MAX = float(
+                data["btc_j1h_short_max"])
+        print(f"[RESTORE] settings restored "
+              f"from Supabase")
 
         print(f"[RESTORE] complete Ã¢ÂÂ trades={len(app_state.open_trades)} "
               f"daily_pnl=${daily_pnl:.2f} cooldowns={len(_scanner_mod._cooldowns)} "
