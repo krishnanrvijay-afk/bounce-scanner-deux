@@ -56,6 +56,19 @@ ADX_MIN_LONG  = 20  # data: LONG ADX 0-19: 119 trades -$2,391
 ADX_MIN_SHORT = 0   # data: SHORT ADX 0-14: 21 trades +$493. SHORTs profitable at all ADX levels
 
 SESSION_FILTER_ENABLED = False
+BLOCKED_PAIR_SESSIONS: dict = {
+    # @107 SHORT ASIA:
+    # archive 11 trades -$556.78
+    # avg MAE -0.448R
+    ("@107", "SHORT", "ASIA"): True,
+    # WIF LONG ASIA on HL only:
+    # archive 17 trades -$269.90
+    # avg MAE -0.457R
+    # WIF_USDT MEXC LONG ASIA is
+    # profitable -- HL specific block
+    ("WIF",  "LONG",  "ASIA"): True,
+}
+
 PLACE_EXCHANGE_SL      = True
 
 MIN_SL_PCT: dict = {
