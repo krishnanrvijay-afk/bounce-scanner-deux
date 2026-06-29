@@ -7,7 +7,7 @@ HL_API_URL = "https://api.hyperliquid.xyz/info"
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
-PAIRS = ["DOGE", "SUI", "BTC", "ETH", "NEAR", "XRP", "SOL", "WIF", "AVAX", "TON", "@107", "@8", "@1", "LTC", "ADA"]
+PAIRS = ["DOGE", "SUI", "BTC", "ETH", "NEAR", "XRP", "SOL", "WIF", "AVAX", "TON", "@107", "@8", "ZEC", "@1", "LTC", "ADA"]
 
 SCAN_INTERVAL_SECONDS  = 30
 PRICE_INTERVAL_SECONDS = 8
@@ -82,6 +82,7 @@ MIN_SL_PCT: dict = {
     "LINK": 0.008,
     "ARB":  0.012,
     "ZEC":  0.030,
+    "@8":   0.030,
 }
 MIN_SL_PCT_DEFAULT = 0.010
 # Per-pair per-session Sentinel minimum peak thresholds (as fraction of notional)
@@ -125,6 +126,12 @@ SENTINEL_MIN_PEAK_PCT: dict = {
     ("ADA",   "ASIA"): 0.0018,
     ("ADA",   "EU"):   0.0030,
     ("ADA",   "US"):   0.0023,
+    ("@8",    "ASIA"): 0.0020,
+    ("@8",    "EU"):   0.0033,
+    ("@8",    "US"):   0.0025,
+    ("ZEC",   "ASIA"): 0.0020,
+    ("ZEC",   "EU"):   0.0033,
+    ("ZEC",   "US"):   0.0025,
 }
 SENTINEL_MIN_PEAK_PCT_DEFAULT: float = 0.0018
 
