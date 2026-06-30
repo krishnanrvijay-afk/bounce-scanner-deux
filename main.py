@@ -1777,7 +1777,7 @@ async def _exit_monitor_loop():
                     "entry_price", 0) or 0
                 _adverse_pct = (
                     (_entry_px - current) / _entry_px
-                    if is_short else
+                    if not is_short else
                     (current - _entry_px) / _entry_px
                 ) if _entry_px > 0 else 0
                 # Tier 1: continuous floor
