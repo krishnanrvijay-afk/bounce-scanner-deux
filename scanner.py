@@ -407,6 +407,14 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     log.warning(f"[PRICE STALE] {symbol} - "
                         f"{_stale_counts[symbol]}/5 "
                         f"consecutive no-price scans")
+                if (symbol in _stale_prices and
+                        _stale_counts.get(symbol, 0) > 8):
+                    log.error(
+                        f"[PRICE STALE CRITICAL] {symbol} - "
+                        f"{_stale_counts[symbol]} consecutive scan misses "
+                        f"with OPEN TRADE — exit monitor staleness "
+                        f"refetch (Change 3) should be compensating, "
+                        f"verify manually if this persists")
                 continue
             _stale_counts[symbol] = 0
             _stale_prices.discard(symbol)
