@@ -45,6 +45,7 @@ async def _log_gate(venue: str, pair: str, gate_type: str, direction: str, reaso
 
 _last_stoch:  dict[str, tuple] = {}   # keyed symbol -> (stoch_k, stoch_d) from previous scan
 _last_stoch_fast: dict[str, tuple] = {}   # keyed symbol -> (stoch_k_fast, stoch_d_fast) 8,3,3
+_j1h_history:     dict[str, float] = {}   # symbol -> previous j1h value for J1H_RISING gate
 _adverse_cluster: dict = {"long": [], "short": []}  # rolling adverse exit timestamps per direction
 _adverse_cooldown_until: dict = {"long": None, "short": None}  # graduated adverse cooldown expiry per direction
 _btc_flash_block_until: dict = {"long": None}                  # expiry for BTC 1m flash crash LONG block
@@ -241,11 +242,21 @@ def _leverage_tier(adx: float) -> tuple[str, int]:
 
 def score_bounce_short(j15m, j1h, ask_pct, adx,
                        j5m: float = 50.0, trend: str = "Neutral",
-                       stoch_k: float = 50.0, stoch_d: float = 50.0) -> tuple[int, str, int]:
+                       stoch_k: float = 50.0, stoch_d: float = 50.0,
+                       j1h_prev: float = None) -> tuple[int, str, int]:
     tier, lev = _leverage_tier(adx)
     stoch_gate = stoch_k > 75 and stoch_k <= 84 and stoch_k < stoch_d
+    _j1h_rising = (
+        j1h_prev is not None and
+        j1h > 70 and
+        j1h > j1h_prev + 8
+    )
+    if _j1h_rising:
+        print(f"[J1H_RISING_BLOCK] HL SHORT blocked "
+              f"j1h={j1h:.1f} prev={j1h_prev:.1f}")
     if not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN and j1h <= J1H_SHORT_MAX
-            and stoch_gate and ask_pct >= DEPTH_GATE_PCT and adx >= ADX_MIN_SHORT):
+            and stoch_gate and ask_pct >= DEPTH_GATE_PCT and adx >= ADX_MIN_SHORT
+            and not _j1h_rising):
         return 0, tier, lev
     score = 4
     if j5m  > 80:              score += 2
@@ -404,6 +415,8 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             _, _, j5m  = _compute_kdj(candles_5m)
             _, _, j15m = _compute_kdj(candles_15m)
             _, _, j1h  = _compute_kdj(candles_1h)
+            _j1h_prev  = _j1h_history.get(symbol)
+            _j1h_history[symbol] = j1h
             rsi15m     = _compute_rsi(candles_15m)
             rsi1h      = _compute_rsi(candles_1h)
             stoch_k, stoch_d           = _compute_stochastic(candles_15m)
@@ -538,7 +551,8 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     g_depth = ask_pct >= DEPTH_GATE_PCT
                     score, tier, lev = score_bounce_short(
                         j15m, j1h, ask_pct, adx1h, j5m=j5m, trend=trend,
-                        stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
+                        stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
+                        j1h_prev=_j1h_prev)
                     log_gates = (f"j15m={j15m:.1f}(need>{J15M_SHORT_GATE}) "
                                  f"j1h={j1h:.1f}(need>{J1H_SHORT_MIN}) "
                                  f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need>75,k<d) "
@@ -693,6 +707,8 @@ async def scan_pair_state(hl_client) -> list[dict]:
             _, _, j5m  = _compute_kdj(candles_5m)
             _, _, j15m = _compute_kdj(candles_15m)
             _, _, j1h  = _compute_kdj(candles_1h)
+            _j1h_prev  = _j1h_history.get(symbol)
+            _j1h_history[symbol] = j1h
             rsi15m     = _compute_rsi(candles_15m)
             rsi1h      = _compute_rsi(candles_1h)
             stoch_k, stoch_d           = _compute_stochastic(candles_15m)
@@ -712,7 +728,8 @@ async def scan_pair_state(hl_client) -> list[dict]:
 
             short_score, short_tier, short_lev = score_bounce_short(
                 j15m, j1h, ask_pct, adx1h, j5m=j5m, trend=trend,
-                stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
+                stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
+                j1h_prev=_j1h_prev)
             long_score,  long_tier,  long_lev  = score_bounce_long(
                 j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
                 stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
