@@ -150,3 +150,23 @@ KILL_GRACE_SECONDS: int = 90
 # June 27. 4/5 correct at 90s.
 # ETH miss saves ~$44 at 90s.
 # 120s creates LTC SL risk.
+# Two-tier percentage-based KILL.
+# Replaces flat time/cpnl<=0 rule.
+# Evidence: 22-trade checkpoint
+# analysis June 29 2026. Every
+# winner stayed inside 0.54% adverse
+# at any checkpoint measured.
+# Tier 1: continuous floor, any time.
+# Tier 2: tighter check at 5min mark
+# -- a trade still bleeding at 5min
+# has not earned the same patience
+# as a fresh trade.
+KILL_PCT_FLOOR: float = 0.006
+# 0.6% adverse from entry, checked
+# every scan, any time elapsed.
+KILL_PCT_5MIN: float = 0.004
+# 0.4% adverse from entry, checked
+# once trade has been open >= 300s.
+# Tighter than the floor because
+# time without recovery is itself
+# a signal.
