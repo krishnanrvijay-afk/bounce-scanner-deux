@@ -64,6 +64,7 @@ _sentinel_sweep: list = []   # deferred protective exits (PEAK_DECAY_20 / RUNNER
 _adverse_shadow: dict = {}  # trade_key -> adverse-cut shadow state (observation only)
 _sign_shadow:   dict = {}  # trade_key -> PnL-sign transition history (observation only)
 _signal_shadow: dict = {}  # trade_key -> signal invalidation shadow state (observation only)
+_signal_exhaustion_armed: dict = {}  # (key + "_se_armed") -> bool; SE arming state per trade
 
 # Ã¢ÂÂÃ¢ÂÂ Per-pair adverse dollar cut thresholds Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 # If adverse PnL <= -threshold AND max favourable excursion < $10, cut immediately.
@@ -1585,6 +1586,7 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
                 _sb2.table("trade_open_locks").delete().eq("lock_key", _lk).execute()
             except Exception as _unlock_e:
                 print(f"[LOCK CLEANUP FAILED] {_lk}: {_unlock_e}")
+    _signal_exhaustion_armed.pop(key + "_se_armed", None)
     _save_state()
 
 
@@ -1735,8 +1737,8 @@ def _flush_sentinel_sweep() -> None:
 async def _exit_monitor_loop():
     """Runs every PRICE_INTERVAL_SECONDS. Checks every open trade against SL/TP."""
     while True:
-        try:
-            for key, trade in list(app_state.open_trades.items()):
+        for key, trade in list(app_state.open_trades.items()):
+            try:
                 sym       = trade["symbol"]
                 direction = trade["direction"]
                 sl_price  = trade.get("sl_price")
@@ -1771,9 +1773,33 @@ async def _exit_monitor_loop():
                 # KILL â 60s grace then zero tolerance
                 _elapsed = time.time() - trade.get(
                     "opened_at", time.time())
-                if _elapsed >= \
-                    _scanner_mod.KILL_GRACE_SECONDS \
-                    and _cpnl <= 0:
+                _entry_px = trade.get(
+                    "entry_price", 0) or 0
+                _adverse_pct = (
+                    (_entry_px - current) / _entry_px
+                    if is_short else
+                    (current - _entry_px) / _entry_px
+                ) if _entry_px > 0 else 0
+                # Tier 1: continuous floor
+                _kill_floor_hit = (
+                    _adverse_pct >=
+                    _scanner_mod.KILL_PCT_FLOOR
+                )
+                # Tier 2: tighter check after 5min
+                _kill_5min_hit = (
+                    _elapsed >= 300 and
+                    _adverse_pct >=
+                    _scanner_mod.KILL_PCT_5MIN
+                )
+                if _kill_floor_hit or _kill_5min_hit:
+                    _kill_tier = (
+                        "FLOOR" if _kill_floor_hit
+                        else "5MIN"
+                    )
+                    print(f"[KILL] HL {sym} {direction}"
+                          f" tier={_kill_tier}"
+                          f" adverse_pct={_adverse_pct*100:.2f}%"
+                          f" elapsed={_elapsed:.0f}s")
                     _do_close_trade(
                         key, trade, current, "KILL")
                     _scanner_mod.set_close_cooldown(
@@ -2104,6 +2130,40 @@ async def _exit_monitor_loop():
                                   current, reason)
                               continue
 
+                # Signal exhaustion -- exit when J15M condition that justified
+                # entry has resolved, while in profit. Evidence: 39-trade June
+                # 29 analysis + 20-trade archive. Net benefit +$1,504 / 20 trades.
+                _cur_j15m = None
+                for _ps in app_state.pair_states:
+                    if _ps.get("symbol") == sym:
+                        _cur_j15m = _ps.get("j15m")
+                        break
+                if _cur_j15m is not None and _cpnl > 0:
+                    _se_key = key + "_se_armed"
+                    if not is_short:
+                        # LONG: arm when J15M below 50, fire when crosses back above 50
+                        if _cur_j15m < 50:
+                            _signal_exhaustion_armed[_se_key] = True
+                        if (_signal_exhaustion_armed.get(_se_key) and
+                                _cur_j15m >= 50):
+                            print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
+                                  f" j15m={_cur_j15m:.1f} cpnl={_cpnl:.2f}")
+                            _do_close_trade(
+                                key, trade, current, "SIGNAL_EXHAUSTION")
+                            _signal_exhaustion_armed.pop(_se_key, None)
+                            continue
+                    else:
+                        # SHORT: arm when J15M above 50, fire when crosses back below 50
+                        if _cur_j15m > 50:
+                            _signal_exhaustion_armed[_se_key] = True
+                        if (_signal_exhaustion_armed.get(_se_key) and
+                                _cur_j15m <= 50):
+                            print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
+                                  f" j15m={_cur_j15m:.1f} cpnl={_cpnl:.2f}")
+                            _do_close_trade(
+                                key, trade, current, "SIGNAL_EXHAUSTION")
+                            _signal_exhaustion_armed.pop(_se_key, None)
+                            continue
                 # Ã¢ÂÂÃ¢ÂÂ TRAILBLAZER: ATR trailing stop after tp1_hit Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
                 if tp1_hit:
                     # Ã¢ÂÂÃ¢ÂÂ RUNNER_DECAY_10: 10% peak-decay on post-TP1 runner Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
@@ -2157,8 +2217,9 @@ async def _exit_monitor_loop():
                 print(f"[EXIT CHECK] {sym} {direction} price={current} "
                       f"sl={sl_price} tp1={tp1_price}{_trail_info} Ã¢ÂÂ no exit")
 
-        except Exception as e:
-            print(f"[EXIT MONITOR] error: {e}")
+            except Exception as e:
+                print(f"[EXIT MONITOR] {trade.get('symbol')} {trade.get('direction')} error: {e}")
+                continue
 
         _flush_sentinel_sweep()
         await asyncio.sleep(PRICE_INTERVAL_SECONDS)
