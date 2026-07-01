@@ -2881,8 +2881,10 @@ async def get_settings():
             CONSECUTIVE_LOSS_STOP,
         "kill_cooldown_seconds":
             _scanner_mod.KILL_COOLDOWN_SECONDS,
-        "kill_grace_seconds":
-            _scanner_mod.KILL_GRACE_SECONDS,
+        "kill_pct_floor":
+            _scanner_mod.KILL_PCT_FLOOR,
+        "kill_pct_5min":
+            _scanner_mod.KILL_PCT_5MIN,
     }
 
 
@@ -2942,9 +2944,12 @@ async def post_settings(request: Request):
     if "kill_cooldown_seconds" in body:
         _scanner_mod.KILL_COOLDOWN_SECONDS = int(
             body["kill_cooldown_seconds"])
-    if "kill_grace_seconds" in body:
-        _scanner_mod.KILL_GRACE_SECONDS = int(
-            body["kill_grace_seconds"])
+    if "kill_pct_floor" in body:
+        _scanner_mod.KILL_PCT_FLOOR = float(
+            body["kill_pct_floor"])
+    if "kill_pct_5min" in body:
+        _scanner_mod.KILL_PCT_5MIN = float(
+            body["kill_pct_5min"])
 
     # Persist ALL settings to Supabase
     # NOTE: columns require migration if not yet in schema.
@@ -2982,8 +2987,10 @@ async def post_settings(request: Request):
                     CONSECUTIVE_LOSS_STOP,
                 "kill_cooldown_seconds":
                     _scanner_mod.KILL_COOLDOWN_SECONDS,
-                "kill_grace_seconds":
-                    _scanner_mod.KILL_GRACE_SECONDS,
+                "kill_pct_floor":
+                    _scanner_mod.KILL_PCT_FLOOR,
+                "kill_pct_5min":
+                    _scanner_mod.KILL_PCT_5MIN,
             }
             _settings_payload["id"] = 1
             _sb.table("hl_scanner_state")\
