@@ -1230,7 +1230,9 @@ async def _scan_loop():
                     # SHORT: j1h must be falling (j1h_now < j1h_prev)
                     _j1h_now = alert.get("j1h", 50)
                     _j1h_was = alert.get("j1h_prev", _j1h_now)
+                    _j1h_prev_valid = alert.get("j1h_prev_valid", True)
                     _j1h_ok  = (
+                        not _j1h_prev_valid or
                         (dir_ == "LONG"  and _j1h_now > _j1h_was) or
                         (dir_ == "SHORT" and _j1h_now < _j1h_was))
                     if not _j1h_ok:
