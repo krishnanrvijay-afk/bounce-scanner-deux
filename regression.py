@@ -214,6 +214,69 @@ result = leverage_cap(t, lev, "DOGE")
 chk("T5", result == scanner.LEVERAGE_MID,
     f"HIGH_PROB + non-anchor DOGE → leverage={result} capped to LEVERAGE_MID={scanner.LEVERAGE_MID}x")
 
+
+# ── SETTINGS COMPLETENESS ──────────────────────────────────────────────────────
+
+settings_response = {
+    "paper_mode":            True,
+    "telegram_enabled":      True,
+    "depth_gate_pct":
+        scanner.DEPTH_GATE_PCT,
+    "adx_min_long":
+        scanner.ADX_MIN_LONG,
+    "j15m_short_gate":
+        scanner.J15M_SHORT_GATE,
+    "j15m_long_gate":
+        scanner.J15M_LONG_GATE,
+    "j1h_short_min":
+        scanner.J1H_SHORT_MIN,
+    "j1h_short_max":
+        scanner.J1H_SHORT_MAX,
+    "j1h_long_max":
+        scanner.J1H_LONG_MAX,
+    "atr_sl_multiplier":
+        scanner.ATR_SL_MULTIPLIER,
+    "tp1_close_pct":
+        scanner.TP1_CLOSE_PCT,
+    "tp2_r":                 scanner.TP2_R,
+    "margin_per_trade":
+        scanner.MARGIN_PER_TRADE,
+    "kill_cooldown_seconds":
+        scanner.KILL_COOLDOWN_SECONDS,
+    "kill_pct_floor":
+        scanner.KILL_PCT_FLOOR,
+    "kill_pct_5min":
+        scanner.KILL_PCT_5MIN,
+    "se_j1h_decay_pts":
+        scanner.SE_J1H_DECAY_PTS,
+}
+
+required_fields = [
+    "j1h_long_max",
+    "j1h_short_max",
+    "kill_pct_floor",
+    "kill_pct_5min",
+    "se_j1h_decay_pts",
+    "margin_per_trade",
+    "adx_min_long",
+    "j15m_short_gate",
+    "j15m_long_gate",
+]
+deprecated_fields = [
+    "kill_grace_seconds",
+]
+
+for field in required_fields:
+    chk(f"SC_{field}",
+        field in settings_response,
+        (f"SC: '{field}' present in settings response "
+         f"(value={settings_response.get(field, 'MISSING')})"))
+
+for field in deprecated_fields:
+    chk(f"SC_no_{field}",
+        field not in settings_response,
+        (f"SC: deprecated '{field}' correctly absent from settings"))
+
 # ── Summary ────────────────────────────────────────────────────────────────────
 
 passed = sum(1 for _, ok, _ in _results if ok)
