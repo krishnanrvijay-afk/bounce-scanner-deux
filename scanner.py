@@ -664,6 +664,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     "dollar_risk":  dollar_risk,
                     "j15m":         round(j15m, 2),
                     "j1h":          round(j1h, 2),
+                    "j1h_prev":     round(_j1h_prev.get(symbol, j1h), 2),
                     "j5m":          round(j5m, 2),
                     "rsi15m":       round(rsi15m, 2),
                     "stoch_k":      round(stoch_k, 2),
