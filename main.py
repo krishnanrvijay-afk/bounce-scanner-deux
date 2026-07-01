@@ -466,6 +466,34 @@ def _load_state():
         if data.get("kill_grace_seconds") is not None:
             _scanner_mod.KILL_GRACE_SECONDS = int(
                 data["kill_grace_seconds"])
+        if data.get(
+                "j1h_long_max") \
+                is not None:
+            _scanner_mod\
+                .J1H_LONG_MAX = \
+                float(data[
+                    "j1h_long_max"])
+        if data.get(
+                "se_j1h_decay_pts") \
+                is not None:
+            _scanner_mod\
+                .SE_J1H_DECAY_PTS = \
+                float(data[
+                    "se_j1h_decay_pts"])
+        if data.get(
+                "kill_pct_floor") \
+                is not None:
+            _scanner_mod\
+                .KILL_PCT_FLOOR = \
+                float(data[
+                    "kill_pct_floor"])
+        if data.get(
+                "kill_pct_5min") \
+                is not None:
+            _scanner_mod\
+                .KILL_PCT_5MIN = \
+                float(data[
+                    "kill_pct_5min"])
         print(f"[RESTORE] settings restored "
               f"from Supabase")
 
