@@ -357,62 +357,6 @@ def _load_state():
             return
         data = result.data[0]
 
-        # Ã¢ÂÂÃ¢ÂÂ New-day check Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-        today_str = datetime.now(ET).strftime("%Y-%m-%d")
-        if data.get("saved_date") != today_str:
-            saved = data.get("saved_date", "unknown")
-            print(f"[DAILY RESET] New trading day ({saved} Ã¢ÂÂ {today_str}) Ã¢ÂÂ P&L reset to $0")
-            daily_pnl              = 0.0
-            trading_halted_today   = False
-            consecutive_losses     = 0
-            circuit_breaker_active = False
-            _save_state()
-            return
-
-        # Ã¢ÂÂÃ¢ÂÂ Restore globals Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-        daily_pnl              = float(data.get("daily_pnl") or 0)
-        trading_halted_today   = bool(data.get("trading_halted_today", False))
-        consecutive_losses     = int(data.get("consecutive_losses") or 0)
-        circuit_breaker_active = bool(data.get("circuit_breaker_active", False))
-        app_state.margin_deployed = float(data.get("margin_deployed") or 0)
-
-        # Ã¢ÂÂÃ¢ÂÂ Restore open trades Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-        for key, trade in (data.get("open_trades") or {}).items():
-            app_state.open_trades[key] = trade
-            print(f"[RESTORE] {trade.get('symbol')} {trade.get('direction')} "
-                  f"entry={trade.get('entry_price')} sl={trade.get('sl_price')} "
-                  f"tp1={trade.get('tp1_price')} restored")
-
-        # Ã¢ÂÂÃ¢ÂÂ Restore shadow dicts (peak + adverse) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-        for key, sh in (data.get("peak_shadow") or {}).items():
-            if key in app_state.open_trades:
-                _peak_shadow[key] = sh
-        for key, sh in (data.get("adverse_shadow") or {}).items():
-            if key in app_state.open_trades:
-                _adverse_shadow[key] = sh
-        for key, sh in (data.get("signal_shadow") or {}).items():
-            if key in app_state.open_trades:
-                _signal_shadow[key] = sh
-        print(f"[RESTORE] shadow dicts Ã¢ÂÂ peak={len(_peak_shadow)} adverse={len(_adverse_shadow)}" + f" signal={len(_signal_shadow)}")
-
-        # -- Sanitize phantom trade-log entries (null/zero exit_price or |R| > 10) --
-        _keep_log = []
-        _drop_log  = []
-        for _e in app_state.trade_log:
-            _ep = _e.get("exit_price") or 0
-            _rv = abs(_e.get("r_value") or 0)
-            if _ep > 0 and _rv <= 10:
-                _keep_log.append(_e)
-            else:
-                _drop_log.append(_e)
-        for _ph in _drop_log:
-            print(f"[SANITIZE] dropped phantom trade {_ph.get('symbol')} {_ph.get('direction')} "
-                  f"pnl={_ph.get('pnl_usd')} r={_ph.get('r_value')} exit_price={_ph.get('exit_price')}")
-        if _drop_log:
-            app_state.trade_log = _keep_log
-            print(f"[SANITIZE] {len(_drop_log)} phantom trade(s) removed from restored log")
-            _save_state()
-
         # ── Restore settings from Supabase
         if data.get("paper_mode") is not None:
             PAPER_MODE = bool(data["paper_mode"])
@@ -494,6 +438,62 @@ def _load_state():
                 .KILL_PCT_5MIN = \
                 float(data[
                     "kill_pct_5min"])
+
+        # Ã¢ÂÂÃ¢ÂÂ New-day check Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+        today_str = datetime.now(ET).strftime("%Y-%m-%d")
+        if data.get("saved_date") != today_str:
+            saved = data.get("saved_date", "unknown")
+            print(f"[DAILY RESET] New trading day ({saved} Ã¢ÂÂ {today_str}) Ã¢ÂÂ P&L reset to $0")
+            daily_pnl              = 0.0
+            trading_halted_today   = False
+            consecutive_losses     = 0
+            circuit_breaker_active = False
+            _save_state()
+            return
+
+        # Ã¢ÂÂÃ¢ÂÂ Restore globals Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+        daily_pnl              = float(data.get("daily_pnl") or 0)
+        trading_halted_today   = bool(data.get("trading_halted_today", False))
+        consecutive_losses     = int(data.get("consecutive_losses") or 0)
+        circuit_breaker_active = bool(data.get("circuit_breaker_active", False))
+        app_state.margin_deployed = float(data.get("margin_deployed") or 0)
+
+        # Ã¢ÂÂÃ¢ÂÂ Restore open trades Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+        for key, trade in (data.get("open_trades") or {}).items():
+            app_state.open_trades[key] = trade
+            print(f"[RESTORE] {trade.get('symbol')} {trade.get('direction')} "
+                  f"entry={trade.get('entry_price')} sl={trade.get('sl_price')} "
+                  f"tp1={trade.get('tp1_price')} restored")
+
+        # Ã¢ÂÂÃ¢ÂÂ Restore shadow dicts (peak + adverse) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+        for key, sh in (data.get("peak_shadow") or {}).items():
+            if key in app_state.open_trades:
+                _peak_shadow[key] = sh
+        for key, sh in (data.get("adverse_shadow") or {}).items():
+            if key in app_state.open_trades:
+                _adverse_shadow[key] = sh
+        for key, sh in (data.get("signal_shadow") or {}).items():
+            if key in app_state.open_trades:
+                _signal_shadow[key] = sh
+        print(f"[RESTORE] shadow dicts Ã¢ÂÂ peak={len(_peak_shadow)} adverse={len(_adverse_shadow)}" + f" signal={len(_signal_shadow)}")
+
+        # -- Sanitize phantom trade-log entries (null/zero exit_price or |R| > 10) --
+        _keep_log = []
+        _drop_log  = []
+        for _e in app_state.trade_log:
+            _ep = _e.get("exit_price") or 0
+            _rv = abs(_e.get("r_value") or 0)
+            if _ep > 0 and _rv <= 10:
+                _keep_log.append(_e)
+            else:
+                _drop_log.append(_e)
+        for _ph in _drop_log:
+            print(f"[SANITIZE] dropped phantom trade {_ph.get('symbol')} {_ph.get('direction')} "
+                  f"pnl={_ph.get('pnl_usd')} r={_ph.get('r_value')} exit_price={_ph.get('exit_price')}")
+        if _drop_log:
+            app_state.trade_log = _keep_log
+            print(f"[SANITIZE] {len(_drop_log)} phantom trade(s) removed from restored log")
+            _save_state()
         print(f"[RESTORE] settings restored "
               f"from Supabase")
 
