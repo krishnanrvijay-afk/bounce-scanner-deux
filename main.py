@@ -927,6 +927,10 @@ async def _do_open_trade(
         "bid_pct":    alert_data.get("bid_pct")   if alert_data else None,
         "ask_pct":    alert_data.get("ask_pct")   if alert_data else None,
         "be_price":   round(entry * 1.001, 6) if direction == "LONG" else round(entry * 0.999, 6),
+        "be_confirm_price":
+            alert_data.get(
+                "be_confirm_price")
+            if alert_data else None,
         "tp1_hit":       False,
         "partial_hit":   False,
         "is_score10":    alert_data.get("is_score10", False) if alert_data else False,
@@ -1876,6 +1880,42 @@ async def _exit_monitor_loop():
                 _cpnl       = ((_entry - current) * _size if is_short
                                else (current - _entry) * _size)
                 # KILL â 60s grace then zero tolerance
+                # CONFIRMATION REVERSAL EXIT
+                # If trade entered via the
+                # confirmation system, exit the
+                # moment price breaks back through
+                # the confirmation level. The
+                # confirmation level is where price
+                # proved the move was real -- if
+                # price returns there, the move
+                # has failed. No arming required.
+                # No percentage threshold. Pure
+                # price level exit.
+                # Only fires for confirmed entries
+                # (be_confirm_price is not None).
+                _confirm_px = trade.get(
+                    "be_confirm_price")
+                if _confirm_px:
+                    _confirm_broken = (
+                        (not is_short and
+                         current < _confirm_px)
+                        or
+                        (is_short and
+                         current > _confirm_px))
+                    if _confirm_broken:
+                        print(
+                            f"[CONFIRM_REVERSAL]"
+                            f" {sym} {direction}"
+                            f" price={current}"
+                            f" confirm_px="
+                            f"{_confirm_px}"
+                            f" -- entry thesis"
+                            f" failed, exiting")
+                        _do_close_trade(
+                            key, trade,
+                            current,
+                            "CONFIRM_REVERSAL")
+                        continue
                 _elapsed = time.time() - trade.get(
                     "opened_at", time.time())
                 _entry_px = trade.get(
