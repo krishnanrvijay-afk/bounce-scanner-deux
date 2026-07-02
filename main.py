@@ -1896,7 +1896,7 @@ async def _exit_monitor_loop():
                 # Only fires for confirmed entries
                 # (be_confirm_price is not None).
                 _confirm_px = trade.get(
-                    "be_confirm_price")
+                    "be_price")
                 if _confirm_px:
                     _confirm_broken = (
                         (not is_short and
