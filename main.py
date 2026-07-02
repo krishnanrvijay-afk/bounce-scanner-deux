@@ -1918,7 +1918,6 @@ async def _exit_monitor_loop():
                             current,
                             "CONFIRM_REVERSAL")
                         continue
-                        continue
                 _elapsed = time.time() - trade.get(
                     "opened_at", time.time())
                 _entry_px = trade.get(
