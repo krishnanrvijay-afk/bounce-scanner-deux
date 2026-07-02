@@ -1895,28 +1895,29 @@ async def _exit_monitor_loop():
                 # price level exit.
                 # Only fires for confirmed entries
                 # (be_confirm_price is not None).
+                _entry_px_cr = trade.get(
+                    "entry_price")
                 _confirm_px = trade.get(
-                    "be_price")
-                if _confirm_px:
+                    "be_confirm_price")
+                if _confirm_px and _entry_px_cr:
                     _confirm_broken = (
                         (not is_short and
-                         current < _confirm_px)
+                         current <= _entry_px_cr)
                         or
                         (is_short and
-                         current > _confirm_px))
+                         current >= _entry_px_cr))
                     if _confirm_broken:
                         print(
                             f"[CONFIRM_REVERSAL]"
                             f" {sym} {direction}"
                             f" price={current}"
-                            f" confirm_px="
-                            f"{_confirm_px}"
-                            f" -- entry thesis"
-                            f" failed, exiting")
+                            f" entry={_entry_px_cr}"
+                            f" — exiting")
                         _do_close_trade(
                             key, trade,
                             current,
                             "CONFIRM_REVERSAL")
+                        continue
                         continue
                 _elapsed = time.time() - trade.get(
                     "opened_at", time.time())
