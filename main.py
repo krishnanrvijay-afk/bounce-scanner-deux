@@ -1256,18 +1256,16 @@ async def _scan_loop():
                                 "HL",
                             ))
                         continue
-                    # PRICE CONFIRMATION — add to pending, wait for be_confirm_price
+                    # PROJ_PNL GATE — add to pending, awaits proj_pnl check
+                    # (no more than 0.1% adverse from signal_price) before
+                    # opening. be_confirm_price is set later, at trade open.
                     _ep = alert.get("entry_price", 0) or 0
-                    _be_confirm = round(
-                        _ep * 1.001 if dir_ == "LONG" else _ep * 0.999, 6)
                     _pend_key = f"{sym}_{dir_}"
-                    alert["pending_since"]    = int(time.time())
-                    alert["be_confirm_price"] = _be_confirm
+                    alert["pending_since"] = int(time.time())
                     _pending_alerts[_pend_key] = alert
                     print(
-                        f"[PENDING] {sym} {dir_} awaiting price confirmation"
-                        f" at {_be_confirm:.5f}"
-                        f" (entry={_ep:.5f} j1h={_j1h_now:.1f})")
+                        f"[PENDING] {sym} {dir_} awaiting proj_pnl gate"
+                        f" (signal={_ep:.5f} j1h={_j1h_now:.1f})")
         except Exception as e:
             print(f"[SCAN LOOP] error: {e}")
         await _process_pending_alerts()
@@ -2461,10 +2459,12 @@ async def _log_alert_outcome(
 
 
 async def _process_pending_alerts():
-    """Called each scan cycle. Checks pending alerts for expiry or price
-    confirmation. Expiry thresholds reuse data-derived staleness values:
+    """Called each scan cycle. Checks pending alerts for expiry or proj_pnl
+    gate pass. Expiry thresholds reuse data-derived staleness values:
     age>480s, J15M drift>30pts, price drift>1.5%.
-    Price confirmation target: entry*1.001 LONG / entry*0.999 SHORT.
+    Proj_pnl gate: current price must not be more than 0.1% adverse from
+    signal_price (LONG: cur >= signal*0.999, SHORT: cur <= signal*1.001).
+    Opens immediately once the gate passes -- no price-move wait.
     """
     if not _pending_alerts:
         return
@@ -2473,7 +2473,6 @@ async def _process_pending_alerts():
         _sym   = _alert["symbol"]
         _dir   = _alert["direction"]
         _ep    = _alert.get("entry_price", 0) or 0
-        _be    = _alert.get("be_confirm_price", 0)
         _since = _alert.get("pending_since", int(time.time()))
         _age   = int(time.time()) - _since
         _cur   = app_state.prices.get(_sym, 0) or 0
@@ -2512,17 +2511,20 @@ async def _process_pending_alerts():
             _to_remove.append(_pk)
             continue
 
-        if _cur <= 0 or not _be:
+        if _cur <= 0 or not _ep:
             continue
 
-        # Price confirmation check
-        _confirmed = (
-            (_dir == "LONG"  and _cur >= _be) or
-            (_dir == "SHORT" and _cur <= _be))
-        if _confirmed:
+        # Proj_pnl gate — current price must not be more than 0.1% adverse
+        # from signal_price. Prevents opening into a price that has already
+        # moved hard against the signal.
+        _gate_ok = (
+            (_dir == "LONG"  and _cur >= _ep * 0.999) or
+            (_dir == "SHORT" and _cur <= _ep * 1.001))
+        if _gate_ok:
             print(
                 f"[CONFIRMED] {_sym} {_dir} price={_cur:.5f}"
-                f" be={_be:.5f} — opening trade")
+                f" signal={_ep:.5f} — opening trade")
+            _alert["be_confirm_price"] = _ep
             _margin = _alert.get("margin", MARGIN_PER_TRADE)
             trade, err = await _do_open_trade(
                 _sym, _dir,
