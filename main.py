@@ -1879,51 +1879,56 @@ async def _exit_monitor_loop():
                 _cut_usd    = ADVERSE_CUT_USD.get(sym, ADVERSE_CUT_DEFAULT_USD)
                 _cpnl       = ((_entry - current) * _size if is_short
                                else (current - _entry) * _size)
-                # KILL â 60s grace then zero tolerance
-                # CONFIRMATION REVERSAL EXIT
-                # If trade entered via the
-                # confirmation system, exit the
-                # moment price breaks back through
-                # the confirmation level. The
-                # confirmation level is where price
-                # proved the move was real -- if
-                # price returns there, the move
-                # has failed. No arming required.
-                # No percentage threshold. Pure
-                # price level exit.
-                # Only fires for confirmed entries
-                # (be_confirm_price is not None).
-                _entry_px_cr = trade.get(
-                    "entry_price")
-                _confirm_px = trade.get(
-                    "be_confirm_price")
-                _cr_age = (
-                    int(time.time())
-                    - trade.get(
-                        "opened_at",
-                        int(time.time())))
-                if (_confirm_px and
-                        _entry_px_cr and
-                        _cr_age >= 300):
-                    _confirm_broken = (
-                        (not is_short and
-                         current <= _entry_px_cr)
-                        or
-                        (is_short and
-                         current >= _entry_px_cr))
-                    if _confirm_broken:
-                        print(
-                            f"[CONFIRM_REVERSAL]"
-                            f" {sym} {direction}"
-                            f" price={current}"
-                            f" entry={_entry_px_cr}"
-                            f" age={_cr_age}s"
-                            f" — exiting")
-                        _do_close_trade(
-                            key, trade,
-                            current,
-                            "CONFIRM_REVERSAL")
-                        continue
+                if trade.get("tier") != "HIGH_PROB":
+                    # HIGH_PROB tier trades skip CONFIRM_REVERSAL
+                    # entirely -- they already passed more gates,
+                    # so the stronger exit stack (KILL, PEAK_DECAY,
+                    # SE) handles them instead.
+                    # KILL â 60s grace then zero tolerance
+                    # CONFIRMATION REVERSAL EXIT
+                    # If trade entered via the
+                    # confirmation system, exit the
+                    # moment price breaks back through
+                    # the confirmation level. The
+                    # confirmation level is where price
+                    # proved the move was real -- if
+                    # price returns there, the move
+                    # has failed. No arming required.
+                    # No percentage threshold. Pure
+                    # price level exit.
+                    # Only fires for confirmed entries
+                    # (be_confirm_price is not None).
+                    _entry_px_cr = trade.get(
+                        "entry_price")
+                    _confirm_px = trade.get(
+                        "be_confirm_price")
+                    _cr_age = (
+                        int(time.time())
+                        - trade.get(
+                            "opened_at",
+                            int(time.time())))
+                    if (_confirm_px and
+                            _entry_px_cr and
+                            _cr_age >= 300):
+                        _confirm_broken = (
+                            (not is_short and
+                             current <= _entry_px_cr)
+                            or
+                            (is_short and
+                             current >= _entry_px_cr))
+                        if _confirm_broken:
+                            print(
+                                f"[CONFIRM_REVERSAL]"
+                                f" {sym} {direction}"
+                                f" price={current}"
+                                f" entry={_entry_px_cr}"
+                                f" age={_cr_age}s"
+                                f" — exiting")
+                            _do_close_trade(
+                                key, trade,
+                                current,
+                                "CONFIRM_REVERSAL")
+                            continue
                 _elapsed = time.time() - trade.get(
                     "opened_at", time.time())
                 _entry_px = trade.get(
