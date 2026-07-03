@@ -1904,7 +1904,7 @@ async def _exit_monitor_loop():
                         int(time.time())))
                 if (_confirm_px and
                         _entry_px_cr and
-                        _cr_age >= 30):
+                        _cr_age >= 300):
                     _confirm_broken = (
                         (not is_short and
                          current <= _entry_px_cr)
