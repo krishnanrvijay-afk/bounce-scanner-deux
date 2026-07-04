@@ -248,17 +248,8 @@ def score_bounce_short(j15m, j1h, ask_pct, adx,
                        j1h_prev: float = None) -> tuple[int, str, int]:
     tier, lev = _leverage_tier(adx)
     stoch_gate = stoch_k > 75 and stoch_k <= 84 and stoch_k < stoch_d
-    _j1h_rising = (
-        j1h_prev is not None and
-        j1h > 70 and
-        j1h > j1h_prev + 8
-    )
-    if _j1h_rising:
-        print(f"[J1H_RISING_BLOCK] HL SHORT blocked "
-              f"j1h={j1h:.1f} prev={j1h_prev:.1f}")
     if not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN and j1h <= J1H_SHORT_MAX
-            and stoch_gate and ask_pct >= DEPTH_GATE_PCT and adx >= ADX_MIN_SHORT
-            and not _j1h_rising):
+            and stoch_gate and ask_pct >= DEPTH_GATE_PCT and adx >= ADX_MIN_SHORT):
         return 0, tier, lev
     score = 4
     if j5m  > 80:              score += 2
@@ -693,6 +684,11 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     "partial_price": partial_price,
                     "session":       get_session_name(),
                 }
+                if direction == "SHORT":
+                    alert["j1h_short_direction"] = (
+                        "FALLING" if (_j1h_prev is not None and j1h < _j1h_prev)
+                        else "RISING" if (_j1h_prev is not None and j1h > _j1h_prev)
+                        else "FLAT")
                 _vwap_v, _vwap_pct, _vwap_pos = _compute_session_vwap(candles_15m, price)
                 if _vwap_v is not None:
                     alert["vwap_at_entry"] = _vwap_v
