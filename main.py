@@ -1963,7 +1963,8 @@ async def _exit_monitor_loop():
                         - trade.get(
                             "opened_at",
                             int(time.time())))
-                    if (_confirm_px and
+                    if (is_short and
+                            _confirm_px and
                             _entry_px_cr and
                             _cr_age >= 300):
                         _confirm_broken = (
