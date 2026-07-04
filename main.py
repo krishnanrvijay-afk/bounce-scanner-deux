@@ -1288,7 +1288,11 @@ async def _scan_loop():
                     _j1h_ok  = (
                         not _j1h_prev_valid or
                         (dir_ == "LONG"  and _j1h_now > _j1h_was) or
-                        (dir_ == "SHORT" and _j1h_now < _j1h_was))
+                        (dir_ == "LONG"  and _j1h_now < 30
+                                         and (_j1h_was - _j1h_now) < 5) or
+                        (dir_ == "SHORT" and _j1h_now < _j1h_was) or
+                        (dir_ == "SHORT" and _j1h_now > 70
+                                         and (_j1h_now - _j1h_was) < 5))
                     if not _j1h_ok:
                         print(
                             f"[CONFIRM GATE] "
