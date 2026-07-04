@@ -1308,19 +1308,82 @@ async def _scan_loop():
                                 "HL",
                             ))
                         continue
-                    # PROJ_PNL GATE — add to pending, awaits proj_pnl check
-                    # (no more than 0.1% adverse from signal_price) before
-                    # opening. be_confirm_price is set later, at trade open.
+                    # DIRECT-OPEN ARCHITECTURE (replaces _pending_alerts queue):
+                    # cooldown check -> already-open check -> price-drift guard
+                    # -> _do_open_trade(), all in the same scan cycle as the signal.
                     _ep = alert.get("entry_price", 0) or 0
-                    _pend_key = f"{sym}_{dir_}"
-                    alert["pending_since"] = int(time.time())
-                    _pending_alerts[_pend_key] = alert
+
+                    # Cooldown check — pair-wide 900s cooldown (set by
+                    # _set_pair_cooldown_900() on trade close) and per-symbol+
+                    # direction cooldown (set by set_close_cooldown() on signal
+                    # fire, above) are the SAME _cooldowns dict/check — there is
+                    # only one gate here, not two independent ones.
+                    _cd_remaining = get_cooldown_remaining(sym, dir_)
+                    if _cd_remaining > 0:
+                        print(
+                            f"[BLOCKED_COOLDOWN] {sym} {dir_} "
+                            f"{_cd_remaining}s remaining")
+                        asyncio.create_task(
+                            _log_alert_outcome(
+                                alert,
+                                "BLOCKED_COOLDOWN",
+                                "HL",
+                            ))
+                        continue
+
+                    # Already-open duplicate guard — skip silently, no log.
+                    _open_key = app_state.trade_key(sym, dir_)
+                    if _open_key in app_state.open_trades:
+                        continue
+
+                    # Price-drift guard (formerly EXPIRED_PRICE in the pending
+                    # queue) — protects against opening into a price that has
+                    # already moved > 1.5% adverse from signal_price during
+                    # this scan cycle's processing time.
+                    _cur = app_state.prices.get(sym, 0) or 0
+                    _p_drift = abs(_cur - _ep) / _ep * 100 if _ep else 0
+                    if _cur <= 0 or not _ep or _p_drift > 1.5:
+                        print(
+                            f"[EXPIRED_PRICE] {sym} {dir_} "
+                            f"drift={_p_drift:.2f}% "
+                            f"signal={_ep:.5f} cur={_cur:.5f}")
+                        asyncio.create_task(
+                            _log_alert_outcome(
+                                alert,
+                                "EXPIRED_PRICE",
+                                "HL",
+                            ))
+                        continue
+
                     print(
-                        f"[PENDING] {sym} {dir_} awaiting proj_pnl gate"
-                        f" (signal={_ep:.5f} j1h={_j1h_now:.1f})")
+                        f"[DIRECT OPEN] {sym} {dir_} price={_cur:.5f}"
+                        f" signal={_ep:.5f} — opening trade")
+                    alert["be_confirm_price"] = _ep
+                    _margin = alert.get("margin", MARGIN_PER_TRADE)
+                    trade, err = await _do_open_trade(
+                        sym, dir_,
+                        _margin, alert["leverage"],
+                        alert_data=alert,
+                        exchange="HL",
+                    )
+                    if trade:
+                        print(
+                            f"[OPENED] {sym} {dir_}"
+                            f" entry={trade.get('entry_price')}")
+                    elif err:
+                        print(f"[OPEN FAILED] {sym} {dir_}: {err}")
+                    asyncio.create_task(
+                        _log_alert_outcome(
+                            alert,
+                            "OPENED" if trade else "OPEN_FAILED",
+                            "HL",
+                            confirm_price=_cur,
+                        ))
         except Exception as e:
             print(f"[SCAN LOOP] error: {e}")
-        await _process_pending_alerts()
+        # _process_pending_alerts() no longer called — direct-open
+        # architecture opens trades inline above. Function body kept
+        # in place, uncalled, pending a future cleanup pass.
         await asyncio.sleep(SCAN_INTERVAL_SECONDS)
 
 
@@ -2686,6 +2749,9 @@ async def lifespan(app: FastAPI):
     mexc_client = MexcClient()
     log_startup_config()
     _load_state()
+    if _pending_alerts:
+        _pending_alerts.clear()
+    print("[STARTUP] Pending alerts cleared on restart — direct open mode active")
     await _resolve_bot_identity("HL")
     print("[SCHEMA] hl_trade_log analytics columns Ã¢ÂÂ run once in Supabase SQL editor if any are missing:")
     print("  ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS j15m_entry       float;")
