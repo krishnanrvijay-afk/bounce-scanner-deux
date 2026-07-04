@@ -11,7 +11,6 @@ PAIRS = [
 
 async def main():
     client = HLClient()
-    await client.init()
 
     print(f"{'PAIR':>8} {'TF':>4} {'COUNT':>7} "
           f"{'J':>8} {'FLAG':>20}")
