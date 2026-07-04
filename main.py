@@ -1370,15 +1370,18 @@ async def _scan_loop():
                         print(
                             f"[OPENED] {sym} {dir_}"
                             f" entry={trade.get('entry_price')}")
+                        # No separate "OPENED" alert_log row here — _do_open_trade()
+                        # already logs "TRADE_OPENED" internally on success. Logging
+                        # again here produced a duplicate row per trade open.
                     elif err:
                         print(f"[OPEN FAILED] {sym} {dir_}: {err}")
-                    asyncio.create_task(
-                        _log_alert_outcome(
-                            alert,
-                            "OPENED" if trade else "OPEN_FAILED",
-                            "HL",
-                            confirm_price=_cur,
-                        ))
+                        asyncio.create_task(
+                            _log_alert_outcome(
+                                alert,
+                                "OPEN_FAILED",
+                                "HL",
+                                confirm_price=_cur,
+                            ))
         except Exception as e:
             print(f"[SCAN LOOP] error: {e}")
         # _process_pending_alerts() no longer called — direct-open
