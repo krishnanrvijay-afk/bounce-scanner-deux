@@ -1929,6 +1929,45 @@ async def _exit_monitor_loop():
                                 current,
                                 "CONFIRM_REVERSAL")
                             continue
+
+                # -- SL_PROXIMITY_EXIT: HIGH_PROB tier only. -----------------
+                # Exits once price has moved 80% of the way from entry to
+                # SL, regardless of MFE or whether a peak was ever reached.
+                # No arming required, no percentage-of-MFE check -- pure
+                # adverse-move-toward-SL level exit.
+                if trade.get("tier") == "HIGH_PROB":
+                    _entry_sp = trade.get("entry_price", 0) or 0
+                    _sl_sp    = trade.get("sl_price")
+                    if _entry_sp > 0 and _sl_sp:
+                        if not is_short:
+                            _sl_distance_pct = (
+                                (_entry_sp - _sl_sp) / _entry_sp)
+                            _price_to_sl_pct = (
+                                (current - _sl_sp) / _entry_sp)
+                        else:
+                            _sl_distance_pct = (
+                                (_sl_sp - _entry_sp) / _entry_sp)
+                            _price_to_sl_pct = (
+                                (_sl_sp - current) / _entry_sp)
+                        if (_sl_distance_pct > 0 and
+                                _price_to_sl_pct <=
+                                _sl_distance_pct * 0.20):
+                            print(
+                                f"[SL_PROXIMITY] {sym} {direction}"
+                                f" price={current}"
+                                f" entry={_entry_sp}"
+                                f" sl={_sl_sp}"
+                                f" price_to_sl_pct="
+                                f"{_price_to_sl_pct*100:.2f}%"
+                                f" sl_distance_pct="
+                                f"{_sl_distance_pct*100:.2f}%"
+                                f" — exiting")
+                            _do_close_trade(
+                                key, trade,
+                                current,
+                                "SL_PROXIMITY")
+                            continue
+
                 _elapsed = time.time() - trade.get(
                     "opened_at", time.time())
                 _entry_px = trade.get(
