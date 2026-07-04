@@ -1573,6 +1573,13 @@ async def _write_sign_shadow_rows(key: str, trade: dict, reason: str,
         print("[SIGN SHADOW] write error: " + str(_ss_e))
 
 
+def _set_pair_cooldown_900(symbol: str) -> None:
+    # Per-pair cooldown: any trade close blocks BOTH directions on this
+    # pair for 900s (15 min), not just the direction that closed.
+    set_close_cooldown(symbol, "LONG", 900)
+    set_close_cooldown(symbol, "SHORT", 900)
+
+
 def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
     """Synchronous internal close Ã¢ÂÂ no exchange call, price already known."""
     if not exit_price or exit_price <= 0:
@@ -1659,10 +1666,7 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
     # Always set cooldown on close regardless of exit reason --
     # prevents scanner/exit-monitor race condition where a new
     # alert fires before the KILL call site writes its cooldown.
-    _scanner_mod.set_close_cooldown(
-        sym,
-        trade.get("direction", ""),
-        _scanner_mod.KILL_COOLDOWN_SECONDS)
+    _set_pair_cooldown_900(sym)
     _signal_exhaustion_armed.pop(key + "_se_armed", None)
     _se_j1h_extreme.pop(key, None)
     _save_state()
@@ -1750,7 +1754,7 @@ def _do_trailblazer_close(key: str, trade: dict, exit_price: float,
     if key in app_state.open_trades:
         del app_state.open_trades[key]
     _retire_alert(sym, direction)
-    set_close_cooldown(sym, direction)
+    _set_pair_cooldown_900(sym)
 
     print(f"[TRAILBLAZER] {sym} {direction} Ã¢ÂÂ runner closed at {exit_price}, "
           f"best price was {trail_best}, trail stop triggered at {trail_stop}")
@@ -1930,43 +1934,61 @@ async def _exit_monitor_loop():
                                 "CONFIRM_REVERSAL")
                             continue
 
-                # -- SL_PROXIMITY_EXIT: HIGH_PROB tier only. -----------------
+                # -- SL_PROXIMITY_EXIT: all tiers, all pairs, both directions.
                 # Exits once price has moved 80% of the way from entry to
                 # SL, regardless of MFE or whether a peak was ever reached.
                 # No arming required, no percentage-of-MFE check -- pure
                 # adverse-move-toward-SL level exit.
+                _entry_sp = trade.get("entry_price", 0) or 0
+                _sl_sp    = trade.get("sl_price")
+                if _entry_sp > 0 and _sl_sp:
+                    if not is_short:
+                        _sl_distance_pct = (
+                            (_entry_sp - _sl_sp) / _entry_sp)
+                        _price_to_sl_pct = (
+                            (current - _sl_sp) / _entry_sp)
+                    else:
+                        _sl_distance_pct = (
+                            (_sl_sp - _entry_sp) / _entry_sp)
+                        _price_to_sl_pct = (
+                            (_sl_sp - current) / _entry_sp)
+                    if (_sl_distance_pct > 0 and
+                            _price_to_sl_pct <=
+                            _sl_distance_pct * 0.20):
+                        print(
+                            f"[SL_PROXIMITY] {sym} {direction}"
+                            f" price={current}"
+                            f" entry={_entry_sp}"
+                            f" sl={_sl_sp}"
+                            f" price_to_sl_pct="
+                            f"{_price_to_sl_pct*100:.2f}%"
+                            f" sl_distance_pct="
+                            f"{_sl_distance_pct*100:.2f}%"
+                            f" — exiting")
+                        _do_close_trade(
+                            key, trade,
+                            current,
+                            "SL_PROXIMITY")
+                        continue
+
+                # -- HP_TIME_EXIT: HIGH_PROB trades open >= 30 min with PnL
+                # still <= 0 get closed. Placed after CONFIRM_REVERSAL
+                # (which HIGH_PROB tier skips) and before KILL in the
+                # exit stack.
                 if trade.get("tier") == "HIGH_PROB":
-                    _entry_sp = trade.get("entry_price", 0) or 0
-                    _sl_sp    = trade.get("sl_price")
-                    if _entry_sp > 0 and _sl_sp:
-                        if not is_short:
-                            _sl_distance_pct = (
-                                (_entry_sp - _sl_sp) / _entry_sp)
-                            _price_to_sl_pct = (
-                                (current - _sl_sp) / _entry_sp)
-                        else:
-                            _sl_distance_pct = (
-                                (_sl_sp - _entry_sp) / _entry_sp)
-                            _price_to_sl_pct = (
-                                (_sl_sp - current) / _entry_sp)
-                        if (_sl_distance_pct > 0 and
-                                _price_to_sl_pct <=
-                                _sl_distance_pct * 0.20):
-                            print(
-                                f"[SL_PROXIMITY] {sym} {direction}"
-                                f" price={current}"
-                                f" entry={_entry_sp}"
-                                f" sl={_sl_sp}"
-                                f" price_to_sl_pct="
-                                f"{_price_to_sl_pct*100:.2f}%"
-                                f" sl_distance_pct="
-                                f"{_sl_distance_pct*100:.2f}%"
-                                f" — exiting")
-                            _do_close_trade(
-                                key, trade,
-                                current,
-                                "SL_PROXIMITY")
-                            continue
+                    _hp_age = time.time() - trade.get(
+                        "opened_at", time.time())
+                    if _hp_age >= 1800 and _cpnl <= 0:
+                        print(
+                            f"[HP_TIME_EXIT] {sym} {direction}"
+                            f" age={_hp_age:.0f}s"
+                            f" cpnl={_cpnl:.2f}"
+                            f" — exiting")
+                        _do_close_trade(
+                            key, trade,
+                            current,
+                            "HP_TIME_EXIT")
+                        continue
 
                 _elapsed = time.time() - trade.get(
                     "opened_at", time.time())
@@ -1999,9 +2021,7 @@ async def _exit_monitor_loop():
                           f" elapsed={_elapsed:.0f}s")
                     _do_close_trade(
                         key, trade, current, "KILL")
-                    _scanner_mod.set_close_cooldown(
-                        sym, direction,
-                        _scanner_mod.KILL_COOLDOWN_SECONDS)
+                    _set_pair_cooldown_900(sym)
                     continue
                 # -- ANCHOR time exit: 90 minutes max duration
                 _anchor_pairs = {
@@ -2022,9 +2042,7 @@ async def _exit_monitor_loop():
                                   f"90min exceeded, exiting")
                             _do_close_trade(key, trade,
                                             current, "ANCHOR_TIME_EXIT")
-                            _scanner_mod.set_close_cooldown(
-                                sym, direction,
-                                _scanner_mod.KILL_COOLDOWN_SECONDS)
+                            _set_pair_cooldown_900(sym)
                             continue
 
                 # -- Peak PnL protection shadow (observation only, no exit logic) ----
@@ -2928,7 +2946,7 @@ async def close_trade(req: CloseTradeRequest):
     closed = {**trade, "close_price": close_price, "final_pnl": round(pnl, 2)}
     del app_state.open_trades[key]
     _retire_alert(req.symbol, req.direction)
-    set_close_cooldown(req.symbol, req.direction)
+    _set_pair_cooldown_900(req.symbol)
 
     _save_state()
     print(f"[TRADE CLOSE] {req.symbol} {req.direction} MANUAL pnl=${pnl:.2f} r={r:+.2f}")
