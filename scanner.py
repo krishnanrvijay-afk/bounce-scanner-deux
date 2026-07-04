@@ -465,18 +465,19 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             _pair_corr         = BTC_CORRELATION.get(_sym_base, 0.75)
             _regime_block_short = False
             _regime_block_long  = False
+            _btc_regime_context = "CLEAR"
 
             # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Component A: BTC fast stoch flash detector ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
             _btc_fast         = _last_stoch_fast.get("BTC", (50.0, 50.0))
             _btc_fk, _btc_fd  = _btc_fast
             _btc_fast_margin  = _btc_fk - _btc_fd
             if _btc_fast_margin < -15:
-                _regime_block_long  = True
+                _btc_regime_context = "LONG_SUPPRESSED"
                 log.info(f"[FAST_STOCH_BLOCK] BTC fast K-D={_btc_fast_margin:.1f} ÃÂ¢ÃÂÃÂ LONG entries blocked")
                 asyncio.create_task(_log_gate("HL", "BTC", "FAST_STOCH_BLOCK", "LONG",
                     f"BTC fast K-D={_btc_fast_margin:.1f}"))
             if _btc_fast_margin > 15:
-                _regime_block_short = True
+                _btc_regime_context = "SHORT_SUPPRESSED"
                 log.info(f"[FAST_STOCH_BLOCK] BTC fast K-D={_btc_fast_margin:.1f} ÃÂ¢ÃÂÃÂ SHORT entries blocked")
                 asyncio.create_task(_log_gate("HL", "BTC", "FAST_STOCH_BLOCK", "SHORT",
                     f"BTC fast K-D={_btc_fast_margin:.1f}"))
@@ -652,6 +653,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
 
                 alert = {
                     "symbol":       symbol,
+                    "btc_regime_context": _btc_regime_context,
                     "direction":    direction,
                     "score":        score,
                     "tier":         tier,
