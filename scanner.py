@@ -381,6 +381,14 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
     global _scan_count
 
     _scan_count += 1
+    if _scan_count < 3:
+        print(
+            f"[WARMUP] scan "
+            f"#{_scan_count}/3 — "
+            f"KDJ initializing, "
+            f"skipping signal "
+            f"evaluation")
+        return []
     new_alerts: list[dict] = []
 
     for symbol in PAIRS:
