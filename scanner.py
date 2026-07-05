@@ -264,6 +264,7 @@ def score_bounce_long(j15m, j1h, bid_pct, adx,
     tier, lev = _leverage_tier(adx)
     stoch_gate = stoch_k < 25 and stoch_k > stoch_d
     if not (j15m < J15M_LONG_GATE and j1h >= J1H_LONG_MIN
+            and j1h < J1H_LONG_MAX
             and stoch_gate):
         return 0, tier, lev
     score = 4
@@ -606,7 +607,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     elif direction == "SHORT" and not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN):
                         asyncio.create_task(_log_gate("HL", symbol, "J1H_GATE", direction,
                             f"j1h={j1h:.1f} j15m={j15m:.1f}"))
-                    elif direction == "LONG" and not (j15m < J15M_LONG_GATE and j1h >= J1H_LONG_MIN):
+                    elif direction == "LONG" and not (j15m < J15M_LONG_GATE and j1h >= J1H_LONG_MIN and j1h < J1H_LONG_MAX):
                         asyncio.create_task(_log_gate("HL", symbol, "J1H_GATE", direction,
                             f"j1h={j1h:.1f} j15m={j15m:.1f}"))
                     else:
