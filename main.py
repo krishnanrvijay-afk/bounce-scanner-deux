@@ -498,6 +498,16 @@ def _load_state():
         print(f"[RESTORE] settings restored "
               f"from Supabase")
 
+        # Clear all cooldowns on startup
+        # — prevents stale cooldowns
+        # from blocking signals after
+        # restart. Cooldowns are
+        # ephemeral per-session state,
+        # not persistent state.
+        _scanner_mod._cooldowns.clear()
+        print("[STARTUP] All cooldowns"
+              " cleared on startup")
+
         print(f"[RESTORE] complete Ã¢ÂÂ trades={len(app_state.open_trades)} "
               f"daily_pnl=${daily_pnl:.2f} cooldowns={len(_scanner_mod._cooldowns)} "
               f"cb={consecutive_losses}/{CONSECUTIVE_LOSS_STOP}")
@@ -1282,32 +1292,6 @@ async def _scan_loop():
                     # J1H DIRECTION GATE — confirm J1H moving in right direction
                     # LONG:  j1h must be rising  (j1h_now > j1h_prev)
                     # SHORT: j1h must be falling (j1h_now < j1h_prev)
-                    _j1h_now = alert.get("j1h", 50)
-                    _j1h_was = alert.get("j1h_prev", _j1h_now)
-                    _j1h_prev_valid = alert.get("j1h_prev_valid", True)
-                    _j1h_ok  = (
-                        not _j1h_prev_valid or
-                        (dir_ == "LONG"  and _j1h_now > _j1h_was) or
-                        (dir_ == "LONG"  and _j1h_now < 30
-                                         and (_j1h_was - _j1h_now) < 5) or
-                        (dir_ == "SHORT" and _j1h_now < _j1h_was) or
-                        (dir_ == "SHORT" and _j1h_now > 70
-                                         and (_j1h_now - _j1h_was) < 5))
-                    if not _j1h_ok:
-                        print(
-                            f"[CONFIRM GATE] "
-                            f"{sym} {dir_} J1H "
-                            f"direction wrong -- "
-                            f"j1h={_j1h_now:.1f} "
-                            f"prev={_j1h_was:.1f}"
-                            f" -- discarded")
-                        asyncio.create_task(
-                            _log_alert_outcome(
-                                alert,
-                                "J1H_DISCARDED",
-                                "HL",
-                            ))
-                        continue
                     # DIRECT-OPEN ARCHITECTURE (replaces _pending_alerts queue):
                     # cooldown check -> already-open check -> price-drift guard
                     # -> _do_open_trade(), all in the same scan cycle as the signal.
