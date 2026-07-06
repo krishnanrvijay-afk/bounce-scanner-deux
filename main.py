@@ -423,6 +423,12 @@ def _load_state():
                 .J1H_LONG_MAX = \
                 float(data[
                     "j1h_long_max"])
+        if data.get("j1h_long_min") \
+                is not None:
+            _scanner_mod\
+                .J1H_LONG_MIN = \
+                float(data[
+                    "j1h_long_min"])
         if data.get(
                 "se_j1h_decay_pts") \
                 is not None:
