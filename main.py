@@ -1202,6 +1202,29 @@ async def _scan_loop():
     await asyncio.sleep(3)
     while True:
         try:
+            # Fleet-wide pre-checks
+            # before any scan runs.
+            # If either is active skip
+            # the entire scan cycle —
+            # no signals generated,
+            # no alerts logged,
+            # no Telegram fired.
+            if circuit_breaker_active:
+                print(
+                    "[SCAN SKIP] circuit"
+                    " breaker active —"
+                    " skipping scan")
+                await asyncio.sleep(
+                    SCAN_INTERVAL_SECONDS)
+                continue
+            if trading_halted_today:
+                print(
+                    "[SCAN SKIP] daily"
+                    " halt active —"
+                    " skipping scan")
+                await asyncio.sleep(
+                    SCAN_INTERVAL_SECONDS)
+                continue
             new_alerts = await run_full_scan(hl_client, market_health=app_state.market_health)
             # -- BTC flash TG alert -- fires once per flash event when block arms --------
             if _scanner_mod._btc_flash_tg_pending[0]:
