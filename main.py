@@ -814,14 +814,6 @@ async def _do_open_trade(
 ) -> tuple[Optional[dict], Optional[str]]:
     global circuit_breaker_active, trading_halted_today
 
-    if app_state.margin_deployed + margin_usdc > MARGIN_HARD_CAP:
-        asyncio.create_task(
-            _log_alert_outcome(
-                {"symbol": symbol, "direction": direction},
-                "BLOCKED_CAP",
-                exchange,
-            ))
-        return None, "cap_reached"
     if circuit_breaker_active:
         asyncio.create_task(
             _log_alert_outcome(
