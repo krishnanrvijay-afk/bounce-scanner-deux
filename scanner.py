@@ -247,7 +247,7 @@ def score_bounce_short(j15m, j1h, ask_pct, adx,
                        stoch_k: float = 50.0, stoch_d: float = 50.0,
                        j1h_prev: float = None) -> tuple[int, str, int]:
     tier, lev = _leverage_tier(adx)
-    stoch_gate = stoch_k > 75 and stoch_k <= 84 and stoch_k < stoch_d
+    stoch_gate = (j5m > 80 and j15m > 80)
     if not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN and j1h <= J1H_SHORT_MAX
             and stoch_gate):
         return 0, tier, lev
@@ -262,7 +262,7 @@ def score_bounce_long(j15m, j1h, bid_pct, adx,
                       j5m: float = 50.0, trend: str = "Neutral",
                       stoch_k: float = 50.0, stoch_d: float = 50.0) -> tuple[int, str, int]:
     tier, lev = _leverage_tier(adx)
-    stoch_gate = stoch_k < 25 and stoch_k > stoch_d
+    stoch_gate = (j5m < 20 and j15m < 20)
     if not (j15m < J15M_LONG_GATE and j1h >= J1H_LONG_MIN
             and j1h < J1H_LONG_MAX
             and stoch_gate):
