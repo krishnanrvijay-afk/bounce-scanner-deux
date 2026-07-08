@@ -168,8 +168,8 @@ chk("I2", hasattr(scanner, "KILL_PCT_5MIN") and scanner.KILL_PCT_5MIN == 0.004,
 chk("I3", hasattr(scanner, "SE_J1H_DECAY_PTS") and scanner.SE_J1H_DECAY_PTS == 10.0,
     f"scanner.SE_J1H_DECAY_PTS exists = {getattr(scanner, 'SE_J1H_DECAY_PTS', 'MISSING')}")
 
-chk("I4", hasattr(scanner, "KILL_COOLDOWN_SECONDS") and scanner.KILL_COOLDOWN_SECONDS == 1800,
-    f"scanner.KILL_COOLDOWN_SECONDS exists = {getattr(scanner, 'KILL_COOLDOWN_SECONDS', 'MISSING')}")
+chk("I4", hasattr(scanner, "PAIR_COOLDOWN_SECONDS") and scanner.PAIR_COOLDOWN_SECONDS == 1800,
+    f"scanner.PAIR_COOLDOWN_SECONDS exists = {getattr(scanner, 'PAIR_COOLDOWN_SECONDS', 'MISSING')}")
 
 chk("I5", not hasattr(scanner, "KILL_GRACE_SECONDS"),
     "scanner.KILL_GRACE_SECONDS does NOT exist (deprecated constant gone — this was the 500 crash bug)")
@@ -242,7 +242,7 @@ settings_response = {
     "margin_per_trade":
         scanner.MARGIN_PER_TRADE,
     "kill_cooldown_seconds":
-        scanner.KILL_COOLDOWN_SECONDS,
+        scanner.PAIR_COOLDOWN_SECONDS,
     "kill_pct_floor":
         scanner.KILL_PCT_FLOOR,
     "kill_pct_5min":
