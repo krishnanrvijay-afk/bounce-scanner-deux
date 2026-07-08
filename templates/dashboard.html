@@ -686,6 +686,28 @@
       </div>
     </div>
   </div>
+  <div style="display:flex;gap:6px;margin-bottom:8px">
+    <button id="jmap-btn-all" onclick="setJmapView('all')" style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#00e676;color:#000;border:none;cursor:pointer">ALL</button>
+    <button id="jmap-btn-5m" onclick="setJmapView('5m')" style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#333;color:#fff;border:none;cursor:pointer">5M</button>
+    <button id="jmap-btn-15m" onclick="setJmapView('15m')" style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#333;color:#fff;border:none;cursor:pointer">15M</button>
+    <button id="jmap-btn-1h" onclick="setJmapView('1h')" style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;background:#333;color:#fff;border:none;cursor:pointer">1H</button>
+  </div>
+  <div class="jb-ruler-row" id="jb-ruler-5m">
+    <span class="jb-rdot" style="background:#00bcd4"></span>
+    <div class="jb-ruler-content">
+      <div class="jb-ticks">
+        <span class="jb-tick" style="color:#00e676">0</span><span class="jb-tick" style="color:#00e676">20</span><span class="jb-tick" style="color:#555">40</span><span class="jb-tick" style="color:#555">60</span><span class="jb-tick" style="color:#ff3d57">80</span><span class="jb-tick" style="color:#ff3d57">100</span>
+      </div>
+      <div class="jb-bar-outer">
+        <div class="jb-chips-layer" id="jb-chips-5m"></div>
+        <div class="jb-bar">
+          <div class="jb-zg" style="width:20%"></div>
+          <div class="jb-zr" style="left:80%;width:20%"></div>
+          <div class="jb-mid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="jb-ruler-row" id="jb-ruler-15m">
     <div class="jb-ruler-content">
       <div class="jb-ticks">
