@@ -47,6 +47,7 @@ from scanner import (
     get_scan_count, set_close_cooldown, clear_cooldown,
     get_cooldown_remaining, clear_all_scanner_state, log_startup_config,
     compute_market_health, get_session_name,
+    set_pair_cooldown, get_pair_cooldown_remaining, get_all_cooldowns,
 )
 import scanner as _scanner_mod  # direct access to _cooldowns dict for persistence
 
@@ -412,7 +413,7 @@ def _load_state():
             _scanner_mod.CONSECUTIVE_LOSS_STOP = \
                 CONSECUTIVE_LOSS_STOP
         if data.get("kill_cooldown_seconds") is not None:
-            _scanner_mod.KILL_COOLDOWN_SECONDS = int(
+            _scanner_mod.PAIR_COOLDOWN_SECONDS = int(
                 data["kill_cooldown_seconds"])
         if data.get("kill_grace_seconds") is not None:
             _scanner_mod.KILL_GRACE_SECONDS = int(
@@ -1772,6 +1773,7 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
                 print(f"[LOCK CLEANUP FAILED] {_lk}: {_unlock_e}")
     _signal_exhaustion_armed.pop(key + "_se_armed", None)
     _se_j1h_extreme.pop(key, None)
+    set_pair_cooldown(sym)
     _candle_close_history.pop(key, None)
     _candle_high_history.pop(key, None)
     _save_state()
@@ -2937,6 +2939,7 @@ async def get_state():
     _state["btc_j1h"]            = _scanner_mod._btc_j1h
     _state["regime_block_long"]  = False
     _state["regime_block_short"] = False
+    _state["pair_cooldowns"]     = _scanner_mod.get_all_cooldowns()
     return _state
 
 
@@ -3424,7 +3427,7 @@ async def get_settings():
         "consecutive_loss_stop":
             CONSECUTIVE_LOSS_STOP,
         "kill_cooldown_seconds":
-            _scanner_mod.KILL_COOLDOWN_SECONDS,
+            _scanner_mod.PAIR_COOLDOWN_SECONDS,
         "kill_pct_floor":
             _scanner_mod.KILL_PCT_FLOOR,
         "kill_pct_5min":
@@ -3489,7 +3492,7 @@ async def post_settings(request: Request):
         _scanner_mod.CONSECUTIVE_LOSS_STOP = \
             CONSECUTIVE_LOSS_STOP
     if "kill_cooldown_seconds" in body:
-        _scanner_mod.KILL_COOLDOWN_SECONDS = int(
+        _scanner_mod.PAIR_COOLDOWN_SECONDS = int(
             body["kill_cooldown_seconds"])
     if "kill_pct_floor" in body:
         _scanner_mod.KILL_PCT_FLOOR = float(
@@ -3535,7 +3538,7 @@ async def post_settings(request: Request):
                 "consecutive_loss_stop":
                     CONSECUTIVE_LOSS_STOP,
                 "kill_cooldown_seconds":
-                    _scanner_mod.KILL_COOLDOWN_SECONDS,
+                    _scanner_mod.PAIR_COOLDOWN_SECONDS,
                 "kill_pct_floor":
                     _scanner_mod.KILL_PCT_FLOOR,
                 "kill_pct_5min":
