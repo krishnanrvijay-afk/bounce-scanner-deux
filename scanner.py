@@ -11,7 +11,7 @@ from config import (
     TP1_R, TP1_CLOSE_PCT, TP2_R, LEVERAGE_HIGH, LEVERAGE_MID, LEVERAGE_LOW,
     ADX_MIN_LONG, ADX_MIN_SHORT, PAPER_MODE, CONSECUTIVE_LOSS_STOP,
     MIN_SL_PCT, MIN_SL_PCT_DEFAULT, MARGIN_PER_TRADE,
-    KILL_COOLDOWN_SECONDS,
+    PAIR_COOLDOWN_SECONDS,
     KILL_PCT_FLOOR, KILL_PCT_5MIN,
     SE_J1H_DECAY_PTS,
     BLOCKED_PAIR_SESSIONS,
@@ -54,6 +54,7 @@ _btc_flash_block_until: dict = {"long": None}                  # expiry for BTC 
 _flash_closed: set = set()                                      # trade keys already force-closed this flash event
 _btc_flash_tg_pending = [False]                                 # set True when flash arms; cleared in main.py after TG sent
 _cooldowns:   dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" ÃÂ¢ÃÂÃÂ expiry ts
+_pair_cooldowns: dict           = {}   # keyed symbol -> expiry ts
 _scan_count:  int              = 0
 _stale_prices: set[str]        = set()  # symbols with 2 consecutive missing prices
 _stale_counts: dict             = {}     # consecutive no-price count per symbol
@@ -281,7 +282,7 @@ def set_close_cooldown(
         direction: str,
         seconds: int = None):
     _secs = (seconds if seconds is not None
-             else KILL_COOLDOWN_SECONDS)
+             else PAIR_COOLDOWN_SECONDS)
     _cooldowns[
         f"{symbol}{direction}"] = (
         time.time() + _secs)
@@ -420,6 +421,11 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                 continue
             _stale_counts[symbol] = 0
             _stale_prices.discard(symbol)
+
+            # Pair cooldown pre-signal check
+            if get_pair_cooldown_remaining(
+                    symbol) > 0:
+                continue
 
             # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Indicators ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
             _, _, j5m  = _compute_kdj(candles_5m)
@@ -862,3 +868,46 @@ def log_startup_config():
         f"ADX_MIN_LONG={ADX_MIN_LONG} ADX_MIN_SHORT={ADX_MIN_SHORT} "
         f"CIRCUIT_BREAKER={CONSECUTIVE_LOSS_STOP} PAPER={PAPER_MODE}"
     )
+
+
+def set_pair_cooldown(
+        symbol: str,
+        duration: int =
+        PAIR_COOLDOWN_SECONDS
+) -> None:
+    _pair_cooldowns[symbol] = (
+        time.time() + duration)
+    print(
+        f"[PAIR COOLDOWN] {symbol}"
+        f" cooling down for"
+        f" {duration}s")
+
+
+def get_pair_cooldown_remaining(
+        symbol: str
+) -> float:
+    exp = _pair_cooldowns.get(
+        symbol, 0)
+    remaining = exp - time.time()
+    if remaining <= 0:
+        _pair_cooldowns.pop(
+            symbol, None)
+        return 0.0
+    return round(remaining, 1)
+
+
+def get_all_cooldowns() -> dict:
+    now = time.time()
+    result = {}
+    expired = []
+    for sym, exp in list(
+            _pair_cooldowns.items()):
+        rem = exp - now
+        if rem > 0:
+            result[sym] = round(rem, 1)
+        else:
+            expired.append(sym)
+    for sym in expired:
+        _pair_cooldowns.pop(sym, None)
+    return result
+
