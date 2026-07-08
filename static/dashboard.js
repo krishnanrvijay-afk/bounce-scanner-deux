@@ -758,10 +758,18 @@ function renderBanner() {
     if (!container || container.style.display === 'none') return;
 
     const items = [...pairs].map(p => {
-      const raw = tfKey === '15m' ? (p.j15m || 50) : (p.j1h || 50);
+      const raw = tfKey === '5m'
+          ? (p.j5m || 50)
+          : tfKey === '15m'
+          ? (p.j15m || 50)
+          : (p.j1h || 50);
       const j   = Math.min(97, Math.max(3, +raw));
-      const longConf  = (p.j15m || 0) < 20 && (p.j1h || 0) < 40;
-      const shortConf = (p.j15m || 0) > 80 && (p.j1h || 0) > 60;
+      const longConf  = tfKey === '5m'
+          ? (p.j5m || 0) < 20 && (p.j1h || 0) >= 30 && (p.j1h || 0) <= 70
+          : (p.j15m || 0) < 20 && (p.j1h || 0) < 40;
+      const shortConf = tfKey === '5m'
+          ? (p.j5m || 0) > 80 && (p.j1h || 0) >= 30 && (p.j1h || 0) <= 70
+          : (p.j15m || 0) > 80 && (p.j1h || 0) > 60;
       return { sym: p.symbol, j, longConf, shortConf };
     }).sort((a, b) => a.j - b.j);
 
@@ -782,9 +790,9 @@ function renderBanner() {
 
     container.innerHTML = placed.map(({ sym, j, row, longConf, shortConf }) => {
       const isConf = longConf || shortConf;
-      const col = tfKey === '15m'
-        ? (j < 20 ? '#00e676' : j < 35 ? 'rgba(0,230,118,0.5)' : j < 65 ? 'rgba(255,255,255,0.4)' : j < 80 ? 'rgba(255,61,87,0.5)' : '#ff3d57')
-        : (j < 40 ? '#00e676' : j < 50 ? 'rgba(0,230,118,0.5)' : j < 60 ? 'rgba(255,255,255,0.4)' : j < 70 ? 'rgba(255,61,87,0.5)' : '#ff3d57');
+      const col = tfKey === '1h'
+        ? (j < 40 ? '#00e676' : j < 50 ? 'rgba(0,230,118,0.5)' : j < 60 ? 'rgba(255,255,255,0.4)' : j < 70 ? 'rgba(255,61,87,0.5)' : '#ff3d57')
+        : (j < 20 ? '#00e676' : j < 35 ? 'rgba(0,230,118,0.5)' : j < 65 ? 'rgba(255,255,255,0.4)' : j < 80 ? 'rgba(255,61,87,0.5)' : '#ff3d57');
       const pulseCls   = isConf ? ' cb-conf' : '';
       const extraBot   = row * 18;
       return `<div class="cb-chip${pulseCls}" style="left:${j.toFixed(1)}%;bottom:${extraBot}px;color:${col}">${sym}${isConf ? '' : ''}<div class="cb-tick"></div></div>`;
@@ -793,6 +801,38 @@ function renderBanner() {
 
   fillRuler('jb-chips-15m', '15m');
   fillRuler('jb-chips-1h',  '1h');
+  fillRuler('jb-chips-5m',  '5m');
+}
+
+function setJmapView(view) {
+  const r5m  = document.getElementById('jb-ruler-5m');
+  const r15m = document.getElementById('jb-ruler-15m');
+  const r1h  = document.getElementById('jb-ruler-1h');
+  const btns = {
+    all:  document.getElementById('jmap-btn-all'),
+    '5m': document.getElementById('jmap-btn-5m'),
+    '15m':document.getElementById('jmap-btn-15m'),
+    '1h': document.getElementById('jmap-btn-1h'),
+  };
+  Object.values(btns).forEach(b => { if(b) { b.style.background='#333'; b.style.color='#fff'; } });
+  if (btns[view]) { btns[view].style.background='#00e676'; btns[view].style.color='#000'; }
+  if (view === 'all') {
+    if(r5m)  r5m.style.display='';
+    if(r15m) r15m.style.display='';
+    if(r1h)  r1h.style.display='';
+  } else if (view === '5m') {
+    if(r5m)  r5m.style.display='';
+    if(r15m) r15m.style.display='none';
+    if(r1h)  r1h.style.display='none';
+  } else if (view === '15m') {
+    if(r5m)  r5m.style.display='none';
+    if(r15m) r15m.style.display='';
+    if(r1h)  r1h.style.display='none';
+  } else if (view === '1h') {
+    if(r5m)  r5m.style.display='none';
+    if(r15m) r15m.style.display='none';
+    if(r1h)  r1h.style.display='';
+  }
 }
 
 //  Alerts tab 
@@ -3268,3 +3308,4 @@ async function _cfgDoReset(btn) {
       cfgRenderIdentity(d);
     } catch(e) { alert('Request failed: ' + e); }
   }
+document.addEventListener('DOMContentLoaded', function() { setJmapView('all'); });
