@@ -471,22 +471,15 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             _pair_corr         = BTC_CORRELATION.get(_sym_base, 0.75)
             _regime_block_short = False
             _regime_block_long  = False
-            _btc_regime_context = "CLEAR"
-
-            # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Component A: BTC fast stoch flash detector ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
-            _btc_fast         = _last_stoch_fast.get("BTC", (50.0, 50.0))
-            _btc_fk, _btc_fd  = _btc_fast
-            _btc_fast_margin  = _btc_fk - _btc_fd
-            if _btc_fast_margin < -15:
-                _btc_regime_context = "LONG_SUPPRESSED"
-                log.info(f"[FAST_STOCH_BLOCK] BTC fast K-D={_btc_fast_margin:.1f} ÃÂ¢ÃÂÃÂ LONG entries blocked")
-                asyncio.create_task(_log_gate("HL", "BTC", "FAST_STOCH_BLOCK", "LONG",
-                    f"BTC fast K-D={_btc_fast_margin:.1f}"))
-            if _btc_fast_margin > 15:
-                _btc_regime_context = "SHORT_SUPPRESSED"
-                log.info(f"[FAST_STOCH_BLOCK] BTC fast K-D={_btc_fast_margin:.1f} ÃÂ¢ÃÂÃÂ SHORT entries blocked")
-                asyncio.create_task(_log_gate("HL", "BTC", "FAST_STOCH_BLOCK", "SHORT",
-                    f"BTC fast K-D={_btc_fast_margin:.1f}"))
+            if _btc_j1h > 80.0:
+                _btc_regime_context = "LONG_BLOCKED"
+            elif _btc_j1h < 20.0:
+                _btc_regime_context = "SHORT_BLOCKED"
+            elif 40.0 <= _btc_j1h <= 60.0:
+                _btc_regime_context = "NEUTRAL_BLOCK"
+            else:
+                _btc_regime_context = "CLEAR"
+            _btc_regime_context = (_btc_regime_context or "UNKNOWN")
             # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Component A2: BTC 1m flash crash detector ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
             _flash_thresholds = {"ASIA": 0.0030, "EU": 0.0055, "US": 0.0050}
             _cur_session  = get_session_name()
@@ -583,6 +576,14 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     g_stoch = stoch_k < 25 and stoch_k > stoch_d
 
                     g_depth = bid_pct >= DEPTH_GATE_PCT
+                    # BTC regime LONG gate
+                    # Block LONG entries when BTC J1H is overbought or neutral
+                    # -- market context unfavorable for LONG bounces
+                    if (direction == "LONG" and
+                            _btc_regime_context in (
+                                "LONG_BLOCKED",
+                                "NEUTRAL_BLOCK")):
+                        continue
                     score, tier, lev = score_bounce_long(
                         j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
                         stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
