@@ -2120,7 +2120,16 @@ async def _exit_monitor_loop():
                                    else False)
                     if _be_crossed:
                         _sh["be_armed"] = True
-                    _now_candle_ts = (int(time.time()) // 300) * 300
+                    # Age-based candle boundary for PEAK_DECAY_20:
+                    # < 300s (5 min) -> 1M boundary
+                    # >= 300s (5 min) -> 5M boundary
+                    _pd_boundary = (
+                        60 if _elapsed < 300
+                        else 300)
+                    _now_candle_ts = (
+                        int(time.time())
+                        // _pd_boundary
+                        ) * _pd_boundary
                     if (_sh["be_armed"] and _cpnl > _sh["peak_pnl_usd"]
                             and _now_candle_ts > _sh["last_peak_candle_ts"]):
                         _sh["peak_pnl_usd"]    = _cpnl
