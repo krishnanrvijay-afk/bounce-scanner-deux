@@ -2738,6 +2738,8 @@ async def _log_alert_outcome(
                 alert.get("adx1h"),
             "j15m_at_signal":
                 alert.get("j15m"),
+            "j5m_at_signal":
+                alert.get("j5m", None),
             "depth_bid_pct":
                 alert.get("depth_bid_pct"),
             "depth_ask_pct":
