@@ -657,7 +657,13 @@ def _append_trade_log(trade: dict, exit_price: float, reason: str, pnl: float, r
                 _tl_row["vwap_at_entry"] = trade.get("vwap_at_entry")
                 _tl_row["vwap_pct_diff"] = trade.get("vwap_pct_diff")
                 _tl_row["vwap_position"] = trade.get("vwap_position")
-            sb.table("hl_trade_log").insert(_tl_row).execute()
+            sb.table("hl_trade_log")\
+                .update(_tl_row)\
+                .eq("pair",      trade["symbol"])\
+                .eq("direction", trade["direction"])\
+                .eq("open_time", open_iso)\
+                .is_("close_time", "null")\
+                .execute()
         except Exception as _e:
             print(f"[PERSIST] hl_trade_log insert error: {_e}")
 
