@@ -2500,7 +2500,7 @@ async def _exit_monitor_loop():
 
                     _now_candle = (
                         int(time.time())
-                        // 300) * 300
+                        // 60) * 60
 
                     _hh = _candle_high_history\
                         .setdefault(key, {
