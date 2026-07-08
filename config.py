@@ -136,7 +136,7 @@ SENTINEL_MIN_PEAK_PCT: dict = {
 }
 SENTINEL_MIN_PEAK_PCT_DEFAULT: float = 0.0018
 
-KILL_COOLDOWN_SECONDS: int = 1800
+PAIR_COOLDOWN_SECONDS: int = 1800
 # Post-KILL cooldown -- blocks re-entry
 # on same pair same direction for this
 # many seconds after a KILL exit.
