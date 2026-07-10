@@ -59,6 +59,7 @@ _scan_count:  int              = 0
 _stale_prices: set[str]        = set()  # symbols with 2 consecutive missing prices
 _stale_counts: dict             = {}     # consecutive no-price count per symbol
 _btc_j1h: float = 50.0   # cached BTC J1H ÃÂ¢ÃÂÃÂ updated each scan when BTC is processed
+_btc_j1h_history: list = []  # Tracks last 12 BTC J1H values — ~10-15 minutes of macro trend
 
 BTC_CORRELATION: dict[str, float] = {
     "ETH": 0.94, "SOL": 0.86, "XRP": 0.84, "DOGE": 0.87,
@@ -454,6 +455,11 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
             if symbol == "BTC":
                 global _btc_j1h
                 _btc_j1h = j1h
+                global _btc_j1h_history
+                _btc_j1h_history.append(_btc_j1h)
+                if len(_btc_j1h_history) > 12:
+                    _btc_j1h_history = \
+                        _btc_j1h_history[-12:]
             bid_pct, ask_pct = _depth_pcts(book)
 
             vol_15m    = candles_15m[-1]["volume"] if candles_15m else 0
@@ -560,6 +566,14 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     g_stoch = stoch_k > 75 and stoch_k < stoch_d
 
                     g_depth = ask_pct >= DEPTH_GATE_PCT
+                    # BTC macro trend SHORT gate
+                    # Block SHORTs when BTC J1H is higher now than 6 scans
+                    # ago — macro uptrend active
+                    # prevents firing SHORTs into a sustained BTC rally
+                    if (direction == "SHORT"
+                            and len(_btc_j1h_history) >= 6
+                            and _btc_j1h > _btc_j1h_history[-6]):
+                        continue
                     score, tier, lev = score_bounce_short(
                         j15m, j1h, ask_pct, adx1h, j5m=j5m, trend=trend,
                         stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
