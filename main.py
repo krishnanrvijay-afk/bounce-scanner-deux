@@ -2106,6 +2106,12 @@ async def _exit_monitor_loop():
                           f" elapsed={_elapsed:.0f}s")
                     _do_close_trade(
                         key, trade, current, "KILL")
+                    # Per-pair direction session adverse-exit count
+                    _skey = f"{sym}_{direction}_{get_session_name()}"
+                    _session_sl_counts[_skey] = _session_sl_counts.get(_skey, 0) + 1
+                    if _session_sl_counts[_skey] >= 2 and _skey not in _session_halted:
+                        _session_halted.add(_skey)
+                        print(f"[SESSION HALT] {sym} {direction} — 2 adverse exits (KILL) in {get_session_name()} session. Halted for remainder of session.")
                     continue
                 # -- ANCHOR time exit: 90 minutes max duration
                 _anchor_pairs = {
@@ -2585,6 +2591,12 @@ async def _exit_monitor_loop():
                                     "3H_LOWER_HIGH")
                                 _candle_high_history\
                                     .pop(key, None)
+                                # Per-pair direction session adverse-exit count
+                                _skey = f"{sym}_{direction}_{get_session_name()}"
+                                _session_sl_counts[_skey] = _session_sl_counts.get(_skey, 0) + 1
+                                if _session_sl_counts[_skey] >= 2 and _skey not in _session_halted:
+                                    _session_halted.add(_skey)
+                                    print(f"[SESSION HALT] {sym} {direction} — 2 adverse exits (3H_LOWER_HIGH) in {get_session_name()} session. Halted for remainder of session.")
                                 continue
 
                             elif (is_short
@@ -2608,6 +2620,12 @@ async def _exit_monitor_loop():
                                     "3L_HIGHER_LOW")
                                 _candle_high_history\
                                     .pop(key, None)
+                                # Per-pair direction session adverse-exit count
+                                _skey = f"{sym}_{direction}_{get_session_name()}"
+                                _session_sl_counts[_skey] = _session_sl_counts.get(_skey, 0) + 1
+                                if _session_sl_counts[_skey] >= 2 and _skey not in _session_halted:
+                                    _session_halted.add(_skey)
+                                    print(f"[SESSION HALT] {sym} {direction} — 2 adverse exits (3L_HIGHER_LOW) in {get_session_name()} session. Halted for remainder of session.")
                                 continue
 
                 # ── TIME_ADVERSE_EXIT backstop
@@ -2655,6 +2673,12 @@ async def _exit_monitor_loop():
                             key, trade,
                             current,
                             "TIME_ADVERSE_EXIT")
+                        # Per-pair direction session adverse-exit count
+                        _skey = f"{sym}_{direction}_{get_session_name()}"
+                        _session_sl_counts[_skey] = _session_sl_counts.get(_skey, 0) + 1
+                        if _session_sl_counts[_skey] >= 2 and _skey not in _session_halted:
+                            _session_halted.add(_skey)
+                            print(f"[SESSION HALT] {sym} {direction} — 2 adverse exits (TIME_ADVERSE_EXIT) in {get_session_name()} session. Halted for remainder of session.")
                         continue
 
                 # Signal Exhaustion -- exit when J1H turns against the trade
