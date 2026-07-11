@@ -66,7 +66,6 @@ _sentinel_sweep: list = []   # deferred protective exits (PEAK_DECAY_20 / RUNNER
 _adverse_shadow: dict = {}  # trade_key -> adverse-cut shadow state (observation only)
 _sign_shadow:   dict = {}  # trade_key -> PnL-sign transition history (observation only)
 _signal_shadow: dict = {}  # trade_key -> signal invalidation shadow state (observation only)
-_signal_exhaustion_armed: dict = {}  # (key + "_se_armed") -> bool; SE arming state per trade
 _se_j1h_extreme: dict = {}  # key -> best J1H while cpnl > 0; LONGs: highest, SHORTs: lowest
 _candle_close_history: dict = {}
 _candle_high_history: dict = {}
@@ -1758,7 +1757,6 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
                 _sb2.table("trade_open_locks").delete().eq("lock_key", _lk).execute()
             except Exception as _unlock_e:
                 print(f"[LOCK CLEANUP FAILED] {_lk}: {_unlock_e}")
-    _signal_exhaustion_armed.pop(key + "_se_armed", None)
     _se_j1h_extreme.pop(key, None)
     set_pair_cooldown(sym)
     _candle_close_history.pop(key, None)
@@ -2599,7 +2597,7 @@ async def _exit_monitor_loop():
                         _prev = _se_j1h_extreme.get(key, _cur_j1h)
                         _se_j1h_extreme[key] = max(_prev, _cur_j1h)
                         _j1h_decay = _se_j1h_extreme[key] - _cur_j1h
-                        if _j1h_decay >= _scanner_mod.SE_J1H_DECAY_PTS:
+                        if _j1h_decay >= _scanner_mod.SE_J1H_DECAY_PTS and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min:
                             print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
                                   f" j1h_peak={_se_j1h_extreme[key]:.1f}"
                                   f" j1h_now={_cur_j1h:.1f}"
@@ -2608,14 +2606,13 @@ async def _exit_monitor_loop():
                             _do_close_trade(
                                 key, trade, current, "SIGNAL_EXHAUSTION")
                             _se_j1h_extreme.pop(key, None)
-                            _signal_exhaustion_armed.pop(key + "_se_armed", None)
                             continue
                     else:
                         # SHORT: track J1H trough, fire when rises SE_J1H_DECAY_PTS+
                         _prev = _se_j1h_extreme.get(key, _cur_j1h)
                         _se_j1h_extreme[key] = min(_prev, _cur_j1h)
                         _j1h_rise = _cur_j1h - _se_j1h_extreme[key]
-                        if _j1h_rise >= _scanner_mod.SE_J1H_DECAY_PTS:
+                        if _j1h_rise >= _scanner_mod.SE_J1H_DECAY_PTS and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min:
                             print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
                                   f" j1h_trough={_se_j1h_extreme[key]:.1f}"
                                   f" j1h_now={_cur_j1h:.1f}"
@@ -2624,7 +2621,6 @@ async def _exit_monitor_loop():
                             _do_close_trade(
                                 key, trade, current, "SIGNAL_EXHAUSTION")
                             _se_j1h_extreme.pop(key, None)
-                            _signal_exhaustion_armed.pop(key + "_se_armed", None)
                             continue
                 # Ã¢ÂÂÃ¢ÂÂ TRAILBLAZER: ATR trailing stop after tp1_hit Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
                 if tp1_hit:
