@@ -579,10 +579,21 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                         j15m, j1h, ask_pct, adx1h, j5m=j5m, trend=trend,
                         stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
                         j1h_prev=_j1h_prev)
-                    log_gates = (f"j15m={j15m:.1f}(need>{J15M_SHORT_GATE}) "
-                                 f"j1h={j1h:.1f}(need>{J1H_SHORT_MIN}) "
-                                 f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need>75,k<d) "
-                                 f"ask={ask_pct:.1f}%(need>={DEPTH_GATE_PCT}%)")
+                    _j1h_p_str  = (f"{_j1h_prev:.1f}"
+                                   if _j1h_prev is not None else "None")
+                    _j1h_dir_s  = ("FALL"
+                                   if _j1h_prev is not None and j1h <= _j1h_prev
+                                   else "FLAT/RISE")
+                    _log_gates = (
+                        f"j5m={j5m:.1f}(need>80)"
+                        f" j15m={j15m:.1f}(need>{J15M_SHORT_GATE})"
+                        f" j1h={j1h:.1f}"
+                        f" j1h_prev={_j1h_p_str}"
+                        f" j1h_dir={_j1h_dir_s}"
+                        f" btc={_btc_j1h:.1f}"
+                        f" depth_bid={bid_pct:.1f}%"
+                        f" depth_ask={ask_pct:.1f}%"
+                    )
                 else:
                     if _regime_block_long:
                         log.info(f"[REGIME] {symbol} LONG blocked ÃÂ¢ÃÂÃÂ BTC J1H={_btc_j1h:.1f} corr={_pair_corr}")
@@ -604,10 +615,21 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                         j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
                         stoch_k=stoch_k_fast, stoch_d=stoch_d_fast,
                         j1h_prev=_j1h_prev)
-                    log_gates = (f"j15m={j15m:.1f}(need<{J15M_LONG_GATE}) "
-                                 f"j1h={j1h:.1f}(need>={J1H_LONG_MIN}) "
-                                 f"stoch_k={stoch_k:.1f}/stoch_d={stoch_d:.1f}(need<25,k>d) "
-                                 f"bid={bid_pct:.1f}%(need>={DEPTH_GATE_PCT}%)")
+                    _j1h_p_str  = (f"{_j1h_prev:.1f}"
+                                   if _j1h_prev is not None else "None")
+                    _j1h_dir_l  = ("RISE"
+                                   if _j1h_prev is not None and j1h >= _j1h_prev
+                                   else "FLAT/FALL")
+                    _log_gates = (
+                        f"j5m={j5m:.1f}(need<10)"
+                        f" j15m={j15m:.1f}(need<{J15M_LONG_GATE})"
+                        f" j1h={j1h:.1f}"
+                        f" j1h_prev={_j1h_p_str}"
+                        f" j1h_dir={_j1h_dir_l}"
+                        f" btc={_btc_j1h:.1f}"
+                        f" depth_bid={bid_pct:.1f}%"
+                        f" depth_ask={ask_pct:.1f}%"
+                    )
 
                 # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ GATE3 log ÃÂ¢ÃÂÃÂ every scan when >= 3 of 4 gates pass ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
                 _gate_list  = [g_j15m, g_j1h, g_stoch, g_depth]
@@ -622,21 +644,18 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     )
 
                 if score >= 4:
-                    log.info(f"[SCORE] {symbol} {direction} gates=PASS score={score} {log_gates}")
+                    log.info(f"[SCORE] {symbol} {direction} gates=PASS score={score} {_log_gates}")
                 else:
-                    if (direction == "LONG" and adx1h < ADX_MIN_LONG) or \
-                            (direction == "SHORT" and adx1h < ADX_MIN_SHORT):
-                        asyncio.create_task(_log_gate("HL", symbol, "ADX_GATE", direction,
-                            f"ADX {adx1h:.1f} below min for {direction}"))
-                    elif direction == "SHORT" and not (j15m > J15M_SHORT_GATE and j1h > J1H_SHORT_MIN):
-                        asyncio.create_task(_log_gate("HL", symbol, "J1H_GATE", direction,
-                            f"j1h={j1h:.1f} j15m={j15m:.1f}"))
-                    elif direction == "LONG" and not (j15m < J15M_LONG_GATE and j1h >= J1H_LONG_MIN and j1h < J1H_LONG_MAX):
-                        asyncio.create_task(_log_gate("HL", symbol, "J1H_GATE", direction,
-                            f"j1h={j1h:.1f} j15m={j15m:.1f}"))
+                    _stoch_pass = (
+                        (direction == "SHORT" and j5m > 80 and j15m > J15M_SHORT_GATE) or
+                        (direction == "LONG"  and j5m < 10 and j15m < J15M_LONG_GATE)
+                    )
+                    if not _stoch_pass:
+                        asyncio.create_task(_log_gate("HL", symbol, "STOCH_GATE_FAIL", direction,
+                            f"j5m={j5m:.1f} j15m={j15m:.1f}"))
                     else:
-                        asyncio.create_task(_log_gate("HL", symbol, "STOCH_BLOCK", direction,
-                            f"stoch_k={stoch_k:.1f} stoch_d={stoch_d:.1f}"))
+                        asyncio.create_task(_log_gate("HL", symbol, "J1H_DIRECTION_FAIL", direction,
+                            f"j1h={j1h:.1f} j1h_prev={_j1h_prev}"))
                     continue
 
                 # Compute SL / TP prices (HC score-10: 2.5R TP1, 3.5R TP2)
@@ -725,6 +744,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     "margin":        MARGIN_PER_TRADE * 2 if is_hc else MARGIN_PER_TRADE,
                     "partial_price": partial_price,
                     "session":       get_session_name(),
+                    "btc_j1h":       round(_btc_j1h, 1),
                 }
                 if direction == "SHORT":
                     alert["j1h_short_direction"] = (
@@ -737,9 +757,28 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None) -> list
                     alert["vwap_pct_diff"] = _vwap_pct
                     alert["vwap_position"] = _vwap_pos
                 new_alerts.append(alert)
-                log.info(f"[ALERT] {symbol} {direction} tier={tier} lev={lev}x entry={price} "
-                         f"sl={sl_price} tp1={tp1_price} adx={adx1h:.1f} "
-                         f"stoch_k={stoch_k:.1f} stoch_d={stoch_d:.1f} rsi={rsi15m:.1f}")
+                _j1h_dir_log = (
+                    ("FALL" if _j1h_prev is not None and j1h <= _j1h_prev else "FLAT")
+                    if direction == "SHORT"
+                    else ("RISE" if _j1h_prev is not None and j1h >= _j1h_prev else "FLAT")
+                )
+                log.info(
+                    f"[SIGNAL] {symbol} {direction}"
+                    f" tier={tier} lev={lev}x"
+                    f" score={score}"
+                    f" entry={price:.5f}"
+                    f" sl={sl_price:.5f}"
+                    f" tp1={tp1_price:.5f}"
+                    f" j5m={j5m:.1f}"
+                    f" j15m={j15m:.1f}"
+                    f" j1h={j1h:.1f}"
+                    f" j1h_dir={_j1h_dir_log}"
+                    f" btc={_btc_j1h:.1f}"
+                    f"({_btc_regime_context})"
+                    f" depth={bid_pct:.1f}%B/{ask_pct:.1f}%A"
+                    f" adx={adx1h:.1f}"
+                    f" sess={_cur_sess}"
+                )
 
         except Exception as e:
             log.error(f"[SCAN] {symbol} error: {e}", exc_info=True)
