@@ -1206,7 +1206,7 @@ async def _scan_loop():
                 await asyncio.sleep(
                     SCAN_INTERVAL_SECONDS)
                 continue
-            new_alerts = await run_full_scan(hl_client, market_health=app_state.market_health)
+            new_alerts = await run_full_scan(hl_client, market_health=app_state.market_health, open_trades=app_state.open_trades)
             # -- BTC flash TG alert -- fires once per flash event when block arms --------
             if _scanner_mod._btc_flash_tg_pending[0]:
                 _scanner_mod._btc_flash_tg_pending[0] = False
@@ -1301,21 +1301,6 @@ async def _scan_loop():
                     # cooldown check -> already-open check -> price-drift guard
                     # -> _do_open_trade(), all in the same scan cycle as the signal.
                     _ep = alert.get("entry_price", 0) or 0
-
-                    # Already-open duplicate guard — log and discard.
-                    _open_key = app_state.trade_key(sym, dir_)
-                    if _open_key in app_state.open_trades:
-                        print(
-                            f"[BLOCKED_DUPLICATE]"
-                            f" {sym} {dir_} \u2014"
-                            f" already open,"
-                            f" signal discarded")
-                        asyncio.create_task(
-                            _log_alert_outcome(
-                                alert,
-                                "BLOCKED_DUPLICATE",
-                                "HL"))
-                        continue
 
                     # Stamp cooldown only when a trade will actually open
                     set_close_cooldown(sym, dir_)
