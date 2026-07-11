@@ -1135,6 +1135,12 @@ def send_telegram(alert: dict) -> None:
     leverage  = int(alert.get("leverage", 5) or 5)
     margin    = float(alert.get("margin", MARGIN_PER_TRADE) or MARGIN_PER_TRADE)
     score = int(alert.get("score", 4) or 4)
+    j5m_v         = float(alert.get("j5m", 50) or 50)
+    j1h_prev_v    = float(alert.get("j1h_prev", j1h) or j1h)
+    j1h_prev_ok   = bool(alert.get("j1h_prev_valid", False))
+    btc_v         = float(alert.get("btc_j1h", 50) or 50)
+    btc_ctx       = str(alert.get("btc_regime_context", "") or "")
+    sess_v        = str(alert.get("session", "") or "")
     _strength_map = {
         4:  "●○○○",
         6:  "●●○○",
@@ -1155,6 +1161,11 @@ def send_telegram(alert: dict) -> None:
     tp1_profit_70 = abs(full_tp1_pnl) * 0.70
 
     cross_arrow = "\u2191" if is_long else "\u2193"
+    j1h_dir = (
+        ("FALL" if j1h_prev_ok and j1h <= j1h_prev_v else "FLAT")
+        if not is_long
+        else ("RISE" if j1h_prev_ok and j1h >= j1h_prev_v else "FLAT")
+    )
 
     if bid_pct >= ask_pct:
         depth_pct  = bid_pct
@@ -1174,7 +1185,8 @@ def send_telegram(alert: dict) -> None:
         f"TP1    {_fmt_p(tp1)}   +${tp1_profit_70:.2f} (70%)\n"
         "       runner trails after\n"
         "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
-        f"J {j15m:.0f}/{j1h:.0f} \u00B7 K{cross_arrow}D \u00B7 depth {depth_pct:.0f}%{depth_side}\n"
+        f"J5={j5m_v:.0f} J15={j15m:.0f} J1={j1h:.0f} dir={j1h_dir}\n"
+        f"BTC={btc_v:.0f}({btc_ctx})  {bid_pct:.0f}%B/{ask_pct:.0f}%A  {sess_v}\n"
         f"\u23F1 {ts}"
     )
     _tg_post(msg)
@@ -1363,9 +1375,19 @@ async def _scan_loop():
                     # -> _do_open_trade(), all in the same scan cycle as the signal.
                     _ep = alert.get("entry_price", 0) or 0
 
-                    # Already-open duplicate guard — skip silently, no log.
+                    # Already-open duplicate guard — log and discard.
                     _open_key = app_state.trade_key(sym, dir_)
                     if _open_key in app_state.open_trades:
+                        print(
+                            f"[BLOCKED_DUPLICATE]"
+                            f" {sym} {dir_} \u2014"
+                            f" already open,"
+                            f" signal discarded")
+                        asyncio.create_task(
+                            _log_alert_outcome(
+                                alert,
+                                "BLOCKED_DUPLICATE",
+                                "HL"))
                         continue
 
                     # Stamp cooldown only when a trade will actually open
