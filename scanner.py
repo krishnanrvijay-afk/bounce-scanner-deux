@@ -398,7 +398,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
     for symbol in PAIRS:
         try:
             await asyncio.sleep(0.5)  # rate-limit spacing ÃÂ¢ÃÂÃÂ 12 pairs ÃÂÃÂ 0.5s = 6s minimum spread
-            candles_5m, candles_15m, candles_1h, book, price = await _fetch_pair_data(hl_client, symbol)
+            candles_1m, candles_5m, candles_15m, candles_1h, book, price = await _fetch_pair_data(hl_client, symbol)
 
             if not price or price == 0:
                 _stale_counts[symbol] = \
@@ -430,7 +430,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                 continue
 
             # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Indicators ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
-            _, _, j5m  = _compute_kdj(candles_5m[:-1])
+            _, _, j5m  = _compute_kdj(candles_1m[:-1])
             _, _, j15m = _compute_kdj(candles_15m[:-1])
             _, _, j1h  = _compute_kdj(candles_1h[:-1])
             rsi15m     = _compute_rsi(candles_15m)
@@ -768,12 +768,12 @@ async def scan_pair_state(hl_client) -> list[dict]:
     for symbol in PAIRS:
         try:
             await asyncio.sleep(0.5)  # rate-limit spacing between pairs
-            candles_5m, candles_15m, candles_1h, book, price = await _fetch_pair_data(hl_client, symbol)
+            candles_1m, candles_5m, candles_15m, candles_1h, book, price = await _fetch_pair_data(hl_client, symbol)
             if not price:
                 states.append({"symbol": symbol, "price": 0})
                 continue
 
-            _, _, j5m  = _compute_kdj(candles_5m[:-1])
+            _, _, j5m  = _compute_kdj(candles_1m[:-1])
             _, _, j15m = _compute_kdj(candles_15m[:-1])
             _, _, j1h  = _compute_kdj(candles_1h[:-1])
             rsi15m     = _compute_rsi(candles_15m)
@@ -868,14 +868,15 @@ def _compute_session_vwap(candles_15m: list, entry_price: float):
 
 
 async def _fetch_pair_data(hl_client, symbol: str):
-    candles_5m, candles_15m, candles_1h, book, price = await asyncio.gather(
+    candles_1m, candles_5m, candles_15m, candles_1h, book, price = await asyncio.gather(
+        hl_client.get_candles(symbol, "1m",  30),
         hl_client.get_candles(symbol, "5m",  100),
         hl_client.get_candles(symbol, "15m", 100),
         hl_client.get_candles(symbol, "1h",  100),
         hl_client.get_orderbook(symbol, 20),
         hl_client.get_price(symbol),
     )
-    return candles_5m, candles_15m, candles_1h, book, price
+    return candles_1m, candles_5m, candles_15m, candles_1h, book, price
 
 
 def log_startup_config():
