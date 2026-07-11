@@ -2726,15 +2726,6 @@ async def _exit_monitor_loop():
                             continue
                 # Ã¢ÂÂÃ¢ÂÂ TRAILBLAZER: ATR trailing stop after tp1_hit Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
                 if tp1_hit:
-                    # Ã¢ÂÂÃ¢ÂÂ RUNNER_DECAY_10: 10% peak-decay on post-TP1 runner Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-                    _sh_r = _peak_shadow.setdefault(key, {})
-                    if _sh_r.get("runner_armed"):
-                        if _cpnl > _sh_r.get("runner_peak_pnl", 0.0):
-                            _sh_r["runner_peak_pnl"] = _cpnl
-                        _rpeak = _sh_r["runner_peak_pnl"]
-                        if _rpeak > 0 and _cpnl < _rpeak * 0.90:
-                            _do_close_trade(key, trade, current, "RUNNER_DECAY_10")
-                            continue
                     _ps   = next((p for p in app_state.pair_states if p.get("symbol") == sym), None)
                     _atr  = (_ps.get("atr15m") or 0) if _ps else 0
                     if _atr > 0:
