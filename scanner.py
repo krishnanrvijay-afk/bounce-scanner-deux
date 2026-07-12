@@ -604,8 +604,8 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     # ago — macro uptrend active
                     # prevents firing SHORTs into a sustained BTC rally
                     if (direction == "SHORT"
-                            and len(_btc_j1h_history) >= 6
-                            and _btc_j1h > _btc_j1h_history[-6]):
+                            and len(_btc_j1h_history) >= 10
+                            and _btc_j1h > _btc_j1h_history[-10]):
                         continue
                     # J1H range gate (enforced) — blocks SHORTs outside valid bounce zone
                     if j1h <= J1H_SHORT_MIN or j1h >= J1H_SHORT_MAX:
@@ -662,6 +662,17 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "RSI_CEILING_FAIL", direction,
                             f"rsi15m={rsi15m:.1f} need<{RSI15M_LONG_MAX}"))
+                        continue
+                    # BTC macro downtrend LONG gate — symmetric to SHORT uptrend gate
+                    # Block LONGs when BTC J1H is lower now than 10 scans ago (5 min)
+                    # Evidence: 7/12 02:06-02:14 cascade — 16 trades 0/16 WR -$759
+                    # Same criteria 45 min later (Batch B): 7/9 WR +$649
+                    if (len(_btc_j1h_history) >= 10
+                            and _btc_j1h < _btc_j1h_history[-10]):
+                        asyncio.create_task(_log_gate(
+                            "HL", symbol, "BTC_MACRO_FALL", direction,
+                            f"btc_j1h={_btc_j1h:.1f} < "
+                            f"{_btc_j1h_history[-10]:.1f} 10 scans ago"))
                         continue
                     score, tier, lev = score_bounce_long(
                         j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
@@ -794,6 +805,15 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     alert["vwap_at_entry"] = _vwap_v
                     alert["vwap_pct_diff"] = _vwap_pct
                     alert["vwap_position"] = _vwap_pos
+                # Co-fire limiter: cap same-direction signals per scan at 5
+                # Evidence: 7/12 02:06-02:14 — 12 LONG co-fires in 8 min, 0/12 WR -$759
+                _cofire_n = sum(1 for _ca in new_alerts if _ca["direction"] == direction)
+                if _cofire_n >= 5:
+                    log.info(
+                        f"[COFIRE_LIMIT] {symbol} {direction} "
+                        f"skipped — {_cofire_n} {direction} signals "
+                        f"already queued this scan")
+                    continue
                 new_alerts.append(alert)
                 log.info(
                     f"[SIGNAL] {symbol} {direction}"
