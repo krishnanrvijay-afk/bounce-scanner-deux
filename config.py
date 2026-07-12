@@ -74,6 +74,19 @@ BLOCKED_PAIR_SESSIONS: dict = {
     ("AVAX", "SHORT", "ASIA"): True,
     # NEW -- data: SUI SHORT ASIA: 3 trades 0% WR -$165 (03:55-03:56 back-to-back 3L)
     ("SUI",  "SHORT", "ASIA"): True,
+    # R1 -- ADA all sessions LONG+SHORT: 6 trades 33% WR -$79.78 HL
+    # ADA correlation breaks down on HL across all sessions and directions
+    ("ADA",  "LONG",  "ASIA"): True,
+    ("ADA",  "LONG",  "EU"):   True,
+    ("ADA",  "LONG",  "US"):   True,
+    ("ADA",  "SHORT", "ASIA"): True,
+    ("ADA",  "SHORT", "EU"):   True,
+    ("ADA",  "SHORT", "US"):   True,
+    # R2 -- BTC LONG all sessions: 3 trades 0% WR -$130.83 HL
+    # BTC LONG creates circular logic conflict: BTC J1H used as regime gate AND as the trade pair
+    ("BTC",  "LONG",  "ASIA"): True,
+    ("BTC",  "LONG",  "EU"):   True,
+    ("BTC",  "LONG",  "US"):   True,
 }
 
 PLACE_EXCHANGE_SL      = True
