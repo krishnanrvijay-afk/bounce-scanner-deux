@@ -1764,7 +1764,10 @@ def _do_partial_close_tp1(key: str, trade: dict, exit_price: float):
     sym        = trade["symbol"]
     direction  = trade["direction"]
     full_size  = trade.get("remaining_size", trade["size"])
-    close_size = full_size * TP1_CLOSE_PCT
+    # R6: ADX>=40 high-confidence setups use 50% TP1 close (vs 70%) to extend runner toward TP2 (1.5R)
+    # Data: ADX>=40 signals have trending character -- wider runner captures more
+    _tp1_pct   = 0.50 if trade.get("adx1h", 0) >= 40 else TP1_CLOSE_PCT
+    close_size = full_size * _tp1_pct
     rem_size   = full_size - close_size
     entry      = trade["entry_price"]
 
@@ -1798,11 +1801,11 @@ def _do_partial_close_tp1(key: str, trade: dict, exit_price: float):
     trade["tp1_pnl"]          = pnl
     # Reduce deployed margin proportionally (TP1_CLOSE_PCT closed)
     old_margin = trade.get("margin", MARGIN_PER_TRADE)
-    trade["margin"] = old_margin * (1.0 - TP1_CLOSE_PCT)
+    trade["margin"] = old_margin * (1.0 - _tp1_pct)
     app_state.open_trades[key]     = trade
-    app_state.margin_deployed      = max(0.0, app_state.margin_deployed - old_margin * TP1_CLOSE_PCT)
+    app_state.margin_deployed      = max(0.0, app_state.margin_deployed - old_margin * _tp1_pct)
 
-    print(f"[EXIT] {sym} {direction} TP1 partial close ({int(TP1_CLOSE_PCT*100)}%) at {exit_price} "
+    print(f"[EXIT] {sym} {direction} TP1 partial close ({int(_tp1_pct*100)}%) at {exit_price} "
           f"pnl=${pnl:.2f} r={r:+.2f}R Ã¢ÂÂ 30% runner open watching Trailblazer ATR trail")
     if TELEGRAM_ENABLED:
         def _tp1_tg(s=sym, d=direction, ep=exit_price, p=pnl):
