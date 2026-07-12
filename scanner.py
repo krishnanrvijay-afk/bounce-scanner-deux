@@ -606,6 +606,10 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     if (direction == "SHORT"
                             and len(_btc_j1h_history) >= 10
                             and _btc_j1h > _btc_j1h_history[-10]):
+                        asyncio.create_task(_log_gate(
+                            "HL", symbol, "BTC_MACRO_RISE", direction,
+                            f"btc_j1h={_btc_j1h:.1f} > "
+                            f"{_btc_j1h_history[-10]:.1f} 10 scans ago"))
                         continue
                     # SHORT session/J1H directional gates
                     # Gate 1: SHORT_US_HALT
@@ -632,12 +636,12 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             "HL", symbol, "SHORT_J1H_FLOOR", direction,
                             f"j1h={j1h:.1f} < 45 — 1H oversold, no reversal context"))
                         continue
-                    # J1H range gate (enforced) — blocks SHORTs outside valid bounce zone
-                    if j1h <= J1H_SHORT_MIN or j1h >= J1H_SHORT_MAX:
+                    # J1H ceiling gate (enforced) — blocks SHORTs above valid bounce zone
+                    # Lower bound (j1h<=30) removed: SHORT_J1H_FLOOR (j1h<45) already covers it
+                    if j1h >= J1H_SHORT_MAX:
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "J1H_RANGE_FAIL", direction,
-                            f"j1h={j1h:.1f} need "
-                            f"{J1H_SHORT_MIN}<j1h<{J1H_SHORT_MAX}"))
+                            f"j1h={j1h:.1f} >= J1H_SHORT_MAX={J1H_SHORT_MAX}"))
                         continue
                     # RSI floor gate (enforced) — blocks SHORTs when 15m RSI approaching oversold
                     if rsi15m <= RSI15M_SHORT_MIN:
