@@ -55,6 +55,7 @@ _btc_flash_tg_pending = [False]                                 # set True when 
 _cooldowns:   dict[str, float] = {}   # keyed "BTCSHORT" / "BTCLONG" ÃÂ¢ÃÂÃÂ expiry ts
 _pair_cooldowns: dict           = {}   # keyed symbol -> expiry ts
 _scan_count:  int              = 0
+_fleet_halt:  bool             = False  # set by fleet-scorecard halt API via Supabase
 _stale_prices: set[str]        = set()  # symbols with 2 consecutive missing prices
 _stale_counts: dict             = {}     # consecutive no-price count per symbol
 _btc_j1h: float = 50.0   # cached BTC J1H ÃÂ¢ÃÂÃÂ updated each scan when BTC is processed
@@ -382,6 +383,7 @@ def compute_market_health(pair_states: list[dict], recent_trades: list[dict]) ->
 
 async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_trades: dict = None) -> list[dict]:
     global _scan_count
+    global _fleet_halt
     _open_trades_ref = open_trades if open_trades is not None else {}
 
     _scan_count += 1
@@ -393,6 +395,36 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
             f"skipping signal "
             f"evaluation")
         return []
+
+    # Fleet halt check
+    # Reads from scanner state
+    # Takes effect within one
+    # scan cycle (~30 seconds)
+    if _SB_URL and _SB_KEY:
+        try:
+            import httpx as _httpx
+            async with _httpx.AsyncClient(timeout=2.0) as _hc:
+                _fh = await _hc.get(
+                    f"{_SB_URL}/rest/v1/hl_scanner_state",
+                    params={"select": "fleet_halt",
+                            "id": "eq.1",
+                            "limit": "1"},
+                    headers={"apikey": _SB_KEY,
+                             "Authorization": f"Bearer {_SB_KEY}"},
+                )
+                if _fh.status_code == 200 and _fh.json():
+                    _fleet_halt = bool(
+                        _fh.json()[0].get(
+                            "fleet_halt", False))
+        except Exception:
+            pass
+    if _fleet_halt:
+        log.info(
+            "[FLEET HALT] active"
+            " — signal generation"
+            " suspended")
+        return []
+
     new_alerts: list[dict] = []
 
     for symbol in PAIRS:
