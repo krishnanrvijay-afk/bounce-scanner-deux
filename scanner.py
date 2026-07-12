@@ -248,7 +248,7 @@ def score_bounce_short(j15m, j1h, ask_pct, adx,
                        j5m: float = 50.0, trend: str = "Neutral",
                        stoch_k: float = 50.0, stoch_d: float = 50.0) -> tuple[int, str, int]:
     tier, lev = _leverage_tier(adx)
-    stoch_gate = (j5m > 80 and j15m > 80)
+    stoch_gate = (j5m > 88 and j15m > 80)  # R3: j5m floor raised 80->88; 26.7% WR at >80 vs 71% WR at >88
     _bid_pct = 100 - ask_pct
     if not (j15m > J15M_SHORT_GATE
             and stoch_gate
@@ -733,6 +733,14 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             f"j15m={j15m:.1f} < J15M_LONG_FLOOR={J15M_LONG_FLOOR}"
                             f" -- freefall, no bounce context"))
                         continue
+                    # R5: EU LONG j15m tight gate
+                    # EU LONGs only valid when j15m < 15 (deep oversold)
+                    # Data: EU LONG j15m 15-30 = 25% WR -$112; EU LONG j15m < 15 = 71% WR +$389
+                    if _cur_sess == "EU" and j15m >= 15:
+                        asyncio.create_task(_log_gate(
+                            "HL", symbol, "EU_LONG_J15M_TIGHT", direction,
+                            f"EU j15m={j15m:.1f} >= 15 -- EU LONGs require j15m<15"))
+                        continue
                     score, tier, lev = score_bounce_long(
                         j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
                         stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
@@ -854,7 +862,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     "fired_at":     int(time.time()),
                     "is_in_trade":   False,
                     "is_score10":    is_hc,
-                    "margin":        MARGIN_PER_TRADE * 2 if is_hc else MARGIN_PER_TRADE,
+                    "margin":        MARGIN_PER_TRADE * 2 if (is_hc or (_btc_j1h < 25 and j1h < 25)) else MARGIN_PER_TRADE,  # Tier3: 2x on hc score OR both btc+pair j1h<25 (max conviction oversold)
                     "partial_price": partial_price,
                     "session":       get_session_name(),
                     "btc_j1h":       round(_btc_j1h, 1),
