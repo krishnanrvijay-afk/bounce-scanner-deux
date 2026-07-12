@@ -6,6 +6,7 @@ let lastScanAt   = null;
 let marketOpen   = false;
 let posTimers    = {};
 let bannerTF     = 'BOTH';
+let _pdLastTs    = 0;    // ring freshness — ms of last successful /api/state fetch
 
 const ADX_FADE_MAX = 60;
 const BTC_CORRELATION = {
@@ -46,11 +47,25 @@ async function fetchState() {
     }
 
     render();
+    _pdLastTs = Date.now();
     const dot = document.getElementById('pulse-dot');
-    if (dot) dot.className = STATE.fleet_halt ? 'pulse-dot halted' : 'pulse-dot live';
+    if (dot) {
+      dot.classList.remove('live', 'halted', 'pd-amber', 'pd-stale');
+      dot.classList.add(STATE.fleet_halt ? 'halted' : 'live');
+    }
   } catch (e) { /* network blip */ }
 }
 setInterval(fetchState, 2000);
+// Ring freshness updater — amber 15-90s, stale/red >90s since last data
+function _pdUpdateRing() {
+  var dot = document.getElementById('pulse-dot');
+  if (!dot || dot.classList.contains('halted')) return;
+  var s = (Date.now() - _pdLastTs) / 1000;
+  dot.classList.remove('pd-amber', 'pd-stale');
+  if (s >= 90)      dot.classList.add('pd-stale');
+  else if (s >= 15) dot.classList.add('pd-amber');
+}
+setInterval(_pdUpdateRing, 2000);
 fetchState();
 hlAccFetch();
 setInterval(hlAccFetch, 30000);
