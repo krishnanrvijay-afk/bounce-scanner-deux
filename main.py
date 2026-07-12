@@ -535,12 +535,6 @@ def _update_daily_pnl(pnl: float):
 
 
 def _on_trade_close(reason: str):
-    global consecutive_losses, circuit_breaker_active
-    # Ã¢ÂÂÃ¢ÂÂ Circuit breaker suppressed Ã¢ÂÂ permanently inactive Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-    # Trigger logic removed; CB can never fire. Both fields are force-cleared
-    # on every close so hl_scanner_state always persists False / 0.
-    consecutive_losses     = 0
-    circuit_breaker_active = False
     _save_state()
 
 
@@ -761,14 +755,6 @@ async def _do_open_trade(
 ) -> tuple[Optional[dict], Optional[str]]:
     global circuit_breaker_active, trading_halted_today
 
-    if circuit_breaker_active:
-        asyncio.create_task(
-            _log_alert_outcome(
-                {"symbol": symbol, "direction": direction},
-                "BLOCKED_CIRCUIT_BREAKER",
-                exchange,
-            ))
-        return None, "circuit_breaker"
     if trading_halted_today:
         asyncio.create_task(
             _log_alert_outcome(
@@ -996,6 +982,8 @@ async def _do_open_trade(
         "vwap_pct_diff":     alert_data.get("vwap_pct_diff") if alert_data else None,
         "vwap_position":     alert_data.get("vwap_position") if alert_data else None,
         "btc_j1h_entry":    _scanner_mod._btc_j1h,
+        "dollar_risk":      (margin_usdc * leverage * (max(abs(entry - sl_price), entry * 0.001) / entry)
+                            if entry and sl_price else 0.0),
     }
 
     app_state.open_trades[key] = trade
@@ -2597,7 +2585,7 @@ async def _exit_monitor_loop():
                         _prev = _se_j1h_extreme.get(key, _cur_j1h)
                         _se_j1h_extreme[key] = max(_prev, _cur_j1h)
                         _j1h_decay = _se_j1h_extreme[key] - _cur_j1h
-                        if _j1h_decay >= _scanner_mod.SE_J1H_DECAY_PTS and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min:
+                        if _j1h_decay >= _scanner_mod.SE_J1H_DECAY_PTS and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min and _cpnl > 0:
                             print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
                                   f" j1h_peak={_se_j1h_extreme[key]:.1f}"
                                   f" j1h_now={_cur_j1h:.1f}"
@@ -2612,7 +2600,7 @@ async def _exit_monitor_loop():
                         _prev = _se_j1h_extreme.get(key, _cur_j1h)
                         _se_j1h_extreme[key] = min(_prev, _cur_j1h)
                         _j1h_rise = _cur_j1h - _se_j1h_extreme[key]
-                        if _j1h_rise >= _scanner_mod.SE_J1H_DECAY_PTS and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min:
+                        if _j1h_rise >= _scanner_mod.SE_J1H_DECAY_PTS and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min and _cpnl > 0:
                             print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
                                   f" j1h_trough={_se_j1h_extreme[key]:.1f}"
                                   f" j1h_now={_cur_j1h:.1f}"
