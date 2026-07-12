@@ -607,6 +607,31 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             and len(_btc_j1h_history) >= 10
                             and _btc_j1h > _btc_j1h_history[-10]):
                         continue
+                    # SHORT session/J1H directional gates
+                    # Gate 1: SHORT_US_HALT
+                    # US session SHORTs: 0% WR, -$1,570 net (3 trades 7/12)
+                    # US volume/trend momentum overrides J exhaustion signals
+                    if _cur_sess == "US":
+                        asyncio.create_task(_log_gate(
+                            "HL", symbol, "SHORT_US_HALT", direction,
+                            f"US session — 0% WR historical, -$1,570 net"))
+                        continue
+                    # Gate 2: SHORT_EU_J1H_HIGH
+                    # EU + J1H >= 78: 5 losses 1 win, -$1,062 net
+                    # High J1H in EU = trend has continuation room; exhaustion reversal fails
+                    if _cur_sess == "EU" and j1h >= 78:
+                        asyncio.create_task(_log_gate(
+                            "HL", symbol, "SHORT_EU_J1H_HIGH", direction,
+                            f"EU j1h={j1h:.1f} >= 78 — trend continuation not reversal"))
+                        continue
+                    # Gate 3: SHORT_J1H_FLOOR
+                    # J1H < 45: shorting into 1H oversold — no reversal context
+                    # Evidence: 7/12 AVAX EU j1h=35 -$129, 3L_HIGHER_LOW in 7min
+                    if j1h < 45:
+                        asyncio.create_task(_log_gate(
+                            "HL", symbol, "SHORT_J1H_FLOOR", direction,
+                            f"j1h={j1h:.1f} < 45 — 1H oversold, no reversal context"))
+                        continue
                     # J1H range gate (enforced) — blocks SHORTs outside valid bounce zone
                     if j1h <= J1H_SHORT_MIN or j1h >= J1H_SHORT_MAX:
                         asyncio.create_task(_log_gate(
