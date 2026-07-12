@@ -96,6 +96,35 @@
   .scan-status { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #aaa; white-space: nowrap; }
   .scan-status .ts  { color: #00ff88; }
   .scan-status .cd  { color: #ffaa00; }
+  .pulse-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+  .pulse-dot.live {
+    background: #22c55e;
+    box-shadow: 0 0 0 0 rgba(34,197,94,0.6);
+    animation: pulse-live 1.5s ease-out infinite;
+  }
+  .pulse-dot.halted {
+    background: #ef4444;
+    box-shadow: 0 0 0 0 rgba(239,68,68,0.6);
+    animation: pulse-halt 1.5s ease-out infinite;
+  }
+  @keyframes pulse-live {
+    0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+    70%  { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+    100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+  }
+  @keyframes pulse-halt {
+    0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.6); }
+    70%  { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
+    100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  }
 
   /* ── J BOUNCE MAP BANNER ── */
   @keyframes jb-conf-pulse   { 0%,100% { text-shadow: 0 0 4px currentColor; } 50% { text-shadow: 0 0 14px currentColor; } }
@@ -663,7 +692,7 @@
         <div class="mkt-row"><span class="mkt-label">J15M OVERSOLD</span><div class="mkt-chips" id="mkt-os"></div></div>
       </div>
     </div>
-    <div class="scan-status" id="scan-status">waiting for scan&#x2026;</div>
+    <div class="scan-status" id="scan-status" style="display:flex;align-items:center;"><span class="pulse-dot live" id="pulse-dot"></span><span id="scan-status-text">waiting for scan&#x2026;</span></div>
   </div>
 </div>
 
