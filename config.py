@@ -87,6 +87,14 @@ BLOCKED_PAIR_SESSIONS: dict = {
     ("BTC",  "LONG",  "ASIA"): True,
     ("BTC",  "LONG",  "EU"):   True,
     ("BTC",  "LONG",  "US"):   True,
+    # R9: ZEC — -$61 combined loss (HL -$29, MEXC -$32), chronically low volume
+    # Volume rarely exceeds $500K/24h threshold; block all sessions/directions
+    ("ZEC", "LONG",  "ASIA"): True,
+    ("ZEC", "LONG",  "EU"):   True,
+    ("ZEC", "LONG",  "US"):   True,
+    ("ZEC", "SHORT", "ASIA"): True,
+    ("ZEC", "SHORT", "EU"):   True,
+    ("ZEC", "SHORT", "US"):   True,
 }
 
 PLACE_EXCHANGE_SL      = True
