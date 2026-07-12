@@ -156,6 +156,70 @@ chk("PD3", pd10_fires(True, True, 100.0, 88.0),
 chk("PD4", pd10_fires(False, True, 100.0, 88.0),
     "LONG tp1_hit peak=$100 cpnl=$88 → PEAK_DECAY_10 fires (both directions after C1)")
 
+
+# ── CANDLE GATE / restart-suppression tests ────────────────────────────────
+# These tests verify that PEAK_DECAY_20 and PEAK_DECAY_10 cannot fire on the
+# same 1-minute candle in which the peak was recorded (including the restart
+# backfill case where last_peak_candle_ts=0 is set to the current candle).
+
+_T_BASE = (int(time.time()) // 60) * 60  # current 1-min candle boundary
+
+
+def _state_restore_backfill(sh, now_ts):
+    """Mirror main.py: if last_peak_candle_ts is 0/missing, set it to now_ts."""
+    if not sh.get("last_peak_candle_ts"):
+        sh["last_peak_candle_ts"] = now_ts
+
+
+def candle_gate_open(last_peak_candle_ts, now_ts):
+    """
+    Returns True when decay is ALLOWED to fire.
+    Mirror: if _sh.get("last_peak_candle_ts", 0) != _now_candle_ts
+    """
+    return last_peak_candle_ts != now_ts
+
+
+# PDG1 – after restart backfill, decay must NOT fire on the same candle (pre-TP1)
+_sh_pdg1 = {"last_peak_candle_ts": 0, "be_armed": True, "peak_pnl_usd": 100.0}
+_state_restore_backfill(_sh_pdg1, _T_BASE)
+_gate_open_pdg1 = candle_gate_open(_sh_pdg1["last_peak_candle_ts"], _T_BASE)
+_decay_would_fire_pdg1 = _gate_open_pdg1 and pd20_fires(True, True, 100.0, 75.0)
+chk("PDG1",
+    not _decay_would_fire_pdg1,
+    f"RESTART: last_peak_candle_ts=0 backfilled to now={_T_BASE}; "
+    f"gate_open={_gate_open_pdg1} → PEAK_DECAY_20 suppressed on first scan cycle")
+
+# PDG2 – after restart backfill, decay must NOT fire on the same candle (post-TP1)
+_sh_pdg2 = {"last_peak_candle_ts": 0, "be_armed": True, "peak_pnl_usd": 100.0}
+_state_restore_backfill(_sh_pdg2, _T_BASE)
+_gate_open_pdg2 = candle_gate_open(_sh_pdg2["last_peak_candle_ts"], _T_BASE)
+_decay_would_fire_pdg2 = _gate_open_pdg2 and pd10_fires(True, True, 100.0, 88.0)
+chk("PDG2",
+    not _decay_would_fire_pdg2,
+    f"RESTART: last_peak_candle_ts=0 backfilled to now={_T_BASE}; "
+    f"gate_open={_gate_open_pdg2} → PEAK_DECAY_10 suppressed on first scan cycle")
+
+# PDG3 – on the NEXT candle minute, PEAK_DECAY_20 must fire when conditions are met
+_sh_pdg3 = {"last_peak_candle_ts": 0, "be_armed": True, "peak_pnl_usd": 100.0}
+_T_PREV = _T_BASE - 60  # peak was recorded in the previous candle
+_state_restore_backfill(_sh_pdg3, _T_PREV)  # backfill sets ts to _T_PREV
+_gate_open_pdg3 = candle_gate_open(_sh_pdg3["last_peak_candle_ts"], _T_BASE)
+_decay_would_fire_pdg3 = _gate_open_pdg3 and pd20_fires(True, True, 100.0, 75.0)
+chk("PDG3",
+    _decay_would_fire_pdg3,
+    f"NEXT CANDLE: peak_candle={_T_PREV} now={_T_BASE}; "
+    f"gate_open={_gate_open_pdg3} → PEAK_DECAY_20 fires in the next candle cycle")
+
+# PDG4 – on the NEXT candle minute, PEAK_DECAY_10 must fire when conditions are met
+_sh_pdg4 = {"last_peak_candle_ts": 0, "be_armed": True, "peak_pnl_usd": 100.0}
+_state_restore_backfill(_sh_pdg4, _T_PREV)
+_gate_open_pdg4 = candle_gate_open(_sh_pdg4["last_peak_candle_ts"], _T_BASE)
+_decay_would_fire_pdg4 = _gate_open_pdg4 and pd10_fires(True, True, 100.0, 88.0)
+chk("PDG4",
+    _decay_would_fire_pdg4,
+    f"NEXT CANDLE: peak_candle={_T_PREV} now={_T_BASE}; "
+    f"gate_open={_gate_open_pdg4} → PEAK_DECAY_10 fires in the next candle cycle")
+
 # ── IMPORT / constant tests ────────────────────────────────────────────────────
 
 chk("I1", hasattr(scanner, "KILL_PCT_FLOOR") and scanner.KILL_PCT_FLOOR == 0.006,
