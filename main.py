@@ -40,6 +40,7 @@ from config import (
     SENTINEL_MIN_PEAK_PCT, SENTINEL_MIN_PEAK_PCT_DEFAULT,
 )
 from supabase import create_client, Client
+import sentinel as _sentinel_mod
 from hl_client import HLClient
 from mexc_client import MexcClient
 from scanner import (
@@ -1239,6 +1240,17 @@ async def _scan_loop():
             app_state.market_health = compute_market_health(
                 app_state.pair_states, list(app_state.trade_log)
             )
+            # -- Sentinel Phase 0: compute regime, log only --
+            try:
+                _s = _sentinel_mod.update(app_state.pair_states, app_state.prices)
+                app_state.market_health["sentinel_regime"] = _s["regime"]
+                app_state.market_health["sentinel_text"]   = _sentinel_mod.get_pill_text()
+                if _s.get("changed") and _s.get("telegram_text") and TELEGRAM_ENABLED:
+                    threading.Thread(
+                        target=lambda m=_s["telegram_text"]: _tg_post(m),
+                        daemon=True).start()
+            except Exception as _se:
+                print(f"[SENTINEL] update error: {_se}")
 
             # Capture per-pair scan snapshots for the live overlay
             for _ps in app_state.pair_states:
@@ -2657,6 +2669,15 @@ async def _exit_monitor_loop():
                 continue
 
         _flush_sentinel_sweep()
+        # -- Sentinel Executor Phase 0: observe only, no closes --
+        try:
+            _ex = _sentinel_mod.check_executor(app_state.open_trades)
+            if _ex and _ex.get("telegram_text") and TELEGRAM_ENABLED:
+                threading.Thread(
+                    target=lambda m=_ex["telegram_text"]: _tg_post(m),
+                    daemon=True).start()
+        except Exception as _exe:
+            print(f"[SENTINEL] executor error: {_exe}")
         await asyncio.sleep(PRICE_INTERVAL_SECONDS)
 
 
@@ -2872,6 +2893,8 @@ async def lifespan(app: FastAPI):
         _pending_alerts.clear()
     print("[STARTUP] Pending alerts cleared on restart — direct open mode active")
     await _resolve_bot_identity("HL")
+    _sentinel_mod.init("HL", _get_supabase)
+    print("[SENTINEL] Phase 0 watchdog initialized -- observe-only")
     print("[SCHEMA] hl_trade_log analytics columns Ã¢ÂÂ run once in Supabase SQL editor if any are missing:")
     print("  ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS j15m_entry       float;")
     print("  ALTER TABLE hl_trade_log ADD COLUMN IF NOT EXISTS j1h_entry        float;")
