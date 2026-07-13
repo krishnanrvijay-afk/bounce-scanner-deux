@@ -739,6 +739,14 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             f"j15m={j15m:.1f} < J15M_LONG_FLOOR={J15M_LONG_FLOOR}"
                             f" -- freefall, no bounce context"))
                         continue
+                    # EU LONG j5m freefall gate
+                    # Data: 7/13 @107 EU j5m=-4.13 -> -$48.6, never moved up (0.02R MFE)
+                    # Price still falling at 5m = bounce hasn't started, don't enter
+                    if _cur_sess == "EU" and j5m < 0:
+                        asyncio.create_task(_log_gate(
+                            "HL", symbol, "EU_LONG_J5M_FREEFALL", direction,
+                            f"EU j5m={j5m:.1f} < 0 -- still descending at 5m, no bounce start"))
+                        continue
                     # R5: EU LONG j15m tight gate
                     # EU LONGs only valid when j15m < 15 (deep oversold)
                     # Data: EU LONG j15m 15-30 = 25% WR -$112; EU LONG j15m < 15 = 71% WR +$389
