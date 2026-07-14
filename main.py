@@ -2601,6 +2601,33 @@ async def _exit_monitor_loop():
                             print(f"[SESSION HALT] {sym} {direction} — 2 adverse exits (TIME_ADVERSE_EXIT) in {get_session_name()} session. Halted for remainder of session.")
                         continue
 
+                # -- WALL_TP: exit when price approaches significant book wall in profit
+                # Fires when the largest bid (SHORT) or ask (LONG) level in the live
+                # book is >= 3x average size and within 0.30% of current price.
+                # Uses real market structure as the natural TP — no sentinel floor.
+                _ps_wt = next((p for p in app_state.pair_states if p.get("symbol") == sym), None)
+                if _ps_wt and _cpnl > 0:
+                    if is_short:
+                        _bw = _ps_wt.get("bid_wall")
+                        if _bw and _bw["dist_pct"] <= 0.30:
+                            print(f"[WALL_TP] HL {sym} SHORT"
+                                  f" wall={_bw['price']:.5f}"
+                                  f" dist={_bw['dist_pct']:.3f}%"
+                                  f" ratio={_bw['ratio']:.1f}x"
+                                  f" cpnl={_cpnl:.2f}")
+                            _do_close_trade(key, trade, current, "WALL_TP")
+                            continue
+                    else:
+                        _aw = _ps_wt.get("ask_wall")
+                        if _aw and _aw["dist_pct"] <= 0.30:
+                            print(f"[WALL_TP] HL {sym} LONG"
+                                  f" wall={_aw['price']:.5f}"
+                                  f" dist={_aw['dist_pct']:.3f}%"
+                                  f" ratio={_aw['ratio']:.1f}x"
+                                  f" cpnl={_cpnl:.2f}")
+                            _do_close_trade(key, trade, current, "WALL_TP")
+                            continue
+
                 # Signal Exhaustion -- exit when J1H turns against the trade
                 # while in profit. Tracks J1H peak (LONG) or trough (SHORT)
                 # and fires on SE_J1H_DECAY_PTS decay. Evidence: June 29
