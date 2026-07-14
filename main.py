@@ -2606,7 +2606,7 @@ async def _exit_monitor_loop():
                 # book is >= 3x average size and within 0.30% of current price.
                 # Uses real market structure as the natural TP — no sentinel floor.
                 _ps_wt = next((p for p in app_state.pair_states if p.get("symbol") == sym), None)
-                if _ps_wt and _cpnl > 0:
+                if _ps_wt and _cpnl > 0 and _sh.get("be_armed"):
                     if is_short:
                         _bw = _ps_wt.get("bid_wall")
                         if _bw and _bw["dist_pct"] <= 0.30:
