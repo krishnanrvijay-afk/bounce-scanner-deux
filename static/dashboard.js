@@ -3058,6 +3058,9 @@ async function cfgFetch() {
     document.getElementById(
       'cfg-j1h-ob-max').value =
       d.j1h_long_max ?? 59;
+    document.getElementById(
+      'cfg-j1h-ob').value =
+      d.j1h_long_min ?? 0;
 
     document.getElementById(
       'cfg-atr-sl').value =
@@ -3137,6 +3140,9 @@ async function cfgSave() {
     j1h_long_max: Number(
       document.getElementById(
       'cfg-j1h-ob-max').value),
+    j1h_long_min: Number(
+      document.getElementById(
+      'cfg-j1h-ob').value),
     atr_sl_multiplier: Number(
       document.getElementById(
       'cfg-atr-sl').value),
