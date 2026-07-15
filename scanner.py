@@ -635,15 +635,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             f"{_btc_j1h_history[-10]:.1f} 10 scans ago"))
                         continue
                     # SHORT session/J1H directional gates
-                    # Gate 1: SHORT_US_HALT
-                    # US session SHORTs: 0% WR, -$1,570 net (3 trades 7/12)
-                    # US volume/trend momentum overrides J exhaustion signals
-                    if _cur_sess == "US":
-                        asyncio.create_task(_log_gate(
-                            "HL", symbol, "SHORT_US_HALT", direction,
-                            f"US session — 0% WR historical, -$1,570 net"))
-                        continue
-                    # Gate 2: SHORT_EU_J1H_HIGH
+                    # Gate 1: SHORT_EU_J1H_HIGH
                     # EU + J1H >= 78: 5 losses 1 win, -$1,062 net
                     # High J1H in EU = trend has continuation room; exhaustion reversal fails
                     if _cur_sess == "EU" and j1h >= 78:
