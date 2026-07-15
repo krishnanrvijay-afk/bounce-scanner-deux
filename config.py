@@ -60,7 +60,7 @@ MARGIN_HARD_CAP  = 25000.0
 ADX_MIN_LONG  = 20  # data: LONG ADX 0-19: 119 trades -$2,391
 ADX_MIN_SHORT = 0   # data: SHORT ADX 0-14: 21 trades +$493. SHORTs profitable at all ADX levels
 
-SESSION_FILTER_ENABLED = False
+SESSION_FILTER_ENABLED = True
 BLOCKED_PAIR_SESSIONS: dict = {
     # @107 SHORT ASIA:
     # archive 11 trades -$556.78

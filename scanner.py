@@ -16,6 +16,7 @@ from config import (
     KILL_PCT_FLOOR,
     SE_J1H_DECAY_PTS,
     BLOCKED_PAIR_SESSIONS,
+    SESSION_FILTER_ENABLED,
 )
 
 log = logging.getLogger("scanner")
@@ -628,6 +629,17 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
             for direction in ("SHORT", "LONG"):
                 key = f"{symbol}{direction}"
                 _cur_sess = get_session_name()
+                # ── SESSION BLOCK (enforced) ───────────────────────────────────
+                # BLOCKED_PAIR_SESSIONS is defined in config.py.
+                # Without this check the dict is imported but NEVER EVALUATED:
+                # every entry in BLOCKED_PAIR_SESSIONS is dead code.
+                # SESSION_FILTER_ENABLED is the global on/off toggle.
+                if SESSION_FILTER_ENABLED and BLOCKED_PAIR_SESSIONS.get(
+                        (symbol, direction, _cur_sess)):
+                    asyncio.create_task(_log_gate(
+                        "HL", symbol, "SESSION_BLOCK", direction,
+                        f"({symbol},{direction},{_cur_sess}) in BLOCKED_PAIR_SESSIONS"))
+                    continue
                 _cd = get_cooldown_remaining(
                     symbol, direction)
                 if _cd > 0:
