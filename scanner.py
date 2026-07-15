@@ -597,18 +597,6 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
             for direction in ("SHORT", "LONG"):
                 key = f"{symbol}{direction}"
                 _cur_sess = get_session_name()
-                if BLOCKED_PAIR_SESSIONS.get(
-                        (symbol, direction, _cur_sess),
-                        False):
-                    asyncio.create_task(
-                        _log_gate(
-                            "HL", symbol,
-                            "SESSION_BLOCK",
-                            direction,
-                            f"blocked: {symbol} "
-                            f"{direction} "
-                            f"{_cur_sess}"))
-                    continue
                 _cd = get_cooldown_remaining(
                     symbol, direction)
                 if _cd > 0:
@@ -671,14 +659,6 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             f"j15m={j15m:.1f} > J15M_SHORT_CEILING={J15M_SHORT_CEILING}"
                             f" -- extreme overbought, squeeze can extend"))
                         continue
-                    # Gate 3: SHORT_J1H_FLOOR
-                    # J1H < 45: shorting into 1H oversold — no reversal context
-                    # Evidence: 7/12 AVAX EU j1h=35 -$129, 3L_HIGHER_LOW in 7min
-                    if j1h < 45:
-                        asyncio.create_task(_log_gate(
-                            "HL", symbol, "SHORT_J1H_FLOOR", direction,
-                            f"j1h={j1h:.1f} < 45 — 1H oversold, no reversal context"))
-                        continue
                     # MA-stack gate for SHORTs
                     # Data: 3L_HIGHER_LOW 20 trades 0% WR -$744, all in BULL ma_stack
                     # Block SHORTs when 1H trend structure is bullish aligned
@@ -694,7 +674,6 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             f" -- 1H uptrend, SHORT reversal invalid"))
                         continue
                     # J1H ceiling gate (enforced) — blocks SHORTs above valid bounce zone
-                    # Lower bound (j1h<=30) removed: SHORT_J1H_FLOOR (j1h<45) already covers it
                     if j1h >= J1H_SHORT_MAX:
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "J1H_RANGE_FAIL", direction,
@@ -742,12 +721,6 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "J1H_CEILING_FAIL", direction,
                             f"j1h={j1h:.1f} need j1h<{J1H_LONG_MAX}"))
-                        continue
-                    # RSI ceiling gate (enforced) — blocks LONGs when 15m RSI approaching overbought
-                    if rsi15m >= RSI15M_LONG_MAX:
-                        asyncio.create_task(_log_gate(
-                            "HL", symbol, "RSI_CEILING_FAIL", direction,
-                            f"rsi15m={rsi15m:.1f} need<{RSI15M_LONG_MAX}"))
                         continue
                     # MA-stack gate for LONGs
                     # Symmetric to MA_STACK_BULL_BLOCK for SHORTs (data: 20 trades 0% WR -$744)
