@@ -64,7 +64,7 @@ _pending_alerts:    dict[str, dict]  = {}    # f"{symbol}_{direction}" -> alert 
 _large_sl_cooldowns: dict[str, float] = {}   # "SYMBOLDIR" -> expiry ts for 90-min cooldowns
 _3hlh_cooldowns:     dict[str, float] = {}   # "SYM_DIR" -> expiry ts; 30-min re-entry block after 3H_LOWER_HIGH
 _peak_shadow: dict = {}   # trade_key -> shadow tracking state (observation only)
-_sentinel_sweep: list = []   # deferred protective exits (PEAK_DECAY_20 / RUNNER_DECAY_10) Ã¢ÂÂ flushed once per scan cycle
+_sentinel_sweep: list = []   # deferred protective exits (PEAK_DECAY_10 / RUNNER_DECAY_10) Ã¢ÂÂ flushed once per scan cycle
 _adverse_shadow: dict = {}  # trade_key -> adverse-cut shadow state (observation only)
 _sign_shadow:   dict = {}  # trade_key -> PnL-sign transition history (observation only)
 _signal_shadow: dict = {}  # trade_key -> signal invalidation shadow state (observation only)
@@ -1274,19 +1274,6 @@ async def _scan_loop():
             for alert in new_alerts:
                 sym, dir_ = alert["symbol"], alert["direction"]
 
-                # Session halt gate
-                _sg = f"{sym}_{dir_}_{get_session_name()}"
-                if _sg in _session_halted:
-                    print(f"[GATE] SESSION HALT — {sym} {dir_} halted for {get_session_name()} session (2 SL hits)")
-                    continue
-
-                # 3H_LOWER_HIGH re-entry gate — 30 min after structural exit, same pair+direction
-                _3hlh_k = f"{sym}_{dir_}"
-                if _3hlh_k in _3hlh_cooldowns and time.time() < _3hlh_cooldowns[_3hlh_k]:
-                    _3hlh_rem = int((_3hlh_cooldowns[_3hlh_k] - time.time()) / 60)
-                    print(f"[GATE] 3H_LH_COOLDOWN — {sym} {dir_} {_3hlh_rem}m remaining after structural exit")
-                    continue
-
                 # Update alerts panel
                 existing = next(
                     (a for a in app_state.alerts
@@ -1703,7 +1690,7 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
     r   = _compute_r(pnl, trade)
 
     if (reason in ("ADVERSE_CUT", "SL", "KILL")
-            or (reason == "PEAK_DECAY_20" and pnl <= 0)):
+            or (reason == "PEAK_DECAY_10" and pnl <= 0)):
         _now_ac  = datetime.now(timezone.utc)
         _dir_key = "long" if direction == "LONG" else "short"
         _scanner_mod._adverse_cluster[_dir_key].append(_now_ac)
@@ -1740,7 +1727,7 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
           f"pnl=${pnl:.2f} r={r:+.2f}R")
     if TELEGRAM_ENABLED:
         _pd_peak_tg = _peak_shadow.get(key, {}).get("peak_pnl_usd", 0.0)
-        if reason in ("PEAK_DECAY_20", "RUNNER_DECAY_10"):
+        if reason in ("PEAK_DECAY_10", "RUNNER_DECAY_10"):
             if reason == "RUNNER_DECAY_10":
                 _sweep_peak = _peak_shadow.get(key, {}).get("runner_peak_pnl", 0.0)
             else:
@@ -1888,18 +1875,18 @@ def _do_trailblazer_close(key: str, trade: dict, exit_price: float,
 # Ã¢ÂÂÃ¢ÂÂ Exit monitor loop Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 def _flush_sentinel_sweep() -> None:
-    """Send one consolidated Telegram message per scan cycle for protective exits (PEAK_DECAY_20 / RUNNER_DECAY_10)."""
+    """Send one consolidated Telegram message per scan cycle for protective exits (PEAK_DECAY_10 / RUNNER_DECAY_10)."""
     global _sentinel_sweep
     exits = list(_sentinel_sweep)
     _sentinel_sweep.clear()
     if not exits:
         return
-    has_sentinel = any(e[0] == "PEAK_DECAY_20"  for e in exits)
+    has_sentinel = any(e[0] == "PEAK_DECAY_10"  for e in exits)
     has_runner   = any(e[0] == "RUNNER_DECAY_10" for e in exits)
     if len(exits) == 1:
         reason, sym, direction, pnl, peak, locked, pct = exits[0]
         sl_lbl = "S" if direction == "SHORT" else "L"
-        if reason == "PEAK_DECAY_20":
+        if reason == "PEAK_DECAY_10":
             _tg_post("\U0001F6E1\uFE0F SENTINEL \u2014 " + sym + " " + sl_lbl
                      + " \u00B7 peak-decay exit"
                      + "\nPeaked +$" + f"{peak:.2f}" + " \u2192 locked +$" + f"{locked:.2f}"
@@ -2316,7 +2303,7 @@ async def _exit_monitor_loop():
                         _do_partial_close_tp1(key, trade, current)
                         continue
 
-                # Ã¢ÂÂÃ¢ÂÂ fleet-wide Sentinel (PEAK_DECAY_20) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+                # ── fleet-wide Sentinel (PEAK_DECAY_10) ───────────────────────
                 _session      = get_session_name()
                 _sentinel_pct = SENTINEL_MIN_PEAK_PCT.get(
                     (sym, _session), SENTINEL_MIN_PEAK_PCT_DEFAULT)
@@ -2326,48 +2313,27 @@ async def _exit_monitor_loop():
                 _sentinel_min = _notional * _sentinel_pct
                 if _sh["be_armed"] and \
                           _sh["peak_pnl_usd"] >= _sentinel_min:
-                      _decay_threshold = 0.80 \
-                          if sym in ("@107",) else 0.90
-
                       _now_candle_ts = (
                           int(time.time())
                           // 60) * 60
                       if _sh.get("last_peak_candle_ts", 0) != _now_candle_ts:
-                          # ── Before TP1: PEAK_DECAY_20 on both directions ──
-                          if not tp1_hit:
-                              if _cpnl < _sh["peak_pnl_usd"] \
-                                      * _decay_threshold:
-                                  reason = "PEAK_DECAY_20"
-                                  print(f"[PEAK_DECAY_20] "
-                                        f"{sym} {direction} "
-                                        f"peak={_sh['peak_pnl_usd']:.2f} "
-                                        f"cpnl={_cpnl:.2f} "
-                                        f"-- pre-TP1 decay")
-                                  _do_close_trade(key, trade,
-                                      current, reason)
-                                  continue
+                          if _cpnl < _sh["peak_pnl_usd"] * 0.90:
+                              reason = "PEAK_DECAY_10"
+                              print(f"[PEAK_DECAY_10] "
+                                    f"{sym} {direction} "
+                                    f"peak={_sh['peak_pnl_usd']:.2f} "
+                                    f"cpnl={_cpnl:.2f}")
+                              _do_close_trade(key, trade,
+                                  current, reason)
+                              continue
 
-                          # ── After TP1: PEAK_DECAY_10 on runner both directions ──
-                          if tp1_hit:
-                              _runner_decay = 0.90
-                              if _cpnl < _sh["peak_pnl_usd"] \
-                                      * _runner_decay:
-                                  reason = "PEAK_DECAY_10"
-                                  print(f"[PEAK_DECAY_10] "
-                                        f"{sym} {direction} "
-                                        f"peak={_sh['peak_pnl_usd']:.2f} "
-                                        f"cpnl={_cpnl:.2f} "
-                                        f"-- post-TP1 runner")
-                                  _do_close_trade(key, trade,
-                                      current, reason)
-                                  continue
 
                 # ── 3-CANDLE LOWER LOW EXIT ──
                 # Fires when 3 consecutive
                 # 1-minute candle closes each
                 # show lower PnL than the
                 # previous close. Runs alongside
-                # PEAK_DECAY_20 -- whichever
+                # PEAK_DECAY_10 -- whichever
                 # fires first wins.
                 # Only active when trade is
                 # profitable (_cpnl > 0) and
