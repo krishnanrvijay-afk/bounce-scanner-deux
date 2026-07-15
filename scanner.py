@@ -466,7 +466,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
             "[FLEET HALT] active"
             " — signal generation"
             " suspended")
-        return [], []]
+        return [], []
 
     new_alerts:  list[dict] = []
     pair_states: list[dict] = []  # populated each scan; replaces scan_pair_state() sweep
