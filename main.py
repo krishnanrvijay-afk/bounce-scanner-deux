@@ -2082,6 +2082,37 @@ async def _exit_monitor_loop():
                               f" — 2 adverse exits (DEAD_TRADE_KILL)"
                               f" in {get_session_name()}")
                     continue
+                # -- TREND_ADVERSE_EXIT: no be_armed, adverse > 35% of SL, MFE < 0.20R ----
+                # Fills gap between DEAD_TRADE_KILL (10 min, 0.08R) and SL_PROXIMITY
+                # (60% traversed). Fires when be_armed never set (no favorable momentum)
+                # and price has crossed 35%+ of SL distance. Mimics MEXC stale-shadow
+                # protection for trades that trend immediately against entry.
+                _entry_tae = trade.get("entry_price", 0) or 0
+                _sl_tae    = trade.get("sl_price") or 0
+                if _entry_tae > 0 and _sl_tae > 0:
+                    if not is_short:
+                        _sl_dist_tae   = (_entry_tae - _sl_tae) / _entry_tae
+                        _remaining_tae = (current - _sl_tae) / _entry_tae
+                    else:
+                        _sl_dist_tae   = (_sl_tae - _entry_tae) / _entry_tae
+                        _remaining_tae = (_sl_tae - current) / _entry_tae
+                else:
+                    _sl_dist_tae = 0.0
+                    _remaining_tae = 1.0
+                if (not _sh.get("be_armed", False)
+                        and _elapsed >= 300
+                        and _dr > 0
+                        and _mfe_pnl < 0.20 * _dr
+                        and _sl_dist_tae > 0
+                        and _remaining_tae <= _sl_dist_tae * 0.65):
+                    print(f"[TREND_ADVERSE_EXIT] HL {sym} {direction}"
+                          f" age={{_elapsed:.0f}}s"
+                          f" mfe={{_mfe_pnl:.2f}} dr={{_dr:.2f}}"
+                          f" sl_dist={{_sl_dist_tae*100:.2f}}%"
+                          f" remaining={{_remaining_tae*100:.2f}}%"
+                          f" -- no arm, trending adverse")
+                    _do_close_trade(key, trade, current, "TREND_ADVERSE_EXIT")
+                    continue
                 # Tier 1: continuous floor
                 _kill_floor_hit = (
                     _adverse_pct >=
@@ -3090,7 +3121,6 @@ async def close_trade(req: CloseTradeRequest):
     _append_trade_log(trade, close_price, "MANUAL", pnl, r)
     _update_daily_pnl(pnl)
     _on_trade_close("MANUAL")
-    asyncio.create_task(_write_peak_shadow_row(key, trade, "MANUAL", pnl))
     asyncio.create_task(_write_adverse_shadow_row(key, trade, "MANUAL", pnl, r))
     asyncio.create_task(_write_sign_shadow_rows(key, trade, "MANUAL", pnl))
     asyncio.create_task(_write_signal_shadow_row(key, trade, "MANUAL", pnl, r))
