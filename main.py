@@ -1249,6 +1249,8 @@ async def _scan_loop():
                     _session_sl_counts.pop(_k, None)
                     _session_halted.discard(_k)
                 print(f"[SESSION RESET] {_prev_session} session ended Ã¢ÂÂ clearing all session halts.")
+                _scanner_mod._consec_adverse = {"long": 0, "short": 0}
+                print("[SESSION RESET] consecutive kill counters cleared")
             _prev_session = _curr_sess
             app_state.last_scan_at = int(time.time())
             app_state.pair_states  = _pair_states if _pair_states else await scan_pair_state(hl_client)
@@ -1727,6 +1729,25 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
             if _cur_cd is None or _now_cd >= _cur_cd:
                 _scanner_mod._adverse_cooldown_until[_dir_key] = _now_cd + timedelta(minutes=3)
                 print(f"[COOLDOWN_3] {_dir_key.upper()} cooled 3min")
+
+    # -- Consecutive kill halt counter --------------------------------
+    _dir_key_c = "long" if direction == "LONG" else "short"
+    if reason in ("KILL", "DEAD_TRADE_KILL"):
+        _scanner_mod._consec_adverse[_dir_key_c] = (
+            _scanner_mod._consec_adverse.get(_dir_key_c, 0) + 1)
+        if _scanner_mod._consec_adverse[_dir_key_c] == 3:
+            _halt_msg = (
+                f"⛔ HL {direction} DIRECTION HALTED\n"
+                f"3 consecutive kills — {direction} entries suspended\n"
+                f"Resumes when BTC regime = CLEAR\n"
+                f"Session: {get_session_name()}")
+            print(f"[CONSEC_HALT] HL {direction} halted — 3 consecutive kills")
+            if TELEGRAM_ENABLED:
+                threading.Thread(
+                    target=lambda m=_halt_msg: _tg_post(m),
+                    daemon=True).start()
+    elif pnl > 0:
+        _scanner_mod._consec_adverse[_dir_key_c] = 0
 
     _append_trade_log(trade, exit_price, reason, pnl, r)
     _update_daily_pnl(pnl)
