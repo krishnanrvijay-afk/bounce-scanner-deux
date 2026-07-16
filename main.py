@@ -2038,6 +2038,29 @@ async def _exit_monitor_loop():
                     if not is_short else
                     (current - _entry_px) / _entry_px
                 ) if _entry_px > 0 else 0
+                # -- DEAD_TRADE_KILL: tightened exit — no MFE after 10 min --------
+                # Fires when trade >= 10 min old, adverse >= 1/3 of KILL floor,
+                # and peak favorable (MFE) < 0.08R. Saves avg ~$75 vs full KILL.
+                # Counted as KILL for session-halt purposes.
+                _dr = trade.get("dollar_risk", 0) or 0
+                if (_elapsed >= 600
+                        and _dr > 0
+                        and _mfe_pnl < 0.08 * _dr
+                        and _adverse_pct >= _scanner_mod.KILL_PCT_FLOOR / 3):
+                    print(f"[DEAD_TRADE_KILL] HL {sym} {direction}"
+                          f" elapsed={_elapsed:.0f}s"
+                          f" adverse={_adverse_pct*100:.3f}%"
+                          f" mfe={_mfe_pnl:.2f} dr={_dr:.2f}"
+                          f" thr={_scanner_mod.KILL_PCT_FLOOR/3*100:.3f}%")
+                    _do_close_trade(key, trade, current, "DEAD_TRADE_KILL")
+                    _skey = f"{sym}_{direction}_{get_session_name()}"
+                    _session_sl_counts[_skey] = _session_sl_counts.get(_skey, 0) + 1
+                    if _session_sl_counts[_skey] >= 2 and _skey not in _session_halted:
+                        _session_halted.add(_skey)
+                        print(f"[SESSION HALT] {sym} {direction}"
+                              f" — 2 adverse exits (DEAD_TRADE_KILL)"
+                              f" in {get_session_name()}")
+                    continue
                 # Tier 1: continuous floor
                 _kill_floor_hit = (
                     _adverse_pct >=
