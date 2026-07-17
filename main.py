@@ -2014,9 +2014,10 @@ async def _exit_monitor_loop():
 
                 # -- SL_PROXIMITY_EXIT: all tiers, all pairs, both directions.
                 # Threshold is conditional on trade state (remaining % of SL distance):
-                #   post-TP1 runner   → 0.30 (70% consumed) — half position, tighten runner
-                #   never-green       → 0.35 (65% consumed) — no promise shown, cut earlier
+                #   post-TP1 runner   → 0.50 (50% consumed) — half position booked, tightest exit
+                #   never-green       → 0.45 (55% consumed) — no promise shown, cut 5% earlier
                 #   armed pre-TP1     → 0.40 (60% consumed) — PEAK_GIVEBACK is primary guard
+                # Higher multiplier = more remaining required = fires earlier (less consumed).
                 # Uses _peak_shadow.get(key) to read be_armed without touching shadow state.
                 _entry_sp = trade.get("entry_price", 0) or 0
                 _sl_sp    = trade.get("sl_price")
@@ -2033,8 +2034,8 @@ async def _exit_monitor_loop():
                             (_sl_sp - current) / _entry_sp)
                     _slp_sh  = _peak_shadow.get(key, {})
                     _slp_mul = (
-                        0.30 if trade.get("tp1_hit")
-                        else 0.35 if not _slp_sh.get("be_armed", False)
+                        0.50 if trade.get("tp1_hit")
+                        else 0.45 if not _slp_sh.get("be_armed", False)
                         else 0.40
                     )
                     if (_sl_distance_pct > 0 and
