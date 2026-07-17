@@ -2180,6 +2180,15 @@ async def _exit_monitor_loop():
                 except Exception as _psh_e:
                     print(f"[SHADOW] poll error: {_psh_e}")
 
+                # -- ARMED_REVERSAL: be_armed=True and cpnl < 0 → exit immediately
+                # Trade crossed into profit (be_price arm), now back negative. Out.
+                if _sh.get("be_armed") and _cpnl < 0:
+                    print(f"[ARMED_REVERSAL] HL {sym} {direction}"
+                          f" peak={_sh['peak_pnl_usd']:.2f}"
+                          f" cpnl={_cpnl:.2f}")
+                    _do_close_trade(key, trade, current, "ARMED_REVERSAL")
+                    continue
+
                 # -- Adverse cut shadow (observation only, no exit logic) ------
                 try:
                     _ent_a  = trade.get("entry_price", 0) or 0
