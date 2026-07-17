@@ -2152,8 +2152,11 @@ async def _exit_monitor_loop():
                 try:
                     _sh = _peak_shadow.setdefault(key, {
                         "peak_pnl_usd":    0.0,
+                        "peak_pnl_r":      0.0,
                         "peak_reached_at": None,
                         "be_armed":        False,
+                        "giveback_streak": 0,
+                        "last_cpnl_r":     None,
                         "d20_at": None, "d20_pnl": None, "d20_phase": None,
                         "d30_at": None, "d30_pnl": None, "d30_phase": None,
                         "d40_at": None, "d40_pnl": None, "d40_phase": None,
@@ -2169,6 +2172,19 @@ async def _exit_monitor_loop():
                                    else False)
                     if _be_crossed:
                         _sh["be_armed"] = True
+                    # -- Giveback streak: consecutive scan ticks of declining cpnl in R --
+                    # Feeds PEAK_GIVEBACK exit. Reset when a new R-peak is set.
+                    if _sh["be_armed"] and _dr_ac > 0:
+                        _cpnl_r_tick = _cpnl / _dr_ac
+                        if _cpnl_r_tick > _sh["peak_pnl_r"]:
+                            _sh["peak_pnl_r"]      = _cpnl_r_tick
+                            _sh["giveback_streak"] = 0
+                        elif _sh["last_cpnl_r"] is not None:
+                            if _cpnl_r_tick < _sh["last_cpnl_r"]:
+                                _sh["giveback_streak"] += 1
+                            else:
+                                _sh["giveback_streak"] = 0
+                        _sh["last_cpnl_r"] = _cpnl_r_tick
                     _now_candle_ts = (
                         int(time.time())
                         // 60) * 60
@@ -2195,6 +2211,24 @@ async def _exit_monitor_loop():
                                 _sh[_psh_phk] = _psh_phase
                 except Exception as _psh_e:
                     print(f"[SHADOW] poll error: {_psh_e}")
+
+                # -- PEAK_GIVEBACK: armed trade fading — 2 declining scans + < 50% peak --
+                # Fires when: be_armed=True, real MFE existed (>= 0.08R), current cpnl
+                # has declined for 2+ consecutive scan ticks AND is now below 50% of the
+                # peak R seen. Exits the slow-fade pattern before SL_PROXIMITY bleeds it.
+                if (_sh.get("be_armed")
+                        and _dr_ac > 0
+                        and _sh.get("peak_pnl_r", 0) >= 0.08
+                        and _sh.get("giveback_streak", 0) >= 2
+                        and (_cpnl / _dr_ac) < _sh.get("peak_pnl_r", 0) * 0.50):
+                    _pg_r = _cpnl / _dr_ac
+                    print(f"[PEAK_GIVEBACK] HL {sym} {direction}"
+                          f" streak={_sh['giveback_streak']}"
+                          f" peak_r={_sh['peak_pnl_r']:.3f}R"
+                          f" cur_r={_pg_r:.3f}R"
+                          f" cpnl={_cpnl:.2f}")
+                    _do_close_trade(key, trade, current, "PEAK_GIVEBACK")
+                    continue
 
                 # -- ARMED_REVERSAL: be_armed=True and cpnl < 0 → exit immediately
                 # Trade crossed into profit (be_price arm), now back negative. Out.
