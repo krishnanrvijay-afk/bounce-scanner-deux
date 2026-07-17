@@ -2059,6 +2059,22 @@ async def _exit_monitor_loop():
                     if not is_short else
                     (current - _entry_px) / _entry_px
                 ) if _entry_px > 0 else 0
+                # -- ADVERSE_CUT: dead entry — 0.30R adverse, MFE < 0.05R, age >= 90s --
+                # Trade went straight against entry with no meaningful green shown.
+                # Fires before DTK (10 min) to avoid bleeding the full time window.
+                # Thresholds in R units for consistency with all other exit logic.
+                _dr_ac = trade.get("dollar_risk", 0) or 0
+                if (_elapsed >= 90
+                        and _dr_ac > 0
+                        and _adv_pnl <= -0.30 * _dr_ac
+                        and _mfe_pnl <   0.05 * _dr_ac):
+                    print(f"[ADVERSE_CUT] HL {sym} {direction}"
+                          f" elapsed={_elapsed:.0f}s"
+                          f" adv={_adv_pnl:.2f} ({_adv_pnl/_dr_ac:.2f}R)"
+                          f" mfe={_mfe_pnl:.2f} ({_mfe_pnl/_dr_ac:.2f}R)"
+                          f" dr={_dr_ac:.2f}")
+                    _do_close_trade(key, trade, current, "ADVERSE_CUT")
+                    continue
                 # -- DEAD_TRADE_KILL: tightened exit — no MFE after 10 min --------
                 # Fires when trade >= 10 min old, adverse >= 1/3 of KILL floor,
                 # and peak favorable (MFE) < 0.08R. Saves avg ~$75 vs full KILL.
