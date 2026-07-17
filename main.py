@@ -2012,6 +2012,17 @@ async def _exit_monitor_loop():
                 _cpnl       = ((_entry - current) * _size if is_short
                                else (current - _entry) * _size)
 
+                # -- ARMED_REVERSAL (pre-SLP guard): runs before SL_PROXIMITY so
+                # SL_PROXIMITY's `continue` cannot swallow this exit. Reads
+                # be_armed from peak_shadow without touching shadow state.
+                _ar_pre = _peak_shadow.get(key, {})
+                if _ar_pre.get("be_armed") and _cpnl < 0:
+                    print(f"[ARMED_REVERSAL] HL {sym} {direction}"
+                          f" peak={_ar_pre.get('peak_pnl_usd', 0):.2f}"
+                          f" cpnl={_cpnl:.2f}")
+                    _do_close_trade(key, trade, current, "ARMED_REVERSAL")
+                    continue
+
                 # -- SL_PROXIMITY_EXIT: all tiers, all pairs, both directions.
                 # Threshold is conditional on trade state (remaining % of SL distance):
                 #   post-TP1 runner   → 0.50 (50% consumed) — half position booked, tightest exit
@@ -2169,12 +2180,16 @@ async def _exit_monitor_loop():
                         "d30_at": None, "d30_pnl": None, "d30_phase": None,
                         "d40_at": None, "d40_pnl": None, "d40_phase": None,
                         "last_peak_candle_ts": 0,
+                        "peak_set_time":       0.0,
                     })
                     _sz   = trade.get("remaining_size", trade.get("size", 0)) or 0
                     _ent  = trade.get("entry_price", 0) or 0
                     _cpnl = ((current - _ent) * _sz if not is_short
                              else (_ent - current) * _sz)
                     _be_p = trade.get("be_price") or 0
+                    if not _be_p and _ent:
+                        _be_p = (round(_ent * 1.001, 6) if not is_short
+                                 else round(_ent * 0.999, 6))
                     _be_crossed = ((current >= _be_p) if (not is_short and _be_p)
                                    else (current <= _be_p) if (is_short and _be_p)
                                    else False)
@@ -2201,6 +2216,7 @@ async def _exit_monitor_loop():
                         _sh["peak_pnl_usd"]    = _cpnl
                         _sh["peak_reached_at"] = datetime.now(timezone.utc).isoformat()
                         _sh["last_peak_candle_ts"] = _now_candle_ts
+                        _sh["peak_set_time"]   = time.time()
                         _sh["d20_at"] = _sh["d20_pnl"] = _sh["d20_phase"] = None
                         _sh["d30_at"] = _sh["d30_pnl"] = _sh["d30_phase"] = None
                         _sh["d40_at"] = _sh["d40_pnl"] = _sh["d40_phase"] = None
@@ -2225,13 +2241,14 @@ async def _exit_monitor_loop():
                 # ADVERSE_CUT ceiling), trade is >= 45s old, cpnl has declined for 3+
                 # consecutive scan ticks AND fallen below 40% of peak R (60% given back).
                 # Threshold drop: 0.08→0.05R closes gap with ADVERSE_CUT upper bound.
-                # Streak: 2→3 filters single-tick noise at 2-3s scan intervals (~6-9s).
+                # Streak: >=2 (reduced from 3 after 7/17 forensic: streak=3 misses
+                # fast single-candle reversals that complete in 1-2 scan ticks).
                 # Giveback: 50%→40% exits while 60% of peak R is still held.
                 if (_sh.get("be_armed")
                         and _elapsed >= 45
                         and _dr_ac > 0
                         and _sh.get("peak_pnl_r", 0) >= 0.05
-                        and _sh.get("giveback_streak", 0) >= 3
+                        and _sh.get("giveback_streak", 0) >= 2
                         and (_cpnl / _dr_ac) < _sh.get("peak_pnl_r", 0) * 0.40):
                     _pg_r = _cpnl / _dr_ac
                     print(f"[PEAK_GIVEBACK] HL {sym} {direction}"
@@ -2473,10 +2490,7 @@ async def _exit_monitor_loop():
                 _sentinel_min = _notional * _sentinel_pct
                 if _sh["be_armed"] and \
                           _sh["peak_pnl_usd"] >= _sentinel_min:
-                      _now_candle_ts = (
-                          int(time.time())
-                          // 60) * 60
-                      if _sh.get("last_peak_candle_ts", 0) != _now_candle_ts:
+                      if time.time() - _sh.get("peak_set_time", 0.0) >= 16:
                           if _cpnl < _sh["peak_pnl_usd"] * 0.90:
                               reason = "PEAK_DECAY_10"
                               print(f"[PEAK_DECAY_10] "
