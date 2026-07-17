@@ -2012,10 +2012,103 @@ async def _exit_monitor_loop():
                 _cpnl       = ((_entry - current) * _size if is_short
                                else (current - _entry) * _size)
 
-                # -- ARMED_REVERSAL (pre-SLP guard): runs before SL_PROXIMITY so
-                # SL_PROXIMITY's `continue` cannot swallow this exit. Reads
-                # be_armed from peak_shadow without touching shadow state.
-                _ar_pre = _peak_shadow.get(key, {})
+                # ── PROFIT GUARDS: PD10 → WALL_TP → SE (before AR/SLP) ──────────
+                # These gates exit while cpnl > 0.  They read _ar_pre
+                # (previous-tick shadow) -- no dependency on current-tick shadow block.
+                _ar_pre       = _peak_shadow.get(key, {})
+                _session      = get_session_name()
+                _sentinel_pct = SENTINEL_MIN_PEAK_PCT.get(
+                    (sym, _session), SENTINEL_MIN_PEAK_PCT_DEFAULT)
+                _notional = (
+                    trade.get("margin", 2000)
+                    * trade.get("leverage", 5))
+                _sentinel_min = _notional * _sentinel_pct
+
+                # -- PEAK_DECAY_10: large runner peak (>=sentinel) decayed 10% ----
+                # Fires while cpnl is still positive; uses _ar_pre so it can act
+                # on the same tick decay crosses 10%, before AR sees cpnl negative.
+                if _ar_pre.get("be_armed") and \
+                          _ar_pre.get("peak_pnl_usd", 0.0) >= _sentinel_min:
+                      if time.time() - _ar_pre.get("peak_set_time", 0.0) >= 16:
+                          if _cpnl < _ar_pre.get("peak_pnl_usd", 0.0) * 0.90:
+                              reason = "PEAK_DECAY_10"
+                              print(f"[PEAK_DECAY_10] "
+                                    f"{sym} {direction} "
+                                    f"peak={_ar_pre.get('peak_pnl_usd', 0.0):.2f} "
+                                    f"cpnl={_cpnl:.2f}")
+                              _do_close_trade(key, trade,
+                                  current, reason)
+                              continue
+
+                # -- WALL_TP: exit at book wall while in profit ----------------------
+                # Largest bid (SHORT)/ask (LONG) within 0.30% of price.
+                _ps_wt = next((p for p in app_state.pair_states if p.get("symbol") == sym), None)
+                if _ps_wt and _cpnl > 0 and _ar_pre.get("be_armed"):
+                    if is_short:
+                        _bw = _ps_wt.get("bid_wall")
+                        if _bw and _bw["dist_pct"] <= 0.30:
+                            print(f"[WALL_TP] HL {sym} SHORT"
+                                  f" wall={_bw['price']:.5f}"
+                                  f" dist={_bw['dist_pct']:.3f}%"
+                                  f" ratio={_bw['ratio']:.1f}x"
+                                  f" cpnl={_cpnl:.2f}")
+                            _do_close_trade(key, trade, current, "WALL_TP")
+                            continue
+                    else:
+                        _aw = _ps_wt.get("ask_wall")
+                        if _aw and _aw["dist_pct"] <= 0.30:
+                            print(f"[WALL_TP] HL {sym} LONG"
+                                  f" wall={_aw['price']:.5f}"
+                                  f" dist={_aw['dist_pct']:.3f}%"
+                                  f" ratio={_aw['ratio']:.1f}x"
+                                  f" cpnl={_cpnl:.2f}")
+                            _do_close_trade(key, trade, current, "WALL_TP")
+                            continue
+
+                # -- SIGNAL_EXHAUSTION: J1H turns against trade while in profit -----
+                # Tracks J1H peak (LONG)/trough (SHORT), fires on SE_J1H_DECAY_PTS.
+                # Evidence: June 29 39-trade analysis + June 30 candle confirmation.
+                _cur_j1h = None
+                for _ps in app_state.pair_states:
+                    if _ps.get("symbol") == sym:
+                        _cur_j1h = _ps.get("j1h")
+                        break
+                if _cur_j1h is not None and _cpnl > 0:
+                    if not is_short:
+                        # LONG: track J1H peak, fire when decays SE_J1H_DECAY_PTS+
+                        _prev = _se_j1h_extreme.get(key, _cur_j1h)
+                        _se_j1h_extreme[key] = max(_prev, _cur_j1h)
+                        _j1h_decay = _se_j1h_extreme[key] - _cur_j1h
+                        if _j1h_decay >= _scanner_mod.SE_J1H_DECAY_PTS and _ar_pre.get("peak_pnl_usd", 0.0) >= _sentinel_min and _cpnl > 0:
+                            print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
+                                  f" j1h_peak={_se_j1h_extreme[key]:.1f}"
+                                  f" j1h_now={_cur_j1h:.1f}"
+                                  f" decay={_j1h_decay:.1f}"
+                                  f" cpnl={_cpnl:.2f}")
+                            _do_close_trade(
+                                key, trade, current, "SIGNAL_EXHAUSTION")
+                            _se_j1h_extreme.pop(key, None)
+                            continue
+                    else:
+                        # SHORT: track J1H trough, fire when rises SE_J1H_DECAY_PTS+
+                        _prev = _se_j1h_extreme.get(key, _cur_j1h)
+                        _se_j1h_extreme[key] = min(_prev, _cur_j1h)
+                        _j1h_rise = _cur_j1h - _se_j1h_extreme[key]
+                        if _j1h_rise >= _scanner_mod.SE_J1H_DECAY_PTS and _ar_pre.get("peak_pnl_usd", 0.0) >= _sentinel_min and _cpnl > 0:
+                            print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
+                                  f" j1h_trough={_se_j1h_extreme[key]:.1f}"
+                                  f" j1h_now={_cur_j1h:.1f}"
+                                  f" rise={_j1h_rise:.1f}"
+                                  f" cpnl={_cpnl:.2f}")
+                            _do_close_trade(
+                                key, trade, current, "SIGNAL_EXHAUSTION")
+                            _se_j1h_extreme.pop(key, None)
+                            continue
+
+                # -- ARMED_REVERSAL (pre-SLP guard): backstop for fast reversals ----
+                # PD10/WALL_TP/SE run first above to protect profit while positive;
+                # AR catches cases where the reversal is too fast for streak to build.
+                # _ar_pre is already defined in the profit-guards block above.
                 if _ar_pre.get("be_armed") and _cpnl < 0:
                     print(f"[ARMED_REVERSAL] HL {sym} {direction}"
                           f" peak={_ar_pre.get('peak_pnl_usd', 0):.2f}"
@@ -2259,14 +2352,6 @@ async def _exit_monitor_loop():
                     _do_close_trade(key, trade, current, "PEAK_GIVEBACK")
                     continue
 
-                # -- ARMED_REVERSAL: be_armed=True and cpnl < 0 → exit immediately
-                # Trade crossed into profit (be_price arm), now back negative. Out.
-                if _sh.get("be_armed") and _cpnl < 0:
-                    print(f"[ARMED_REVERSAL] HL {sym} {direction}"
-                          f" peak={_sh['peak_pnl_usd']:.2f}"
-                          f" cpnl={_cpnl:.2f}")
-                    _do_close_trade(key, trade, current, "ARMED_REVERSAL")
-                    continue
 
                 # -- Adverse cut shadow (observation only, no exit logic) ------
                 try:
@@ -2480,26 +2565,6 @@ async def _exit_monitor_loop():
                         _do_partial_close_tp1(key, trade, current)
                         continue
 
-                # ── fleet-wide Sentinel (PEAK_DECAY_10) ───────────────────────
-                _session      = get_session_name()
-                _sentinel_pct = SENTINEL_MIN_PEAK_PCT.get(
-                    (sym, _session), SENTINEL_MIN_PEAK_PCT_DEFAULT)
-                _notional = (
-                    trade.get("margin", 2000)
-                    * trade.get("leverage", 5))
-                _sentinel_min = _notional * _sentinel_pct
-                if _sh["be_armed"] and \
-                          _sh["peak_pnl_usd"] >= _sentinel_min:
-                      if time.time() - _sh.get("peak_set_time", 0.0) >= 16:
-                          if _cpnl < _sh["peak_pnl_usd"] * 0.90:
-                              reason = "PEAK_DECAY_10"
-                              print(f"[PEAK_DECAY_10] "
-                                    f"{sym} {direction} "
-                                    f"peak={_sh['peak_pnl_usd']:.2f} "
-                                    f"cpnl={_cpnl:.2f}")
-                              _do_close_trade(key, trade,
-                                  current, reason)
-                              continue
 
 
                 # ── TIME_ADVERSE_EXIT backstop
@@ -2555,75 +2620,8 @@ async def _exit_monitor_loop():
                             print(f"[SESSION HALT] {sym} {direction} — 2 adverse exits (TIME_ADVERSE_EXIT) in {get_session_name()} session. Halted for remainder of session.")
                         continue
 
-                # -- WALL_TP: exit when price approaches significant book wall in profit
-                # Fires when the largest bid (SHORT) or ask (LONG) level in the live
-                # book is >= 3x average size and within 0.30% of current price.
-                # Uses real market structure as the natural TP — no sentinel floor.
-                _ps_wt = next((p for p in app_state.pair_states if p.get("symbol") == sym), None)
-                if _ps_wt and _cpnl > 0 and _sh.get("be_armed"):
-                    if is_short:
-                        _bw = _ps_wt.get("bid_wall")
-                        if _bw and _bw["dist_pct"] <= 0.30:
-                            print(f"[WALL_TP] HL {sym} SHORT"
-                                  f" wall={_bw['price']:.5f}"
-                                  f" dist={_bw['dist_pct']:.3f}%"
-                                  f" ratio={_bw['ratio']:.1f}x"
-                                  f" cpnl={_cpnl:.2f}")
-                            _do_close_trade(key, trade, current, "WALL_TP")
-                            continue
-                    else:
-                        _aw = _ps_wt.get("ask_wall")
-                        if _aw and _aw["dist_pct"] <= 0.30:
-                            print(f"[WALL_TP] HL {sym} LONG"
-                                  f" wall={_aw['price']:.5f}"
-                                  f" dist={_aw['dist_pct']:.3f}%"
-                                  f" ratio={_aw['ratio']:.1f}x"
-                                  f" cpnl={_cpnl:.2f}")
-                            _do_close_trade(key, trade, current, "WALL_TP")
-                            continue
 
-                # Signal Exhaustion -- exit when J1H turns against the trade
-                # while in profit. Tracks J1H peak (LONG) or trough (SHORT)
-                # and fires on SE_J1H_DECAY_PTS decay. Evidence: June 29
-                # 39-trade analysis + June 30 HYPE/ADA candle confirmation.
-                # Replaces the incorrect J15M-based version (built in error).
-                _cur_j1h = None
-                for _ps in app_state.pair_states:
-                    if _ps.get("symbol") == sym:
-                        _cur_j1h = _ps.get("j1h")
-                        break
-                if _cur_j1h is not None and _cpnl > 0:
-                    if not is_short:
-                        # LONG: track J1H peak, fire when decays SE_J1H_DECAY_PTS+
-                        _prev = _se_j1h_extreme.get(key, _cur_j1h)
-                        _se_j1h_extreme[key] = max(_prev, _cur_j1h)
-                        _j1h_decay = _se_j1h_extreme[key] - _cur_j1h
-                        if _j1h_decay >= _scanner_mod.SE_J1H_DECAY_PTS and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min and _cpnl > 0:
-                            print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
-                                  f" j1h_peak={_se_j1h_extreme[key]:.1f}"
-                                  f" j1h_now={_cur_j1h:.1f}"
-                                  f" decay={_j1h_decay:.1f}"
-                                  f" cpnl={_cpnl:.2f}")
-                            _do_close_trade(
-                                key, trade, current, "SIGNAL_EXHAUSTION")
-                            _se_j1h_extreme.pop(key, None)
-                            continue
-                    else:
-                        # SHORT: track J1H trough, fire when rises SE_J1H_DECAY_PTS+
-                        _prev = _se_j1h_extreme.get(key, _cur_j1h)
-                        _se_j1h_extreme[key] = min(_prev, _cur_j1h)
-                        _j1h_rise = _cur_j1h - _se_j1h_extreme[key]
-                        if _j1h_rise >= _scanner_mod.SE_J1H_DECAY_PTS and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min and _cpnl > 0:
-                            print(f"[SIGNAL_EXHAUSTION] HL {sym} {direction}"
-                                  f" j1h_trough={_se_j1h_extreme[key]:.1f}"
-                                  f" j1h_now={_cur_j1h:.1f}"
-                                  f" rise={_j1h_rise:.1f}"
-                                  f" cpnl={_cpnl:.2f}")
-                            _do_close_trade(
-                                key, trade, current, "SIGNAL_EXHAUSTION")
-                            _se_j1h_extreme.pop(key, None)
-                            continue
-                # Ã¢ÂÂÃ¢ÂÂ TRAILBLAZER: ATR trailing stop after tp1_hit Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+
                 if tp1_hit:
                     _ps   = next((p for p in app_state.pair_states if p.get("symbol") == sym), None)
                     _atr  = (_ps.get("atr15m") or 0) if _ps else 0
