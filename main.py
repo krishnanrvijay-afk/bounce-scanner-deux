@@ -2013,7 +2013,7 @@ async def _exit_monitor_loop():
                                else (current - _entry) * _size)
 
                 # -- SL_PROXIMITY_EXIT: all tiers, all pairs, both directions.
-                # Exits once price has moved 80% of the way from entry to
+                # Exits once price has moved 60% of the way from entry to
                 # SL, regardless of MFE or whether a peak was ever reached.
                 # No arming required, no percentage-of-MFE check -- pure
                 # adverse-move-toward-SL level exit.
@@ -2212,15 +2212,19 @@ async def _exit_monitor_loop():
                 except Exception as _psh_e:
                     print(f"[SHADOW] poll error: {_psh_e}")
 
-                # -- PEAK_GIVEBACK: armed trade fading — 2 declining scans + < 50% peak --
-                # Fires when: be_armed=True, real MFE existed (>= 0.08R), current cpnl
-                # has declined for 2+ consecutive scan ticks AND is now below 50% of the
-                # peak R seen. Exits the slow-fade pattern before SL_PROXIMITY bleeds it.
+                # -- PEAK_GIVEBACK: armed trade fading — 3 declining scans + < 40% peak --
+                # Fires when: be_armed=True, real MFE existed (>= 0.05R, aligns with
+                # ADVERSE_CUT ceiling), trade is >= 45s old, cpnl has declined for 3+
+                # consecutive scan ticks AND fallen below 40% of peak R (60% given back).
+                # Threshold drop: 0.08→0.05R closes gap with ADVERSE_CUT upper bound.
+                # Streak: 2→3 filters single-tick noise at 2-3s scan intervals (~6-9s).
+                # Giveback: 50%→40% exits while 60% of peak R is still held.
                 if (_sh.get("be_armed")
+                        and _elapsed >= 45
                         and _dr_ac > 0
-                        and _sh.get("peak_pnl_r", 0) >= 0.08
-                        and _sh.get("giveback_streak", 0) >= 2
-                        and (_cpnl / _dr_ac) < _sh.get("peak_pnl_r", 0) * 0.50):
+                        and _sh.get("peak_pnl_r", 0) >= 0.05
+                        and _sh.get("giveback_streak", 0) >= 3
+                        and (_cpnl / _dr_ac) < _sh.get("peak_pnl_r", 0) * 0.40):
                     _pg_r = _cpnl / _dr_ac
                     print(f"[PEAK_GIVEBACK] HL {sym} {direction}"
                           f" streak={_sh['giveback_streak']}"
