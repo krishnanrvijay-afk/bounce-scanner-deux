@@ -341,5 +341,23 @@ class HLClient:
         except Exception as e:
             return {"status": "error", "msg": str(e)}
 
+    async def get_open_position_size(self, symbol: str):
+        """Returns live position size on HL for `symbol`.
+        0.0 = no position exists. None = error or paper mode (skip check)."""
+        if self._paper_mode:
+            return None
+        if not self._wallet_address:
+            return None
+        try:
+            data = await self._post({"type": "clearinghouseState", "user": self._wallet_address})
+            for pos in (data or {}).get("assetPositions", []):
+                p = pos.get("position", {})
+                if p.get("coin") == symbol:
+                    return abs(float(p.get("szi", 0)))
+            return 0.0  # symbol not in positions = fully closed
+        except Exception as e:
+            print(f"[HLClient] get_open_position_size({symbol}) error: {e}")
+            return None  # error: skip this check cycle
+
     async def close(self):
         await self._http.aclose()
