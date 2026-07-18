@@ -1262,6 +1262,7 @@ async def _scan_loop():
                 _s = _sentinel_mod.update(app_state.pair_states, app_state.prices)
                 app_state.market_health["sentinel_regime"] = _s["regime"]
                 app_state.market_health["sentinel_text"]   = _sentinel_mod.get_pill_text()
+                app_state.market_health["sentinel_metrics"] = _sentinel_mod.get_metrics()
                 if _s.get("changed") and _s.get("telegram_text") and TELEGRAM_ENABLED:
                     threading.Thread(
                         target=lambda m=_s["telegram_text"]: _tg_post(m),
