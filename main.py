@@ -1955,7 +1955,9 @@ def _flush_sentinel_sweep() -> None:
 
 async def _exit_monitor_loop():
     """Runs every PRICE_INTERVAL_SECONDS. Checks every open trade against SL/TP."""
+    _extclose_tick = 0
     while True:
+        _extclose_tick += 1
         for key, trade in list(app_state.open_trades.items()):
             try:
                 sym       = trade["symbol"]
@@ -1993,6 +1995,52 @@ async def _exit_monitor_loop():
                         print(f"[STALE PRICE] {sym} refetch FAILED — price still stale, "
                               f"exit checks proceeding with last-known price as fallback "
                               f"rather than skipping entirely")
+                # -- External close detection (every 5 ticks) ─────────────────
+                if not PAPER_MODE and _extclose_tick % 5 == 0:
+                    try:
+                        _exsz = await hl_client.get_open_position_size(sym)
+                        if _exsz is not None and _exsz == 0:
+                            print(f"[EXTERNAL_CLOSE] {sym} {direction} "
+                                  f"— position gone on exchange, logging close")
+                            _entry_px = trade.get("entry_price", 0)
+                            _rem_sz   = trade.get("remaining_size", trade.get("size", 0))
+                            _pnl      = (
+                                (current - _entry_px) * _rem_sz if direction == "LONG"
+                                else (_entry_px - current) * _rem_sz
+                            )
+                            _sl_d  = trade.get("sl_dist") or 0
+                            _lev   = trade.get("leverage", 1)
+                            _mar   = trade.get("margin", MARGIN_PER_TRADE)
+                            _dr    = _mar * _lev * (_sl_d / _entry_px) if _entry_px else 0
+                            _r     = round(_pnl / _dr, 2) if _dr else 0.0
+                            _append_trade_log(trade, current, "EXTERNAL_CLOSE", _pnl, _r)
+                            _update_daily_pnl(_pnl)
+                            _on_trade_close("EXTERNAL_CLOSE")
+                            asyncio.create_task(
+                                _write_adverse_shadow_row(key, trade, "EXTERNAL_CLOSE", _pnl, _r))
+                            asyncio.create_task(
+                                _write_sign_shadow_rows(key, trade, "EXTERNAL_CLOSE", _pnl))
+                            asyncio.create_task(
+                                _write_signal_shadow_row(key, trade, "EXTERNAL_CLOSE", _pnl, _r))
+                            app_state.margin_deployed = max(
+                                0.0, app_state.margin_deployed - trade["margin"])
+                            del app_state.open_trades[key]
+                            _retire_alert(sym, direction)
+                            _save_state()
+                            if TELEGRAM_ENABLED:
+                                def _ext_tg(s=sym, d=direction, ep=current, p=_pnl):
+                                    _sl_lbl = "S" if d == "SHORT" else "L"
+                                    _tg_post(
+                                        "🟠 " + s + " " + _sl_lbl +
+                                        " · closed (EXTERNAL) at " + _fmt_p(ep) +
+                                        "\n" + ("+" if p >= 0 else "-") +
+                                        "$" + f"{abs(p):.2f}")
+                                import threading as _th
+                                _th.Thread(target=_ext_tg, daemon=True).start()
+                            continue
+                    except Exception as _ece:
+                        print(f"[EXTERNAL_CLOSE] {sym} check error: {_ece}")
+                # ─────────────────────────────────────────────────────────────
                 # Update excursion tracking regardless of sl_price
                 ep = trade.get("extreme_price") or current
                 trade["extreme_price"] = (min(ep, current) if is_short
