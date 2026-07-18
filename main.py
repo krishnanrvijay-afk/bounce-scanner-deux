@@ -2060,9 +2060,10 @@ async def _exit_monitor_loop():
                 _cpnl       = ((_entry - current) * _size if is_short
                                else (current - _entry) * _size)
 
-                # ── PROFIT GUARDS: PD10 → WALL_TP → SE (before AR/SLP) ──────────
+                # ── PROFIT GUARDS: WALL_TP → SE (before AR/SLP) ─────────────────
                 # These gates exit while cpnl > 0.  They read _ar_pre
                 # (previous-tick shadow) -- no dependency on current-tick shadow block.
+                # PEAK_PROTECT (after shadow update) replaces PEAK_DECAY_10 + PEAK_GIVEBACK.
                 _ar_pre       = _peak_shadow.get(key, {})
                 _session      = get_session_name()
                 _sentinel_pct = SENTINEL_MIN_PEAK_PCT.get(
@@ -2071,22 +2072,6 @@ async def _exit_monitor_loop():
                     trade.get("margin", 2000)
                     * trade.get("leverage", 5))
                 _sentinel_min = _notional * _sentinel_pct
-
-                # -- PEAK_DECAY_10: large runner peak (>=sentinel) decayed 10% ----
-                # Fires while cpnl is still positive; uses _ar_pre so it can act
-                # on the same tick decay crosses 10%, before AR sees cpnl negative.
-                if _ar_pre.get("be_armed") and \
-                          _ar_pre.get("peak_pnl_usd", 0.0) >= _sentinel_min:
-                      if time.time() - _ar_pre.get("peak_set_time", 0.0) >= 16:
-                          if _cpnl < _ar_pre.get("peak_pnl_usd", 0.0) * 0.90:
-                              reason = "PEAK_DECAY_10"
-                              print(f"[PEAK_DECAY_10] "
-                                    f"{sym} {direction} "
-                                    f"peak={_ar_pre.get('peak_pnl_usd', 0.0):.2f} "
-                                    f"cpnl={_cpnl:.2f}")
-                              _do_close_trade(key, trade,
-                                  current, reason)
-                              continue
 
                 # -- WALL_TP: exit at book wall while in profit ----------------------
                 # Largest bid (SHORT)/ask (LONG) within 0.30% of price.
@@ -2154,23 +2139,25 @@ async def _exit_monitor_loop():
                             continue
 
                 # -- ARMED_REVERSAL (pre-SLP guard): backstop for fast reversals ----
-                # PD10/WALL_TP/SE run first above to protect profit while positive;
-                # AR catches cases where the reversal is too fast for streak to build.
+                # WALL_TP/SE run first above to protect profit while positive;
+                # AR catches reversals after arming. Hysteresis: requires cpnl < -0.05R
+                # before firing to avoid premature exits on spread noise at entry.
                 # _ar_pre is already defined in the profit-guards block above.
-                if _ar_pre.get("be_armed") and _cpnl < 0:
+                _ar_dr = trade.get("dollar_risk", 0) or 0
+                if (_ar_pre.get("be_armed")
+                        and _ar_dr > 0
+                        and (_cpnl / _ar_dr) < -0.05):
                     print(f"[ARMED_REVERSAL] HL {sym} {direction}"
                           f" peak={_ar_pre.get('peak_pnl_usd', 0):.2f}"
-                          f" cpnl={_cpnl:.2f}")
+                          f" cpnl={_cpnl:.2f}"
+                          f" cpnl_r={_cpnl/_ar_dr:.3f}R")
                     _do_close_trade(key, trade, current, "ARMED_REVERSAL")
                     continue
 
                 # -- SL_PROXIMITY_EXIT: all tiers, all pairs, both directions.
-                # Threshold is conditional on trade state (remaining % of SL distance):
-                #   post-TP1 runner   → 0.50 (50% consumed) — half position booked, tightest exit
-                #   never-green       → 0.45 (55% consumed) — no promise shown, cut 5% earlier
-                #   armed pre-TP1     → 0.40 (60% consumed) — PEAK_GIVEBACK is primary guard
-                # Higher multiplier = more remaining required = fires earlier (less consumed).
-                # Uses _peak_shadow.get(key) to read be_armed without touching shadow state.
+                # Threshold: 50% of SL distance consumed → exit for all states.
+                # Dead "armed pre-TP1 0.40" branch removed — AR fires first when
+                # armed+adverse (cpnl < -0.05R hysteresis). Unified at 0.50 for simplicity.
                 _entry_sp = trade.get("entry_price", 0) or 0
                 _sl_sp    = trade.get("sl_price")
                 if _entry_sp > 0 and _sl_sp:
@@ -2184,12 +2171,7 @@ async def _exit_monitor_loop():
                             (_sl_sp - _entry_sp) / _entry_sp)
                         _price_to_sl_pct = (
                             (_sl_sp - current) / _entry_sp)
-                    _slp_sh  = _peak_shadow.get(key, {})
-                    _slp_mul = (
-                        0.50 if trade.get("tp1_hit")
-                        else 0.45 if not _slp_sh.get("be_armed", False)
-                        else 0.40
-                    )
+                    _slp_mul = 0.50
                     if (_sl_distance_pct > 0 and
                             _price_to_sl_pct <=
                             _sl_distance_pct * _slp_mul):
@@ -2210,85 +2192,14 @@ async def _exit_monitor_loop():
                         continue
 
 
-                _elapsed = time.time() - trade.get(
-                    "opened_at", time.time())
-                _entry_px = trade.get(
-                    "entry_price", 0) or 0
+                _elapsed = time.time() - trade.get("opened_at", time.time())
+                _entry_px = trade.get("entry_price", 0) or 0
                 _adverse_pct = (
                     (_entry_px - current) / _entry_px
                     if not is_short else
                     (current - _entry_px) / _entry_px
                 ) if _entry_px > 0 else 0
-                # -- ADVERSE_CUT: dead entry — 0.30R adverse, MFE < 0.05R, age >= 90s --
-                # Trade went straight against entry with no meaningful green shown.
-                # Fires before DTK (10 min) to avoid bleeding the full time window.
-                # Thresholds in R units for consistency with all other exit logic.
                 _dr_ac = trade.get("dollar_risk", 0) or 0
-                if (_elapsed >= 90
-                        and _dr_ac > 0
-                        and _adv_pnl <= -0.30 * _dr_ac
-                        and _mfe_pnl <   0.05 * _dr_ac):
-                    print(f"[ADVERSE_CUT] HL {sym} {direction}"
-                          f" elapsed={_elapsed:.0f}s"
-                          f" adv={_adv_pnl:.2f} ({_adv_pnl/_dr_ac:.2f}R)"
-                          f" mfe={_mfe_pnl:.2f} ({_mfe_pnl/_dr_ac:.2f}R)"
-                          f" dr={_dr_ac:.2f}")
-                    _do_close_trade(key, trade, current, "ADVERSE_CUT")
-                    continue
-                # -- DEAD_TRADE_KILL: tightened exit — no MFE after 10 min --------
-                # Fires when trade >= 10 min old, adverse >= 1/3 of KILL floor,
-                # and peak favorable (MFE) < 0.08R. Saves avg ~$75 vs full KILL.
-                # Counted as KILL for session-halt purposes.
-                _dr = trade.get("dollar_risk", 0) or 0
-                if (_elapsed >= 600
-                        and _dr > 0
-                        and _mfe_pnl < 0.08 * _dr
-                        and _adverse_pct >= _scanner_mod.KILL_PCT_FLOOR / 3):
-                    print(f"[DEAD_TRADE_KILL] HL {sym} {direction}"
-                          f" elapsed={_elapsed:.0f}s"
-                          f" adverse={_adverse_pct*100:.3f}%"
-                          f" mfe={_mfe_pnl:.2f} dr={_dr:.2f}"
-                          f" thr={_scanner_mod.KILL_PCT_FLOOR/3*100:.3f}%")
-                    _do_close_trade(key, trade, current, "DEAD_TRADE_KILL")
-                    _skey = f"{sym}_{direction}_{get_session_name()}"
-                    _session_sl_counts[_skey] = _session_sl_counts.get(_skey, 0) + 1
-                    if _session_sl_counts[_skey] >= 2 and _skey not in _session_halted:
-                        _session_halted.add(_skey)
-                        print(f"[SESSION HALT] {sym} {direction}"
-                              f" — 2 adverse exits (DEAD_TRADE_KILL)"
-                              f" in {get_session_name()}")
-                    continue
-                # -- TREND_ADVERSE_EXIT: no be_armed, adverse > 35% of SL, MFE < 0.20R ----
-                # Fills gap between DEAD_TRADE_KILL (10 min, 0.08R) and SL_PROXIMITY
-                # (60% traversed). Fires when be_armed never set (no favorable momentum)
-                # and price has crossed 35%+ of SL distance. Mimics MEXC stale-shadow
-                # protection for trades that trend immediately against entry.
-                _entry_tae = trade.get("entry_price", 0) or 0
-                _sl_tae    = trade.get("sl_price") or 0
-                if _entry_tae > 0 and _sl_tae > 0:
-                    if not is_short:
-                        _sl_dist_tae   = (_entry_tae - _sl_tae) / _entry_tae
-                        _remaining_tae = (current - _sl_tae) / _entry_tae
-                    else:
-                        _sl_dist_tae   = (_sl_tae - _entry_tae) / _entry_tae
-                        _remaining_tae = (_sl_tae - current) / _entry_tae
-                else:
-                    _sl_dist_tae = 0.0
-                    _remaining_tae = 1.0
-                if (not _sh.get("be_armed", False)
-                        and _elapsed >= 300
-                        and _dr > 0
-                        and _mfe_pnl < 0.20 * _dr
-                        and _sl_dist_tae > 0
-                        and _remaining_tae <= _sl_dist_tae * 0.65):
-                    print(f"[TREND_ADVERSE_EXIT] HL {sym} {direction}"
-                          f" age={{_elapsed:.0f}}s"
-                          f" mfe={{_mfe_pnl:.2f}} dr={{_dr:.2f}}"
-                          f" sl_dist={{_sl_dist_tae*100:.2f}}%"
-                          f" remaining={{_remaining_tae*100:.2f}}%"
-                          f" -- no arm, trending adverse")
-                    _do_close_trade(key, trade, current, "TREND_ADVERSE_EXIT")
-                    continue
                 # Tier 1: continuous floor
                 _kill_floor_hit = (
                     _adverse_pct >=
@@ -2377,27 +2288,22 @@ async def _exit_monitor_loop():
                 except Exception as _psh_e:
                     print(f"[SHADOW] poll error: {_psh_e}")
 
-                # -- PEAK_GIVEBACK: armed trade fading — 3 declining scans + < 40% peak --
-                # Fires when: be_armed=True, real MFE existed (>= 0.05R, aligns with
-                # ADVERSE_CUT ceiling), trade is >= 45s old, cpnl has declined for 3+
-                # consecutive scan ticks AND fallen below 40% of peak R (60% given back).
-                # Threshold drop: 0.08→0.05R closes gap with ADVERSE_CUT upper bound.
-                # Streak: >=2 (reduced from 3 after 7/17 forensic: streak=3 misses
-                # fast single-candle reversals that complete in 1-2 scan ticks).
-                # Giveback: 50%→40% exits while 60% of peak R is still held.
+                # -- PEAK_PROTECT: armed trade given back ≥ 30% of R peak ---------------
+                # Replaces PEAK_DECAY_10 (prev-tick, 10% USD decay, sentinel_min gated)
+                # and PEAK_GIVEBACK (current-tick, 60% R giveback, streak=2 gated).
+                # Single rule: be_armed + peak_r > 0 + cpnl < 70% of peak_r + age >= 16s.
+                # Uses current-tick shadow. No streak, no sentinel_min requirement.
                 if (_sh.get("be_armed")
-                        and _elapsed >= 45
+                        and _elapsed >= 16
                         and _dr_ac > 0
-                        and _sh.get("peak_pnl_r", 0) >= 0.05
-                        and _sh.get("giveback_streak", 0) >= 2
-                        and (_cpnl / _dr_ac) < _sh.get("peak_pnl_r", 0) * 0.40):
-                    _pg_r = _cpnl / _dr_ac
-                    print(f"[PEAK_GIVEBACK] HL {sym} {direction}"
-                          f" streak={_sh['giveback_streak']}"
+                        and _sh.get("peak_pnl_r", 0) > 0
+                        and (_cpnl / _dr_ac) < _sh.get("peak_pnl_r", 0) * 0.70):
+                    _pp_r = _cpnl / _dr_ac
+                    print(f"[PEAK_PROTECT] HL {sym} {direction}"
                           f" peak_r={_sh['peak_pnl_r']:.3f}R"
-                          f" cur_r={_pg_r:.3f}R"
+                          f" cur_r={_pp_r:.3f}R"
                           f" cpnl={_cpnl:.2f}")
-                    _do_close_trade(key, trade, current, "PEAK_GIVEBACK")
+                    _do_close_trade(key, trade, current, "PEAK_PROTECT")
                     continue
 
 
@@ -2615,57 +2521,35 @@ async def _exit_monitor_loop():
 
 
 
-                # ── TIME_ADVERSE_EXIT backstop
-                # Fires when trade has been
-                # adverse or breakeven for
-                # 10 minutes with near-zero MFE.
-                # Catches choppy adverse trades
-                # that oscillate without forming
-                # clean 3H/3L pattern.
-                # mfe_r tracks peak R achieved
-                # during trade -- if < 0.05R the
-                # trade never had meaningful
-                # favorable movement.
-
-                if (_trade_age >= 600
+                # -- BAD_TRADE_EXIT: progressive time-based cut for never-armed trades --
+                # Replaces ADVERSE_CUT (90s/0.05R), TREND_ADVERSE_EXIT (300s/0.20R),
+                # DEAD_TRADE_KILL (600s/0.08R), and TIME_ADVERSE_EXIT (600s/0.15R).
+                # Single rule: NOT armed + cpnl <= 0 + MFE < threshold(elapsed).
+                # Thresholds: 0.08R at 120s · 0.15R at 300s · 0.20R at 600s.
+                # MFE from excursion tracking (_mfe_pnl) — works regardless of armed status.
+                if (not _sh.get("be_armed", False)
                         and _cpnl <= 0
-                        and not _sh.get(
-                            "be_armed", False)):
-
-                    # compute mfe_r from shadow
-                    # peak_pnl_usd and dollar_risk
-                    _dollar_risk = trade.get(
-                        "dollar_risk")
-                    if _dollar_risk and \
-                            _dollar_risk > 0:
-                        _mfe_r_cur = (
-                            _sh.get(
-                                "peak_pnl_usd",
-                                0.0)
-                            / _dollar_risk)
-                    else:
-                        _mfe_r_cur = 0.0
-
-                    if _mfe_r_cur < 0.15:
-                        print(
-                            f"[TIME_ADVERSE_EXIT]"
-                            f" {sym} {direction}"
-                            f" age={_trade_age}s"
-                            f" cpnl={_cpnl:.2f}"
-                            f" mfe_r="
-                            f"{_mfe_r_cur:.3f}R"
-                            f" -- adverse 10min"
-                            f" no recovery")
-                        _do_close_trade(
-                            key, trade,
-                            current,
-                            "TIME_ADVERSE_EXIT")
-                        # Per-pair direction session adverse-exit count
+                        and _dr_ac > 0):
+                    _bte_mfe_r = _mfe_pnl / _dr_ac
+                    _bte_fired = False
+                    for _bte_age, _bte_thr in (
+                            (120, 0.08), (300, 0.15), (600, 0.20)):
+                        if _elapsed >= _bte_age and _bte_mfe_r < _bte_thr:
+                            _bte_fired = True
+                            break
+                    if _bte_fired:
+                        print(f"[BAD_TRADE_EXIT] HL {sym} {direction}"
+                              f" elapsed={_elapsed:.0f}s"
+                              f" mfe_r={_bte_mfe_r:.3f}R"
+                              f" cpnl={_cpnl:.2f}")
+                        _do_close_trade(key, trade, current, "BAD_TRADE_EXIT")
                         _skey = f"{sym}_{direction}_{get_session_name()}"
                         _session_sl_counts[_skey] = _session_sl_counts.get(_skey, 0) + 1
                         if _session_sl_counts[_skey] >= 2 and _skey not in _session_halted:
                             _session_halted.add(_skey)
-                            print(f"[SESSION HALT] {sym} {direction} — 2 adverse exits (TIME_ADVERSE_EXIT) in {get_session_name()} session. Halted for remainder of session.")
+                            print(f"[SESSION HALT] {sym} {direction}"
+                                  f" — 2 adverse exits (BAD_TRADE_EXIT)"
+                                  f" in {get_session_name()}")
                         continue
 
 
