@@ -2291,12 +2291,13 @@ async def _exit_monitor_loop():
                 # -- PEAK_PROTECT: armed trade given back ≥ 30% of R peak ---------------
                 # Replaces PEAK_DECAY_10 (prev-tick, 10% USD decay, sentinel_min gated)
                 # and PEAK_GIVEBACK (current-tick, 60% R giveback, streak=2 gated).
-                # Single rule: be_armed + peak_r > 0 + cpnl < 70% of peak_r + age >= 16s.
+                # Single rule: be_armed + peak_r >= 0.05R + cpnl < 70% of peak_r + age >= 16s.
+                # 0.05R minimum filters noise peaks from brief be_price grazes.
                 # Uses current-tick shadow. No streak, no sentinel_min requirement.
                 if (_sh.get("be_armed")
                         and _elapsed >= 16
                         and _dr_ac > 0
-                        and _sh.get("peak_pnl_r", 0) > 0
+                        and _sh.get("peak_pnl_r", 0) >= 0.05
                         and (_cpnl / _dr_ac) < _sh.get("peak_pnl_r", 0) * 0.70):
                     _pp_r = _cpnl / _dr_ac
                     print(f"[PEAK_PROTECT] HL {sym} {direction}"
