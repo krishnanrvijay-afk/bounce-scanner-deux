@@ -313,7 +313,7 @@ def _save_state():
 
 def _load_state():
     """On startup: restore all state from Supabase."""
-    global daily_pnl, trading_halted_today, consecutive_losses, circuit_breaker_active, PAPER_MODE, TELEGRAM_ENABLED, DAILY_LOSS_LIMIT, MARGIN_PER_TRADE, CONSECUTIVE_LOSS_STOP
+    global daily_pnl, trading_halted_today, consecutive_losses, circuit_breaker_active, PAPER_MODE, TELEGRAM_ENABLED, DAILY_LOSS_LIMIT, MARGIN_PER_TRADE, CONSECUTIVE_LOSS_STOP, MARGIN_HARD_CAP, TRAIL_ATR_MULTIPLIER
     sb = _get_supabase()
     if sb is None:
         print("[RESTORE] No Supabase client Ã¢ÂÂ starting fresh")
@@ -446,6 +446,16 @@ def _load_state():
                 .KILL_PCT_FLOOR = \
                 float(data[
                     "kill_pct_floor"])
+        if data.get("leverage_high") is not None:
+            _scanner_mod.LEVERAGE_HIGH = int(data["leverage_high"])
+        if data.get("leverage_mid") is not None:
+            _scanner_mod.LEVERAGE_MID = int(data["leverage_mid"])
+        if data.get("leverage_low") is not None:
+            _scanner_mod.LEVERAGE_LOW = int(data["leverage_low"])
+        if data.get("margin_hard_cap") is not None:
+            MARGIN_HARD_CAP = float(data["margin_hard_cap"])
+        if data.get("trail_atr_multiplier") is not None:
+            TRAIL_ATR_MULTIPLIER = float(data["trail_atr_multiplier"])
 
         # Ã¢ÂÂÃ¢ÂÂ New-day check Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
         today_str = datetime.now(ET).strftime("%Y-%m-%d")
@@ -3376,6 +3386,16 @@ async def get_settings():
             _scanner_mod.PAIR_COOLDOWN_SECONDS,
         "kill_pct_floor":
             _scanner_mod.KILL_PCT_FLOOR,
+        "leverage_high":
+            _scanner_mod.LEVERAGE_HIGH,
+        "leverage_mid":
+            _scanner_mod.LEVERAGE_MID,
+        "leverage_low":
+            _scanner_mod.LEVERAGE_LOW,
+        "margin_hard_cap":
+            MARGIN_HARD_CAP,
+        "trail_atr_multiplier":
+            TRAIL_ATR_MULTIPLIER,
     }
 
 
@@ -3384,7 +3404,7 @@ async def post_settings(request: Request):
     """Partial-update runtime settings. Only fields present in the body are changed."""
     global PAPER_MODE, TELEGRAM_ENABLED, \
            DAILY_LOSS_LIMIT, MARGIN_PER_TRADE, \
-           CONSECUTIVE_LOSS_STOP
+           CONSECUTIVE_LOSS_STOP, MARGIN_HARD_CAP, TRAIL_ATR_MULTIPLIER
     body = await request.json()
     if "paper_mode" in body:
         PAPER_MODE = bool(body["paper_mode"])
@@ -3444,6 +3464,21 @@ async def post_settings(request: Request):
     if "kill_pct_floor" in body:
         _scanner_mod.KILL_PCT_FLOOR = float(
             body["kill_pct_floor"])
+    if "leverage_high" in body:
+        _scanner_mod.LEVERAGE_HIGH = int(
+            body["leverage_high"])
+    if "leverage_mid" in body:
+        _scanner_mod.LEVERAGE_MID = int(
+            body["leverage_mid"])
+    if "leverage_low" in body:
+        _scanner_mod.LEVERAGE_LOW = int(
+            body["leverage_low"])
+    if "margin_hard_cap" in body:
+        MARGIN_HARD_CAP = float(
+            body["margin_hard_cap"])
+    if "trail_atr_multiplier" in body:
+        TRAIL_ATR_MULTIPLIER = float(
+            body["trail_atr_multiplier"])
 
     # Persist ALL settings to Supabase
     # NOTE: columns require migration if not yet in schema.
@@ -3487,6 +3522,16 @@ async def post_settings(request: Request):
                     _scanner_mod.PAIR_COOLDOWN_SECONDS,
                 "kill_pct_floor":
                     _scanner_mod.KILL_PCT_FLOOR,
+                "leverage_high":
+                    _scanner_mod.LEVERAGE_HIGH,
+                "leverage_mid":
+                    _scanner_mod.LEVERAGE_MID,
+                "leverage_low":
+                    _scanner_mod.LEVERAGE_LOW,
+                "margin_hard_cap":
+                    MARGIN_HARD_CAP,
+                "trail_atr_multiplier":
+                    TRAIL_ATR_MULTIPLIER,
             }
             _settings_payload["id"] = 1
             _sb.table("hl_scanner_state")\
