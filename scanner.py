@@ -842,6 +842,13 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             "HL", symbol, "EU_LONG_J15M_TIGHT", direction,
                             f"EU j15m={j15m:.1f} >= 15 -- EU LONGs require j15m<15"))
                         continue
+                    # RSI ceiling gate (enforced) — blocks LONGs when 15m RSI recovered above neutral
+                    # Data: ETH RSI=54.2, SUI RSI=53.9 tail losers Jul 19; all 9 winners had RSI<50
+                    if rsi15m >= RSI15M_LONG_MAX:
+                        asyncio.create_task(_log_gate(
+                            "HL", symbol, "RSI_CEILING_FAIL", direction,
+                            f"rsi15m={rsi15m:.1f} need<{RSI15M_LONG_MAX}"))
+                        continue
                     score, tier, lev = score_bounce_long(
                         j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
                         stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
