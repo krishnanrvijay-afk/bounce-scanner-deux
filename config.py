@@ -62,20 +62,8 @@ ADX_MIN_SHORT = 0   # data: SHORT ADX 0-14: 21 trades +$493. SHORTs profitable a
 
 SESSION_FILTER_ENABLED = True
 BLOCKED_PAIR_SESSIONS: dict = {
-    # @107 SHORT ASIA:
-    # archive 11 trades -$556.78
-    # avg MAE -0.448R
-    ("@107", "SHORT", "ASIA"): True,
-    # WIF LONG ASIA on HL only:
-    # archive 17 trades -$269.90
-    # avg MAE -0.457R
-    # WIF_USDT MEXC LONG ASIA is
-    # profitable -- HL specific block
-    ("WIF",  "LONG",  "ASIA"): True,
-    # NEW -- data: AVAX SHORT ASIA: 4 trades 0% WR -$75 (3L exits into macro uptrend)
-    ("AVAX", "SHORT", "ASIA"): True,
-    # NEW -- data: SUI SHORT ASIA: 3 trades 0% WR -$165 (03:55-03:56 back-to-back 3L)
-    ("SUI",  "SHORT", "ASIA"): True,
+    # Session-specific ASIA blocks removed Jul 2026 — BZ1/BZ2 auto-halt +
+    # dynamic gates now cover. Re-evaluate after 1 week.
     # R1 -- ADA all sessions LONG+SHORT: 6 trades 33% WR -$79.78 HL
     # ADA correlation breaks down on HL across all sessions and directions
     ("ADA",  "LONG",  "ASIA"): True,
