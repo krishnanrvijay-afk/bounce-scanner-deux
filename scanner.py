@@ -582,6 +582,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                 _btc_regime_context = "LONG_BLOCKED"
             elif _btc_j1h < 20.0:
                 _btc_regime_context = "SHORT_BLOCKED"
+                _regime_block_short = True
             elif 40.0 <= _btc_j1h <= 60.0:
                 _btc_regime_context = "NEUTRAL_BLOCK"
             else:
