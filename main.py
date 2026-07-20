@@ -446,12 +446,8 @@ def _load_state():
                 .KILL_PCT_FLOOR = \
                 float(data[
                     "kill_pct_floor"])
-        if data.get("leverage_high") is not None:
-            _scanner_mod.LEVERAGE_HIGH = int(data["leverage_high"])
-        if data.get("leverage_mid") is not None:
-            _scanner_mod.LEVERAGE_MID = int(data["leverage_mid"])
-        if data.get("leverage_low") is not None:
-            _scanner_mod.LEVERAGE_LOW = int(data["leverage_low"])
+        if data.get("leverage") is not None:
+            _scanner_mod.LEVERAGE = int(data["leverage"])
         if data.get("margin_hard_cap") is not None:
             MARGIN_HARD_CAP = float(data["margin_hard_cap"])
         if data.get("trail_atr_multiplier") is not None:
@@ -857,16 +853,6 @@ async def _do_open_trade(
 
     _client = mexc_client if exchange == "MEXC" else hl_client
     sl_price = alert_data.get("sl_price") if alert_data else None
-    # HC/HP 10x only on anchor pairs
-    _hc_anchor = {
-        "BTC", "ETH", "SOL",
-        "BTC_USDT", "ETH_USDT", "SOL_USDT"
-    }
-    if (alert_data and
-            alert_data.get("tier") == "HIGH_PROB" and
-            symbol not in _hc_anchor):
-        leverage = min(leverage,
-                       _scanner_mod.LEVERAGE_MID)
     result   = await _client.open_position(
         symbol, direction, margin_usdc, leverage, sl_price=sl_price
     )
@@ -1081,7 +1067,6 @@ def send_telegram(alert: dict) -> None:
     """Build and send the compact entry alert."""
     sym       = alert.get("symbol", "")
     direction = alert.get("direction", "LONG")
-    tier      = alert.get("tier", "REGULAR")
     j15m      = float(alert.get("j15m", 0) or 0)
     j1h       = float(alert.get("j1h",  0) or 0)
     bid_pct   = float(alert.get("bid_pct", 0) or 0)
@@ -1091,25 +1076,12 @@ def send_telegram(alert: dict) -> None:
     tp1       = float(alert.get("tp1_price", 0) or 0)
     leverage  = int(alert.get("leverage", 5) or 5)
     margin    = float(alert.get("margin", MARGIN_PER_TRADE) or MARGIN_PER_TRADE)
-    score = int(alert.get("score", 4) or 4)
     j5m_v         = float(alert.get("j5m", 50) or 50)
     j1h_prev_v    = float(alert.get("j1h_prev", j1h) or j1h)
     j1h_prev_ok   = bool(alert.get("j1h_prev_valid", False))
     btc_v         = float(alert.get("btc_j1h", 50) or 50)
     btc_ctx       = str(alert.get("btc_regime_context", "") or "")
     sess_v        = str(alert.get("session", "") or "")
-    _strength_map = {
-        4:  "●○○○",
-        6:  "●●○○",
-        8:  "●●●○",
-        10: "●●●●",
-    }
-    _strength = _strength_map.get(
-        score, "●○○○")
-
-    tier_map  = {"HIGH_PROB": "\u29BF", "STRONG": "\u25C6"}
-    tier_icon = tier_map.get(tier, "\u25CF")
-
     is_long      = direction == "LONG"
     size         = (margin * leverage / entry) if entry else 0
     full_sl_pnl  = ((sl  - entry) * size) if is_long else ((entry - sl)  * size)
@@ -1134,10 +1106,9 @@ def send_telegram(alert: dict) -> None:
     ts = datetime.now(_EDT).strftime("%I:%M %p ET").lstrip("0")
 
     msg = (
-        f"\U0001F7E3  HL \u00B7 {direction} {sym} \u00B7 {leverage}x {tier_icon}\n"
+        f"\U0001F7E3  HL \u00B7 {direction} {sym} \u00B7 {leverage}x\n"
         "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
         f"ENTRY  {_fmt_p(entry)}\n"
-        f"SIGNAL  {_strength} ({score}pts)\n"
         f"SL     {_fmt_p(sl)}   \u2212${max_loss:.2f}\n"
         f"TP1    {_fmt_p(tp1)}   +${tp1_profit_70:.2f} (70%)\n"
         "       runner trails after\n"
@@ -3399,12 +3370,8 @@ async def get_settings():
             _scanner_mod.PAIR_COOLDOWN_SECONDS,
         "kill_pct_floor":
             _scanner_mod.KILL_PCT_FLOOR,
-        "leverage_high":
-            _scanner_mod.LEVERAGE_HIGH,
-        "leverage_mid":
-            _scanner_mod.LEVERAGE_MID,
-        "leverage_low":
-            _scanner_mod.LEVERAGE_LOW,
+        "leverage":
+            _scanner_mod.LEVERAGE,
         "margin_hard_cap":
             MARGIN_HARD_CAP,
         "trail_atr_multiplier":
@@ -3477,15 +3444,9 @@ async def post_settings(request: Request):
     if "kill_pct_floor" in body:
         _scanner_mod.KILL_PCT_FLOOR = float(
             body["kill_pct_floor"])
-    if "leverage_high" in body:
-        _scanner_mod.LEVERAGE_HIGH = int(
-            body["leverage_high"])
-    if "leverage_mid" in body:
-        _scanner_mod.LEVERAGE_MID = int(
-            body["leverage_mid"])
-    if "leverage_low" in body:
-        _scanner_mod.LEVERAGE_LOW = int(
-            body["leverage_low"])
+    if "leverage" in body:
+        _scanner_mod.LEVERAGE = int(
+            body["leverage"])
     if "margin_hard_cap" in body:
         MARGIN_HARD_CAP = float(
             body["margin_hard_cap"])
@@ -3535,12 +3496,8 @@ async def post_settings(request: Request):
                     _scanner_mod.PAIR_COOLDOWN_SECONDS,
                 "kill_pct_floor":
                     _scanner_mod.KILL_PCT_FLOOR,
-                "leverage_high":
-                    _scanner_mod.LEVERAGE_HIGH,
-                "leverage_mid":
-                    _scanner_mod.LEVERAGE_MID,
-                "leverage_low":
-                    _scanner_mod.LEVERAGE_LOW,
+                "leverage":
+                    _scanner_mod.LEVERAGE,
                 "margin_hard_cap":
                     MARGIN_HARD_CAP,
                 "trail_atr_multiplier":
