@@ -187,19 +187,55 @@ class AppState:
             in_trade = kl in trades_out or ks in trades_out
             cd_s = get_cooldown_remaining(sym, "SHORT")
             cd_l = get_cooldown_remaining(sym, "LONG")
+            _lgcd_l = max(0, int(_large_sl_cooldowns.get(f"{sym}LONG",  0) - time.time()))
+            _lgcd_s = max(0, int(_large_sl_cooldowns.get(f"{sym}SHORT", 0) - time.time()))
+            _sess   = get_session_name()
+            _j15m   = ps.get("j15m",   50)
+            _j1h    = ps.get("j1h",    50)
+            _rsi    = ps.get("rsi15m", 50)
+            _bid    = ps.get("bid_pct", 50)
+            _ask    = ps.get("ask_pct", 50)
+            _gates_long  = [
+                _j15m < _scanner_mod.J15M_LONG_GATE,
+                _j1h  < _scanner_mod.J1H_LONG_MAX,
+                _rsi  < _scanner_mod.RSI15M_LONG_MAX,
+                _bid  >= _scanner_mod.DEPTH_GATE_PCT,
+                f"{sym}_LONG_{_sess}"  not in _session_halted,
+                cd_l == 0 and _lgcd_l == 0,
+            ]
+            _gates_short = [
+                _j15m > _scanner_mod.J15M_SHORT_GATE,
+                _j1h  > _scanner_mod.J1H_SHORT_MIN and _j1h < _scanner_mod.J1H_SHORT_MAX,
+                _rsi  > _scanner_mod.RSI15M_SHORT_MIN,
+                _ask  >= _scanner_mod.DEPTH_GATE_PCT,
+                f"{sym}_SHORT_{_sess}" not in _session_halted,
+                cd_s == 0 and _lgcd_s == 0,
+            ]
             pair_states_out[i] = {
                 **ps,
                 "in_trade":           in_trade,
                 "cooldown_short":     cd_s,
                 "cooldown_long":      cd_l,
-                "session_halted_long":  f"{sym}_LONG_{get_session_name()}"  in _session_halted,
-                "session_halted_short": f"{sym}_SHORT_{get_session_name()}" in _session_halted,
-                "large_sl_cd_long":     (lambda v: v or None)(max(0, int(_large_sl_cooldowns.get(f"{sym}LONG",  0) - time.time()))),
-                "large_sl_cd_short":    (lambda v: v or None)(max(0, int(_large_sl_cooldowns.get(f"{sym}SHORT", 0) - time.time()))),
+                "session_halted_long":  f"{sym}_LONG_{_sess}"  in _session_halted,
+                "session_halted_short": f"{sym}_SHORT_{_sess}" in _session_halted,
+                "large_sl_cd_long":     _lgcd_l or None,
+                "large_sl_cd_short":    _lgcd_s or None,
+                "gates_long":           _gates_long,
+                "gates_short":          _gates_short,
             }
 
         return {
             "pair_states":    pair_states_out,
+            "thresholds": {
+                "j15m_short":    _scanner_mod.J15M_SHORT_GATE,
+                "j15m_long":     _scanner_mod.J15M_LONG_GATE,
+                "j1h_long_max":  _scanner_mod.J1H_LONG_MAX,
+                "j1h_short_min": _scanner_mod.J1H_SHORT_MIN,
+                "j1h_short_max": _scanner_mod.J1H_SHORT_MAX,
+                "rsi_short_min": _scanner_mod.RSI15M_SHORT_MIN,
+                "rsi_long_max":  _scanner_mod.RSI15M_LONG_MAX,
+                "depth_gate":    _scanner_mod.DEPTH_GATE_PCT,
+            },
             "session":        get_session_name(),
             "alerts":         self.alerts,
             "prices":         self.prices,
