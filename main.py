@@ -2084,10 +2084,23 @@ async def _exit_monitor_loop():
                     * trade.get("leverage", 5))
                 _sentinel_min = _notional * _sentinel_pct
 
-                # -- WALL_TP: exit at book wall while in profit ----------------------
-                # Largest bid (SHORT)/ask (LONG) within 0.30% of price.
+                # -- TP1: FIRST EXIT -- price target partial close (fires before all condition gates) --
+                if not tp1_hit and tp1_price:
+                    tp1_reached = (is_short and current <= tp1_price) or \
+                                  (not is_short and current >= tp1_price)
+                    print(f"[EXIT CHECK] {sym} {direction} price={current} "
+                          f"tp1={tp1_price} tp1_hit={tp1_hit} Ã¢ÂÂ "
+                          f"{'TP1 TRIGGERED Ã¢ÂÂ partial close' if tp1_reached else 'watching tp1'}")
+                    if tp1_reached:
+                        _do_partial_close_tp1(key, trade, current)
+                        continue
+
+
+                # -- WALL_TP: exit at book wall on runner (post-TP1 only) -------------
+                # Largest bid (SHORT)/ask (LONG) within 0.30% of price. Requires tp1_hit: guards
+                # 30% runner only; pre-TP1 protection is handled by PEAK_PROTECT.
                 _ps_wt = next((p for p in app_state.pair_states if p.get("symbol") == sym), None)
-                if _ps_wt and _cpnl > 0 and _ar_pre.get("be_armed"):
+                if _ps_wt and _cpnl > 0 and _ar_pre.get("be_armed") and tp1_hit:
                     if is_short:
                         _bw = _ps_wt.get("bid_wall")
                         if _bw and _bw["dist_pct"] <= 0.30:
@@ -2109,15 +2122,15 @@ async def _exit_monitor_loop():
                             _do_close_trade(key, trade, current, "WALL_TP")
                             continue
 
-                # -- SIGNAL_EXHAUSTION: J1H turns against trade while in profit -----
-                # Tracks J1H peak (LONG)/trough (SHORT), fires on SE_J1H_DECAY_PTS.
+                # -- SIGNAL_EXHAUSTION: J1H turns against runner (post-TP1 only) ----
+                # Tracks J1H peak (LONG)/trough (SHORT), fires on SE_J1H_DECAY_PTS. Requires tp1_hit.
                 # Evidence: June 29 39-trade analysis + June 30 candle confirmation.
                 _cur_j1h = None
                 for _ps in app_state.pair_states:
                     if _ps.get("symbol") == sym:
                         _cur_j1h = _ps.get("j1h")
                         break
-                if _cur_j1h is not None and _cpnl > 0:
+                if _cur_j1h is not None and _cpnl > 0 and tp1_hit:
                     if not is_short:
                         # LONG: track J1H peak, fire when decays SE_J1H_DECAY_PTS+
                         _prev = _se_j1h_extreme.get(key, _cur_j1h)
@@ -2517,18 +2530,6 @@ async def _exit_monitor_loop():
                         _large_sl_cooldowns[f"{sym}{direction}"]     = _exp
                         print(f"[LARGE SL COOLDOWN] {sym} {direction} Ã¢ÂÂ SL ${abs(_sl_pnl):.2f} >= $100 threshold. 90 min cooldown applied.")
                     continue
-
-                # Ã¢ÂÂÃ¢ÂÂ TP1 (always checked first Ã¢ÂÂ partial close, half position) Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-                if not tp1_hit and tp1_price:
-                    tp1_reached = (is_short and current <= tp1_price) or \
-                                  (not is_short and current >= tp1_price)
-                    print(f"[EXIT CHECK] {sym} {direction} price={current} "
-                          f"tp1={tp1_price} tp1_hit={tp1_hit} Ã¢ÂÂ "
-                          f"{'TP1 TRIGGERED Ã¢ÂÂ partial close' if tp1_reached else 'watching tp1'}")
-                    if tp1_reached:
-                        _do_partial_close_tp1(key, trade, current)
-                        continue
-
 
 
                 # -- BAD_TRADE_EXIT: progressive time-based cut for never-armed trades --
