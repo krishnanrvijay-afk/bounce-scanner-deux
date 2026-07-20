@@ -8,7 +8,7 @@ import os as _os
 from config import (
     PAIRS, J15M_SHORT_GATE, J15M_LONG_GATE, J1H_SHORT_MIN, J1H_SHORT_MAX, J1H_LONG_MIN, J1H_LONG_MAX,
     RSI15M_SHORT_MIN, RSI15M_LONG_MAX, DEPTH_GATE_PCT, ATR_SL_MULTIPLIER,
-    TP1_R, TP1_CLOSE_PCT, TP2_R, LEVERAGE_HIGH, LEVERAGE_MID, LEVERAGE_LOW,
+    TP1_R, TP1_CLOSE_PCT, TP2_R, LEVERAGE,
     ADX_MIN_LONG, ADX_MIN_SHORT, PAPER_MODE, CONSECUTIVE_LOSS_STOP,
     MIN_SL_PCT, MIN_SL_PCT_DEFAULT, MARGIN_PER_TRADE,
     J15M_SHORT_CEILING, J15M_LONG_FLOOR,
@@ -281,45 +281,17 @@ def _find_book_wall(levels: list, price: float, is_bid: bool):
         "ratio":    round(max_sz / avg, 1),
     }
 
-def _leverage_tier(adx: float) -> tuple[str, int]:
-    if adx >= 50:
-        return "HIGH_PROB", LEVERAGE_HIGH
-    if adx >= 25:
-        return "STRONG", LEVERAGE_MID
-    return "REGULAR", LEVERAGE_LOW
+def check_bounce_short(j15m: float, ask_pct: float, j5m: float) -> bool:
+    """Return True when all hard entry gates pass for a SHORT bounce signal."""
+    stoch_gate = (j5m > 88 and j15m > J15M_SHORT_GATE)
+    _bid_pct   = 100 - ask_pct
+    return stoch_gate and (_bid_pct <= 65)
 
 
-def score_bounce_short(j15m, j1h, ask_pct, adx,
-                       j5m: float = 50.0, trend: str = "Neutral",
-                       stoch_k: float = 50.0, stoch_d: float = 50.0) -> tuple[int, str, int]:
-    tier, lev = _leverage_tier(adx)
-    stoch_gate = (j5m > 88 and j15m > 80)  # R3: j5m floor raised 80->88; 26.7% WR at >80 vs 71% WR at >88
-    _bid_pct = 100 - ask_pct
-    if not (j15m > J15M_SHORT_GATE
-            and stoch_gate
-            and _bid_pct <= 65):
-        return 0, tier, lev
-    score = 4
-    if j5m  > 80:              score += 2
-    if trend == "Strong Bear": score += 2
-    if adx  >= 40:             score += 2
-    return score, tier, lev
-
-
-def score_bounce_long(j15m, j1h, bid_pct, adx,
-                      j5m: float = 50.0, trend: str = "Neutral",
-                      stoch_k: float = 50.0, stoch_d: float = 50.0) -> tuple[int, str, int]:
-    tier, lev = _leverage_tier(adx)
-    stoch_gate = (j5m < 20 and j15m < 20)
-    if not (j15m < J15M_LONG_GATE
-            and stoch_gate
-            and bid_pct >= 45):
-        return 0, tier, lev
-    score = 4
-    if j5m  < 20:              score += 2
-    if trend == "Strong Bull": score += 2
-    if adx  >= 40:             score += 2
-    return score, tier, lev
+def check_bounce_long(j15m: float, bid_pct: float, j5m: float) -> bool:
+    """Return True when all hard entry gates pass for a LONG bounce signal."""
+    stoch_gate = (j5m < 20 and j15m < J15M_LONG_GATE)
+    return stoch_gate and (bid_pct >= 45)
 
 
 # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Cooldown helpers ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
@@ -645,8 +617,8 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                 _regime_block_short = True
             # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Score both directions ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
             # Accumulate pair state -- replaces scan_pair_state() second sweep
-            _s_raw, _, _ = score_bounce_short(j15m, j1h, ask_pct, adx1h, j5m=j5m, trend=trend)
-            _l_raw, _, _ = score_bounce_long( j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend)
+            _s_raw = check_bounce_short(j15m, ask_pct, j5m)
+            _l_raw = check_bounce_long( j15m, bid_pct, j5m)
             pair_states.append({
                 "symbol":       symbol,
                 "price":        price,
@@ -658,8 +630,10 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                 "bid_pct":      bid_pct,
                 "ask_pct":      ask_pct,
                 "trend":        trend,
-                "short_score":  _s_raw,
-                "long_score":   _l_raw,
+                "short_qualifies":  _s_raw,
+                "long_qualifies":   _l_raw,
+                "session_blocked_short": SESSION_FILTER_ENABLED and bool(BLOCKED_PAIR_SESSIONS.get((symbol, "SHORT", get_session_name()))),
+                "session_blocked_long":  SESSION_FILTER_ENABLED and bool(BLOCKED_PAIR_SESSIONS.get((symbol, "LONG",  get_session_name()))),
                 "cooldown_short": get_cooldown_remaining(symbol, "SHORT"),
                 "cooldown_long":  get_cooldown_remaining(symbol, "LONG"),
             })
@@ -757,9 +731,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             "HL", symbol, "RSI_FLOOR_FAIL", direction,
                             f"rsi15m={rsi15m:.1f} need>{RSI15M_SHORT_MIN}"))
                         continue
-                    score, tier, lev = score_bounce_short(
-                        j15m, j1h, ask_pct, adx1h, j5m=j5m, trend=trend,
-                        stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
+                    qualifies = check_bounce_short(j15m, ask_pct, j5m)
                     _bid_from_ask = 100 - ask_pct
                     _depth_ok_s   = (_bid_from_ask <= 65)
                     _log_gates = (
@@ -852,9 +824,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             "HL", symbol, "RSI_CEILING_FAIL", direction,
                             f"rsi15m={rsi15m:.1f} need<{RSI15M_LONG_MAX}"))
                         continue
-                    score, tier, lev = score_bounce_long(
-                        j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
-                        stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
+                    qualifies = check_bounce_long(j15m, bid_pct, j5m)
                     _depth_ok_l  = (bid_pct >= 45)
                     _log_gates = (
                         f"j5m={j5m:.1f}(need<10)"
@@ -880,9 +850,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                         f" blocked="
                         f"{_blocked}")
 
-                if score >= 4:
-                    log.info(f"[SCORE] {symbol} {direction} gates=PASS score={score} {_log_gates}")
-                else:
+                if not qualifies:
                     _stoch_pass = (
                         (direction == "SHORT" and j5m > 80 and j15m > J15M_SHORT_GATE) or
                         (direction == "LONG"  and j5m < 10 and j15m < J15M_LONG_GATE)
@@ -895,40 +863,24 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             f"bid_pct={bid_pct:.1f} ask_pct={ask_pct:.1f}"))
                     continue
 
-                # Compute SL / TP prices (HC score-10: 2.5R TP1, 3.5R TP2)
-                is_hc = score >= 10
                 if direction == "SHORT":
-                    sl_price = round(price + sl_dist, 6)
-                    if is_hc:
-                        partial_price = round(price - sl_dist * 1.5, 6)
-                        tp1_price     = round(price - sl_dist * 2.5, 6)
-                        tp2_price     = round(price - sl_dist * 3.5, 6)
-                    else:
-                        partial_price = None
-                        tp1_price     = round(price - sl_dist * TP1_R, 6)
-                        tp2_price     = round(price - sl_dist * TP2_R, 6)
+                    sl_price  = round(price + sl_dist, 6)
+                    tp1_price = round(price - sl_dist * TP1_R, 6)
+                    tp2_price = round(price - sl_dist * TP2_R, 6)
                 else:
-                    sl_price = round(price - sl_dist, 6)
-                    if is_hc:
-                        partial_price = round(price + sl_dist * 1.5, 6)
-                        tp1_price     = round(price + sl_dist * 2.5, 6)
-                        tp2_price     = round(price + sl_dist * 3.5, 6)
-                    else:
-                        partial_price = None
-                        tp1_price     = round(price + sl_dist * TP1_R, 6)
-                        tp2_price     = round(price + sl_dist * TP2_R, 6)
+                    sl_price  = round(price - sl_dist, 6)
+                    tp1_price = round(price + sl_dist * TP1_R, 6)
+                    tp2_price = round(price + sl_dist * TP2_R, 6)
 
                 dollar_risk = round(
-                    2000.0 * lev * (sl_dist / price) if price else 0, 2
+                    MARGIN_PER_TRADE * LEVERAGE * (sl_dist / price) if price else 0, 2
                 )
 
                 alert = {
                     "symbol":       symbol,
                     "btc_regime_context": _btc_regime_context,
                     "direction":    direction,
-                    "score":        score,
-                    "tier":         tier,
-                    "leverage":     lev,
+                    "leverage":     LEVERAGE,
                     "entry_price":  price,
                     "sl_price":     sl_price,
                     "sl_dist":      round(sl_dist, 6),
@@ -948,17 +900,6 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     "adx1h":        round(adx1h, 2),
                     "bid_pct":      bid_pct,
                     "ask_pct":      ask_pct,
-                    "adx_context":  round(adx1h, 2),
-                    "adx_tier": (
-                        "STRONG" if adx1h >= 35
-                        else "MODERATE" if adx1h >= 20
-                        else "WEAK"),
-                    "depth_bid_pct": bid_pct,
-                    "depth_ask_pct": ask_pct,
-                    "depth_context": (
-                        "STRONG_BID" if bid_pct >= 65
-                        else "NEUTRAL" if bid_pct >= 45
-                        else "STRONG_ASK"),
                     "vol_15m":      vol_15m,
                     "vol_ma15m":    vol_ma15m,
                     "vol_surge":    (vol_15m > vol_ma15m * 1.5),
@@ -972,9 +913,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     "ma60":         round(ma60, 6) if ma60 else None,
                     "fired_at":     int(time.time()),
                     "is_in_trade":   False,
-                    "is_score10":    is_hc,
-                    "margin":        MARGIN_PER_TRADE * 2 if (is_hc or (_btc_j1h < 25 and j1h < 25)) else MARGIN_PER_TRADE,  # Tier3: 2x on hc score OR both btc+pair j1h<25 (max conviction oversold)
-                    "partial_price": partial_price,
+                    "margin":        MARGIN_PER_TRADE,
                     "session":       get_session_name(),
                     "btc_j1h":       round(_btc_j1h, 1),
                 }
@@ -995,8 +934,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                 new_alerts.append(alert)
                 log.info(
                     f"[SIGNAL] {symbol} {direction}"
-                    f" tier={tier} lev={lev}x"
-                    f" score={score}"
+                    f" lev={LEVERAGE}x"
                     f" entry={price:.5f}"
                     f" sl={sl_price:.5f}"
                     f" tp1={tp1_price:.5f}"
@@ -1048,12 +986,8 @@ async def scan_pair_state(hl_client) -> list[dict]:
             trend      = _trend_from_ma(price, candles_5m, candles_15m, candles_1h, adx1h)
             bid_pct, ask_pct = _depth_pcts(book)
 
-            short_score, short_tier, short_lev = score_bounce_short(
-                j15m, j1h, ask_pct, adx1h, j5m=j5m, trend=trend,
-                stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
-            long_score,  long_tier,  long_lev  = score_bounce_long(
-                j15m, j1h, bid_pct, adx1h, j5m=j5m, trend=trend,
-                stoch_k=stoch_k_fast, stoch_d=stoch_d_fast)
+            short_qualifies = check_bounce_short(j15m, ask_pct, j5m)
+            long_qualifies  = check_bounce_long( j15m, bid_pct, j5m)
 
             states.append({
                 "symbol":      symbol,
@@ -1081,10 +1015,8 @@ async def scan_pair_state(hl_client) -> list[dict]:
                 "ma10":        round(ma10, 6) if ma10 else None,
                 "ma30":        round(ma30, 6) if ma30 else None,
                 "ma60":        round(ma60, 6) if ma60 else None,
-                "short_score": short_score,
-                "short_tier":  short_tier,
-                "long_score":  long_score,
-                "long_tier":   long_tier,
+                "short_qualifies": short_qualifies,
+                "long_qualifies":  long_qualifies,
                 "cooldown_short": get_cooldown_remaining(symbol, "SHORT"),
                 "cooldown_long":  get_cooldown_remaining(symbol, "LONG"),
             })
