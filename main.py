@@ -2918,10 +2918,10 @@ async def get_pair(symbol: str):
     stoch_d_fast      = ps.get("stoch_d_fast",      50)
     stoch_k_prev_fast = ps.get("stoch_k_prev_fast", stoch_k_fast)
     stoch_d_prev_fast = ps.get("stoch_d_prev_fast", stoch_d_fast)
-    stoch_gate_long  = stoch_k < 25 and stoch_k_prev <= stoch_d_prev and stoch_k > stoch_d
-    stoch_gate_short = stoch_k > 75 and stoch_k_prev >= stoch_d_prev and stoch_k < stoch_d
-    gate_long  = [j15m < 20, j1h < 40, stoch_gate_long,  bid_pct >= 55]
-    gate_short = [j15m > 80, j1h > 60, stoch_gate_short, ask_pct >= 55]
+    rsi_gate_long  = rsi15m < 50   # RSI15M_LONG_MAX — actual hard gate in scanner
+    rsi_gate_short = rsi15m > 35   # RSI15M_SHORT_MIN — actual hard gate in scanner
+    gate_long  = [j15m < 20, j1h < 40, rsi_gate_long,  bid_pct >= 55]
+    gate_short = [j15m > 80, j1h > 60, rsi_gate_short, ask_pct >= 55]
     score_long  = sum(gate_long)
     score_short = sum(gate_short)
     confluence_long  = j15m < 20 and j1h < 40
