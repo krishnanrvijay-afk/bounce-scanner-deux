@@ -1268,6 +1268,14 @@ async def _scan_loop():
                 print(f"[SESSION RESET] {_prev_session} session ended Ã¢ÂÂ clearing all session halts.")
                 _scanner_mod._consec_adverse = {"long": 0, "short": 0}
                 print("[SESSION RESET] consecutive kill counters cleared")
+                try:
+                    _sb_sr = _get_supabase()
+                    if _sb_sr:
+                        _sb_sr.table("hl_scanner_state").update(
+                            {"halt_short": False, "halt_long": False}).eq("id", 1).execute()
+                        print("[SESSION RESET] directional halts cleared in Supabase")
+                except Exception as _sr_e:
+                    print(f"[SESSION RESET] dir-halt clear failed: {_sr_e}")
             _prev_session = _curr_sess
             app_state.last_scan_at = int(time.time())
             app_state.pair_states  = _pair_states if _pair_states else await scan_pair_state(hl_client)
@@ -2580,6 +2588,16 @@ async def _exit_monitor_loop():
                             print(f"[SESSION HALT] {sym} {direction}"
                                   f" — 2 adverse exits (BAD_TRADE_EXIT)"
                                   f" in {get_session_name()}")
+                            _dh_col = "halt_short" if direction == "SHORT" else "halt_long"
+                            try:
+                                _sb_dh = _get_supabase()
+                                if _sb_dh:
+                                    _sb_dh.table("hl_scanner_state").update(
+                                        {_dh_col: True}).eq("id", 1).execute()
+                                    print(f"[DIR_HALT] HL {direction} session-paused"
+                                          f" — {_dh_col}=True written to Supabase")
+                            except Exception as _dh_e:
+                                print(f"[DIR_HALT] Supabase write failed: {_dh_e}")
                         continue
 
 
