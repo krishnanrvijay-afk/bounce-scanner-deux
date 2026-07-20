@@ -2092,11 +2092,35 @@ async function _ovFetch(sym, isFirst) {
     return `<span style="font-size:11px;font-weight:700;color:#ffffff;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em">${name}</span>`;
   }
 
+
+  function _ovSessHtml(d, dir) {
+    const isL  = dir !== 'SHORT';
+    const halt = isL ? (d.session_halted_long || false) : (d.session_halted_short || false);
+    const pass = !halt;
+    const txtCol = pass ? '#00e676' : '#ff5252';
+    const body   = `
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${txtCol}">${pass ? 'SESSION OPEN — no halt active' : '2 SLs this session — resumes at next session open'}</div>`;
+    return _ovGateRowHtml('sess', 'SESSION', _ovPassIcon(pass), body);
+  }
+
+  function _ovCoolHtml(d, dir) {
+    const isL   = dir !== 'SHORT';
+    const stdCd = isL ? (d.cooldown_long  || 0) : (d.cooldown_short  || 0);
+    const lgCd  = isL ? (d.large_sl_cooldown_long_remaining  || 0) : (d.large_sl_cooldown_short_remaining || 0);
+    const maxCd = Math.max(stdCd, lgCd);
+    const pass  = maxCd === 0;
+    const txtCol = pass ? '#00e676' : '#ff5252';
+    const cdStr  = maxCd >= 60 ? Math.floor(maxCd/60)+'m '+(maxCd%60)+'s' : maxCd+'s';
+    const body   = `
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${txtCol}">${pass ? 'CLEAR — no cooldown active' : 'COOLING DOWN — '+cdStr+' remaining'}</div>`;
+    return _ovGateRowHtml('cool', 'COOLDOWN', _ovPassIcon(pass), body);
+  }
+
   function _ovVerdictHtml(d, dir) {
       const isL   = dir !== 'SHORT';
-      const gates = (isL ? d.gate_long : d.gate_short) || [false, false, false, false];
+      const gates = (isL ? d.gate_long : d.gate_short) || [false,false,false,false,false,false];
       const score = gates.filter(Boolean).length;
-      const names = ['J 15M', 'J 1H', 'RSI', isL ? 'BID DEPTH' : 'ASK DEPTH'];
+      const names = ['J 15M', 'J 1H', 'RSI', isL ? 'BID DEPTH' : 'ASK DEPTH', 'SESSION', 'COOLDOWN'];
       const failing = names.filter((_, i) => !gates[i]);
       const base = "padding:7px 16px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;text-align:center";
       const sym = d.symbol;
@@ -2402,6 +2426,8 @@ async function _ovFetch(sym, isFirst) {
           ${_ovJ1hHtml(d, dir)}
           ${_ovRsiHtml(d, dir)}
           ${_ovDepthHtml(d, dir)}
+          ${_ovSessHtml(d, dir)}
+          ${_ovCoolHtml(d, dir)}
           ${showScanConf ? _ovScanConfHtml(d, dir, score) : ''}
         </div>
         <div style="border-top:1px solid #1a1a1a;padding:8px 0 6px">
@@ -2460,6 +2486,8 @@ async function _ovFetch(sym, isFirst) {
           _ovJ1hHtml(d, dir) +
           _ovRsiHtml(d, dir) +
           _ovDepthHtml(d, dir) +
+          _ovSessHtml(d, dir) +
+          _ovCoolHtml(d, dir) +
           (score >= 3 ? _ovScanConfHtml(d, dir, score) : '');
       }
 
