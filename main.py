@@ -2922,6 +2922,7 @@ async def get_pair(symbol: str):
     _rsi_long_max    = _scanner_mod.RSI15M_LONG_MAX
     _rsi_short_min   = _scanner_mod.RSI15M_SHORT_MIN
     _j1h_long_max    = _scanner_mod.J1H_LONG_MAX
+    _j1h_short_min   = _scanner_mod.J1H_SHORT_MIN
     _j1h_short_max   = _scanner_mod.J1H_SHORT_MAX
     _depth_gate      = _scanner_mod.DEPTH_GATE_PCT
     _j15m_short_gate = _scanner_mod.J15M_SHORT_GATE
@@ -2929,7 +2930,7 @@ async def get_pair(symbol: str):
     rsi_gate_long  = rsi15m < _rsi_long_max
     rsi_gate_short = rsi15m > _rsi_short_min
     j1h_gate_long  = j1h < _j1h_long_max
-    j1h_gate_short = j1h > 60 and j1h < _j1h_short_max
+    j1h_gate_short = j1h > _j1h_short_min and j1h < _j1h_short_max
     sess_gate_long  = f"{symbol}_LONG_{get_session_name()}"  not in _session_halted
     sess_gate_short = f"{symbol}_SHORT_{get_session_name()}" not in _session_halted
     _cd_long  = get_cooldown_remaining(symbol, "LONG")
@@ -3020,6 +3021,7 @@ async def get_pair(symbol: str):
             "j15m_short":    _j15m_short_gate,
             "j15m_long":     _j15m_long_gate,
             "j1h_long_max":  _j1h_long_max,
+            "j1h_short_min": _j1h_short_min,
             "j1h_short_max": _j1h_short_max,
             "rsi_short_min": _rsi_short_min,
             "rsi_long_max":  _rsi_long_max,
