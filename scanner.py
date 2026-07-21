@@ -117,7 +117,7 @@ def _compute_kdj(candles: list[dict], period: int = 9) -> tuple[float, float, fl
         K   = 2 / 3 * K + 1 / 3 * rsv
         D   = 2 / 3 * D + 1 / 3 * K
     J = 3 * K - 2 * D
-    return K, D, J
+    return K, D, max(0.0, min(100.0, J))
 
 
 def _compute_rsi(candles: list[dict], period: int = 14) -> float:
@@ -505,9 +505,28 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
             _stale_counts[symbol] = 0
             _stale_prices.discard(symbol)
 
-            # Pair cooldown pre-signal check
-            if get_pair_cooldown_remaining(
-                    symbol) > 0:
+            # Pair cooldown pre-signal check — show stub card, don't vanish
+            _pair_cd_rem = get_pair_cooldown_remaining(symbol)
+            if _pair_cd_rem > 0:
+                pair_states.append({
+                    "symbol":              symbol,
+                    "price":               price,
+                    "pair_cooldown":       _pair_cd_rem,
+                    "j5m":                 50.0,
+                    "j15m":                50.0,
+                    "j1h":                 50.0,
+                    "rsi15m":              50.0,
+                    "adx1h":               0.0,
+                    "bid_pct":             0.0,
+                    "ask_pct":             0.0,
+                    "trend":               None,
+                    "short_qualifies":     False,
+                    "long_qualifies":      False,
+                    "session_blocked_short": False,
+                    "session_blocked_long":  False,
+                    "cooldown_short":      get_cooldown_remaining(symbol, "SHORT"),
+                    "cooldown_long":       get_cooldown_remaining(symbol, "LONG"),
+                })
                 continue
 
             # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Indicators ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
