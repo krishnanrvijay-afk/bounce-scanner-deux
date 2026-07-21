@@ -2176,8 +2176,8 @@ async function _ovFetch(sym, isFirst) {
 
   function _ovJ5mHtml(d, dir) {
     const isL    = dir !== 'SHORT';
-    const v      = (d.j5m_live != null) ? +d.j5m_live : null;
-    const thr    = isL ? +(d.j5m_long_max || 20) : +(d.j5m_short_min || 88);
+    const v      = (d.j5m != null) ? +d.j5m : null;
+    const thr    = isL ? +((d.thresholds && d.thresholds.j5m_long_max)  || 20) : +((d.thresholds && d.thresholds.j5m_short_min) || 88);
     const pass   = (v != null) ? (isL ? v < thr : v > thr) : false;
     const vStr   = (v != null) ? v.toFixed(1) : '—';
     const jLeft  = (v != null) ? Math.min(99.5, Math.max(0.5, v)).toFixed(1) : '50';
