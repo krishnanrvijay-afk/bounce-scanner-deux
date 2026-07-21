@@ -2971,6 +2971,7 @@ async def get_pair(symbol: str):
         raise HTTPException(status_code=404, detail="pair not found")
 
     j15m    = ps.get("j15m",    50)
+    j5m     = ps.get("j5m",     50)
     j1h     = ps.get("j1h",     50)
     rsi15m  = ps.get("rsi15m",  50)
     bid_pct = ps.get("bid_pct", 50)
@@ -3071,6 +3072,7 @@ async def get_pair(symbol: str):
         "price":               price,
         "change_24h":          chg,
         "j15m":                j15m,
+        "j5m":                 j5m,
         "j1h":                 j1h,
         "rsi15m":              rsi15m,
         "adx":                 adx,
@@ -3096,6 +3098,8 @@ async def get_pair(symbol: str):
             "rsi_short_min": _rsi_short_min,
             "rsi_long_max":  _rsi_long_max,
             "depth_gate":    _depth_gate,
+            "j5m_short_min": _scanner_mod.J5M_SHORT_MIN,
+            "j5m_long_max":  _scanner_mod.J5M_LONG_MAX,
         },
         "score_long":          score_long,
         "score_short":         score_short,
