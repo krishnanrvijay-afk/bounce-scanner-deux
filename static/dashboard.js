@@ -529,6 +529,28 @@ function buildCard(p, alerts, trades, changes, cdRemaining = 0) {
   const inTrade = p.in_trade;
   const chg    = changes[sym] ?? null;
 
+  // Pair-level cooldown: scanner skips indicators — show muted stub card
+  if (cdRemaining > 0) {
+    const _cdMins = Math.floor(cdRemaining / 60);
+    const _cdSecs = cdRemaining % 60;
+    const _cdStr  = _cdMins > 0 ? `${_cdMins}m ${_cdSecs}s` : `${_cdSecs}s`;
+    const _cdDirs = [];
+    if (p.cooldown_short > 0) _cdDirs.push('SHORT');
+    if (p.cooldown_long  > 0) _cdDirs.push('LONG');
+    const _cdDirStr = _cdDirs.length ? ` (${_cdDirs.join('/')})` : '';
+    return `<div class="pair-card" style="border-color:#1e1e1e;opacity:0.45;cursor:default">
+      <div class="card-header" style="border-bottom:1px solid #1e1e1e">
+        <span class="card-sym" style="color:#666">${sym}</span>
+        <span style="font-size:10px;color:#444">${price > 0 ? price.toPrecision(6) : ''}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:90px;gap:5px">
+        <span style="color:#c8860a;font-size:10px;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em">&#x23F3; PAIR COOLDOWN</span>
+        <span style="color:#888;font-size:13px;font-family:'JetBrains Mono',monospace;font-weight:700">${_cdStr}</span>
+        <span style="color:#555;font-size:9px;font-family:'JetBrains Mono',monospace">${_cdDirStr}</span>
+      </div>
+    </div>`;
+  }
+
   let chgHtml = '';
   if (chg !== null) {
     const chgColor = chg >= 0 ? '#00ff88' : '#ff4444';
