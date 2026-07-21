@@ -1299,7 +1299,11 @@ async def _scan_loop():
                 _s = _sentinel_mod.update(app_state.pair_states, app_state.prices)
                 app_state.market_health["sentinel_regime"] = _s["regime"]
                 app_state.market_health["sentinel_text"]   = _sentinel_mod.get_pill_text()
-                app_state.market_health["sentinel_metrics"] = _sentinel_mod.get_metrics()
+                _sm = _sentinel_mod.get_metrics()
+                app_state.market_health["sentinel_metrics"] = _sm
+                # R4: push local convergence state into scanner gate vars
+                _scanner_mod._conv_gate_short = bool(_sm.get("fleet_convergence_short", False))
+                _scanner_mod._conv_gate_long  = bool(_sm.get("fleet_convergence_long",  False))
                 if _s.get("changed") and _s.get("telegram_text") and TELEGRAM_ENABLED:
                     threading.Thread(
                         target=lambda m=_s["telegram_text"]: _tg_post(m),
