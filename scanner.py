@@ -19,6 +19,12 @@ from config import (
     SESSION_FILTER_ENABLED,
 )
 
+# ── Configurable via settings overlay (main.py sets these at runtime) ──────
+J5M_SHORT_MIN   = 88.0   # j5m must exceed this for SHORT bounce signal
+J5M_LONG_MAX    = 20.0   # j5m must be below this for LONG bounce signal
+DEPTH_SHORT_MIN = 45.0   # ask_pct must meet or exceed this for SHORT entry
+DEPTH_LONG_MIN  = 50.0   # bid_pct must meet or exceed this for LONG entry
+
 log = logging.getLogger("scanner")
 
 # -- Supabase gate logging (fire-and-forget, never blocks entry) --
@@ -283,15 +289,14 @@ def _find_book_wall(levels: list, price: float, is_bid: bool):
 
 def check_bounce_short(j15m: float, ask_pct: float, j5m: float) -> bool:
     """Return True when all hard entry gates pass for a SHORT bounce signal."""
-    stoch_gate = (j5m > 88 and j15m > J15M_SHORT_GATE)
-    _bid_pct   = 100 - ask_pct
-    return stoch_gate and (_bid_pct <= 65)
+    stoch_gate = (j5m > J5M_SHORT_MIN and j15m > J15M_SHORT_GATE)
+    return stoch_gate and (ask_pct >= DEPTH_SHORT_MIN)
 
 
 def check_bounce_long(j15m: float, bid_pct: float, j5m: float) -> bool:
     """Return True when all hard entry gates pass for a LONG bounce signal."""
-    stoch_gate = (j5m < 20 and j15m < J15M_LONG_GATE)
-    return stoch_gate and (bid_pct >= 45)
+    stoch_gate = (j5m < J5M_LONG_MAX and j15m < J15M_LONG_GATE)
+    return stoch_gate and (bid_pct >= DEPTH_LONG_MIN)
 
 
 # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Cooldown helpers ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
@@ -722,15 +727,14 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                         continue
                     qualifies = check_bounce_short(j15m, ask_pct, j5m)
                     _bid_from_ask = 100 - ask_pct
-                    _depth_ok_s   = (_bid_from_ask <= 65)
+                    _depth_ok_s   = (ask_pct >= DEPTH_SHORT_MIN)
                     _log_gates = (
-                        f"j5m={j5m:.1f}(need>80)"
+                        f"j5m={j5m:.1f}(need>{J5M_SHORT_MIN:.0f})"
                         f" j15m={j15m:.1f}(need>{J15M_SHORT_GATE})"
                         f" j1h={j1h:.1f}"
                         f" btc={_btc_j1h:.1f}"
-                        f" depth_bid={_bid_from_ask:.1f}%"
-                        f"({'PASS' if _depth_ok_s else 'FAIL'})"
                         f" depth_ask={ask_pct:.1f}%"
+                        f"({'PASS' if _depth_ok_s else 'FAIL'},need>={DEPTH_SHORT_MIN:.0f})"
                     )
                 else:
                     if _regime_block_long:
@@ -814,15 +818,14 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             f"rsi15m={rsi15m:.1f} need<{RSI15M_LONG_MAX}"))
                         continue
                     qualifies = check_bounce_long(j15m, bid_pct, j5m)
-                    _depth_ok_l  = (bid_pct >= 45)
+                    _depth_ok_l  = (bid_pct >= DEPTH_LONG_MIN)
                     _log_gates = (
-                        f"j5m={j5m:.1f}(need<10)"
+                        f"j5m={j5m:.1f}(need<{J5M_LONG_MAX:.0f})"
                         f" j15m={j15m:.1f}(need<{J15M_LONG_GATE})"
                         f" j1h={j1h:.1f}"
                         f" btc={_btc_j1h:.1f}"
                         f" depth_bid={bid_pct:.1f}%"
-                        f"({'PASS' if _depth_ok_l else 'FAIL'})"
-                        f" depth_ask={ask_pct:.1f}%"
+                        f"({'PASS' if _depth_ok_l else 'FAIL'},need>={DEPTH_LONG_MIN:.0f})"
                     )
 
                 # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ GATE_FAIL log ÃÂ¢ÃÂÃÂ every scan when >= 3 of 4 gates pass ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
