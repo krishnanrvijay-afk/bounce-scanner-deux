@@ -560,7 +560,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
             _regime_block_long  = False
             if _btc_j1h > 80.0:
                 _btc_regime_context = "LONG_BLOCKED"
-                if _pair_corr >= 0.70:  # corr-gated, symmetric with SHORT_BLOCKED
+                if _pair_corr >= 0.70 and j1h >= J1H_LONG_MAX:  # bypass: pair already corrected past its own J1H gate
                     _regime_block_long = True
             elif _btc_j1h < 20.0:
                 _btc_regime_context = "SHORT_BLOCKED"
@@ -763,10 +763,11 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     # NEUTRAL_BLOCK is informational only — not a hard gate.
                     if (direction == "LONG" and
                             _btc_regime_context == "LONG_BLOCKED" and
-                            _pair_corr >= 0.70):
+                            _pair_corr >= 0.70 and
+                            j1h >= J1H_LONG_MAX):  # bypass: pair J1H < J1H_LONG_MAX means already corrected
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "BTC_REGIME_CORR_BLOCK", direction,
-                            f"btc_j1h={_btc_j1h:.1f} LONG_BLOCKED corr={_pair_corr:.2f}>=0.70"))
+                            f"btc_j1h={_btc_j1h:.1f} LONG_BLOCKED corr={_pair_corr:.2f}>=0.70 j1h={j1h:.1f}>={J1H_LONG_MAX}"))
                         continue
                     # J1H ceiling gate (enforced) — blocks LONGs above valid bounce zone
                     if j1h >= J1H_LONG_MAX:
