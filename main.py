@@ -2204,7 +2204,9 @@ async def _exit_monitor_loop():
                 _ar_dr     = trade.get("dollar_risk", 0) or 0
                 _ar_peak_r = _ar_pre.get("peak_pnl_r", 0.0)
                 _ar_thresh = 0.02 if _ar_peak_r >= 0.10 else -0.05
-                if (_ar_pre.get("be_armed")
+                # Trend trades: skip ARMED_REVERSAL — trends retrace before continuing
+                if (trade.get("trade_mode") != "trend"
+                        and _ar_pre.get("be_armed")
                         and _ar_dr > 0
                         and _ar_pre.get("ar_below_thresh_ticks", 0) >= 1
                         and (_cpnl / _ar_dr) < _ar_thresh):
@@ -2605,8 +2607,12 @@ async def _exit_monitor_loop():
                     _bte_mfe_r = _mfe_pnl / _dr_ac
                     _bte_fired = False
                     if _bte_mfe_r < 0.05:  # escape hatch: real excursion — skip BTE
-                        for _bte_age, _bte_thr in (
-                                (180, 0.08), (300, 0.15), (600, 0.20)):
+                        _bte_schedule = (
+                            ((300, 0.08), (450, 0.15), (600, 0.20))
+                            if trade.get("trade_mode") == "trend"
+                            else ((180, 0.08), (300, 0.15), (600, 0.20))
+                        )
+                        for _bte_age, _bte_thr in _bte_schedule:
                             if _elapsed >= _bte_age and _bte_mfe_r < _bte_thr:
                                 _bte_fired = True
                                 break
