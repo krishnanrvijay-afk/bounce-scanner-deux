@@ -2342,11 +2342,9 @@ async def _exit_monitor_loop():
                     print(f"[SHADOW] poll error: {_psh_e}")
 
                 # -- PEAK_PROTECT: armed trade given back beyond decay threshold ----------
-                # Replaces PEAK_DECAY_10 (prev-tick, 10% USD decay, sentinel_min gated)
-                # and PEAK_GIVEBACK (current-tick, 60% R giveback, streak=2 gated).
-                # Single rule: be_armed + peak_r >= 0.05R + cpnl < threshold of peak_r + age >= 16s.
-                # 0.05R minimum filters noise peaks from brief be_price grazes.
-                # Uses current-tick shadow. No streak, no sentinel_min requirement.
+                # Requires peak_pnl_usd >= sentinel_min (per-pair/per-session floor from
+                # SENTINEL_MIN_PEAK_PCT). Anchors (BTC/SOL/ETH/XRP) carry higher floors so
+                # small peaks on wide-ranging pairs don't trigger premature exits.
                 # TP1 proximity tiers (data-driven, July 2026 analysis):
                 #   >= 60% to TP1  ->  suppressed: trade is at TP1's door, let it run
                 #   40-60% to TP1  ->  lenient: 40% decay allowed (threshold=0.60)
@@ -2361,9 +2359,11 @@ async def _exit_monitor_loop():
                         and _elapsed >= 16
                         and _dr_ac > 0
                         and _sh.get("peak_pnl_r", 0) >= 0.05
+                        and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min
                         and (_cpnl / _dr_ac) < _sh.get("peak_pnl_r", 0) * _pp_decay_th):
                     _pp_r = _cpnl / _dr_ac
                     print(f"[PEAK_PROTECT] HL {sym} {direction}"
+                          f" peak_usd={_sh['peak_pnl_usd']:.2f} sentinel_min={_sentinel_min:.2f}"
                           f" peak_r={_sh['peak_pnl_r']:.3f}R"
                           f" cur_r={_pp_r:.3f}R"
                           f" pct_to_tp1={_pp_pct_to_tp1:.0%}"
