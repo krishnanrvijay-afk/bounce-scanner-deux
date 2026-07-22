@@ -78,6 +78,13 @@ _btc_j1h_history: list = []  # Tracks last 12 BTC J1H values
 _conv_gate_short: bool = False   # set by main.py from local sentinel; True = 55%+ pairs overbought
 _conv_gate_long:  bool = False   # set by main.py from local sentinel; True = 55%+ pairs oversold — ~10-15 minutes of macro trend
 
+# ── Dual-mode regime state (updated every BTC scan) ──────────────────────────
+_regime:              str   = "RANGING"  # BULL_TREND / BEAR_TREND / RANGING
+_regime_confidence:   str   = "HIGH"     # HIGH / MEDIUM / LOW
+_btc_momentum_5c:     float = 0.0        # sum of last 5 closed BTC 1m candle bodies (pts)
+_btc_candle_velocity: float = 0.0        # BTC current candle body (close - open, pts)
+_regime_last_push:    float = 0.0        # epoch of last venue_live_state Supabase push
+
 BTC_CORRELATION: dict[str, float] = {
     "ETH": 0.94, "SOL": 0.86, "XRP": 0.84, "DOGE": 0.87,
     "LINK": 0.82, "AVAX": 0.80, "SUI": 0.82, "NEAR": 0.78,
@@ -118,6 +125,54 @@ def _compute_kdj(candles: list[dict], period: int = 9) -> tuple[float, float, fl
         D   = 2 / 3 * D + 1 / 3 * K
     J = 3 * K - 2 * D
     return K, D, max(0.0, min(100.0, J))
+
+
+def _compute_regime(j1h: float, momentum_5c: float, velocity: float) -> tuple:
+    """Classify BTC macro regime from J1H, 5-candle body sum, and current candle velocity.
+    BULL_TREND: j1h>60 AND momentum_5c>100 AND velocity>0
+    BEAR_TREND: j1h<40 AND momentum_5c<-100 AND velocity<0
+    RANGING:    everything else
+    """
+    bull = j1h > 60 and momentum_5c > 100 and velocity > 0
+    bear = j1h < 40 and momentum_5c < -100 and velocity < 0
+    if bull:
+        conf = "HIGH" if j1h > 65 and momentum_5c > 150 else "MEDIUM"
+        return "BULL_TREND", conf
+    if bear:
+        conf = "HIGH" if j1h < 35 and momentum_5c < -150 else "MEDIUM"
+        return "BEAR_TREND", conf
+    return "RANGING", "HIGH"
+
+
+async def _push_venue_live_state(venue: str, regime: str, confidence: str,
+                                  j1h: float, momentum_5c: float, vel: float) -> None:
+    """Fire-and-forget: write regime snapshot to Supabase venue_live_state (upsert)."""
+    if not _SB_URL or not _SB_KEY:
+        return
+    try:
+        import httpx as _httpx
+        from datetime import datetime, timezone as _tz
+        async with _httpx.AsyncClient(timeout=3.0) as _c:
+            await _c.post(
+                f"{_SB_URL}/rest/v1/venue_live_state",
+                headers={
+                    "apikey": _SB_KEY,
+                    "Authorization": f"Bearer {_SB_KEY}",
+                    "Content-Type": "application/json",
+                    "Prefer": "resolution=merge-duplicates,return=minimal",
+                },
+                json={
+                    "venue": venue,
+                    "regime": regime,
+                    "regime_confidence": confidence,
+                    "btc_j1h": round(j1h, 1),
+                    "btc_momentum_5c": round(momentum_5c, 1),
+                    "btc_candle_velocity": round(vel, 1),
+                    "updated_at": datetime.now(_tz.utc).isoformat(),
+                },
+            )
+    except Exception:
+        pass
 
 
 def _compute_rsi(candles: list[dict], period: int = 14) -> float:
@@ -558,6 +613,26 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                 if len(_btc_j1h_history) > 12:
                     _btc_j1h_history = \
                         _btc_j1h_history[-12:]
+                # ── Dual-mode: compute regime from BTC 1m candle momentum ─────
+                global _regime, _regime_confidence, _btc_momentum_5c, _btc_candle_velocity, _regime_last_push
+                if candles_1m and len(candles_1m) >= 6:
+                    _closed_1m = candles_1m[-6:-1]  # last 5 fully closed 1m candles
+                    _btc_momentum_5c = sum(
+                        float(c["close"]) - float(c["open"]) for c in _closed_1m)
+                    _btc_candle_velocity = float(candles_1m[-1]["close"]) - float(candles_1m[-1]["open"])
+                _regime, _regime_confidence = _compute_regime(
+                    _btc_j1h, _btc_momentum_5c, _btc_candle_velocity)
+                print(f"[REGIME] BTC J1H={_btc_j1h:.1f}"
+                      f" mom5c={_btc_momentum_5c:.0f}"
+                      f" vel={_btc_candle_velocity:.1f}"
+                      f" => {_regime} ({_regime_confidence})")
+                # Push to Supabase venue_live_state (throttled to 30s)
+                _now_ts = time.time()
+                if _now_ts - _regime_last_push >= 30:
+                    _regime_last_push = _now_ts
+                    asyncio.create_task(_push_venue_live_state(
+                        "HL", _regime, _regime_confidence,
+                        _btc_j1h, _btc_momentum_5c, _btc_candle_velocity))
             bid_pct, ask_pct = _depth_pcts(book)
 
             vol_15m    = candles_15m[-1]["volume"] if candles_15m else 0
@@ -656,6 +731,11 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     _regime_block_long  = True
                 if _conv_gate_long:   # 55%+ pairs oversold  -> block SHORTs
                     _regime_block_short = True
+            # Dual-mode: block opposite direction in trending markets
+            if _regime == "BULL_TREND":
+                _regime_block_short = True  # no counter-trend SHORTs in bull
+            elif _regime == "BEAR_TREND":
+                _regime_block_long  = True  # no counter-trend LONGs in bear
             # ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ Score both directions ÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂÃÂ¢ÃÂÃÂ
             # Accumulate pair state -- replaces scan_pair_state() second sweep
             _s_raw = check_bounce_short(j15m, ask_pct, j5m)
@@ -708,6 +788,13 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                 if key in _open_trades_ref:
                     continue
 
+                # Dual-mode: is this a trend-continuation entry or a bounce entry?
+                _is_trend_entry = (
+                    (direction == "SHORT" and _regime == "BEAR_TREND") or
+                    (direction == "LONG"  and _regime == "BULL_TREND")
+                )
+                _trade_mode = "trend" if _is_trend_entry else "bounce"
+
                 if direction == "SHORT":
                     if _regime_block_short:
                         log.info(f"[REGIME] {symbol} SHORT blocked ÃÂ¢ÃÂÃÂ BTC J1H={_btc_j1h:.1f} corr={_pair_corr}")
@@ -741,10 +828,9 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                                 "HL", symbol, "BYPASS_REENTRY_CD_S", direction,
                                 f"bypass SHORT cooldown {_bypass_cd_rem}s remaining ({BYPASS_COOLDOWN_SECONDS//60}min timer)"))
                             continue
-                    g_j15m  = j15m > J15M_SHORT_GATE
-                    g_j1h   = j1h  > J1H_SHORT_MIN
-                    g_stoch = stoch_k > 75 and stoch_k < stoch_d
-
+                    g_j15m  = j15m > (65.0 if _is_trend_entry else J15M_SHORT_GATE)
+                    g_j1h   = True if _is_trend_entry else (j1h > J1H_SHORT_MIN)
+                    g_stoch = True if _is_trend_entry else (stoch_k > 75 and stoch_k < stoch_d)
                     g_depth = ask_pct >= DEPTH_GATE_PCT
                     # BTC_MACRO_RISE removed — pair J15M/J1H gates are sufficient
                     # SHORT session/J1H directional gates
@@ -758,7 +844,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                         continue
                     # Gate 3b: J15M extreme overbought ceiling
                     # Data: j15m>115 = 0% WR, squeeze risk -- extreme OB can extend
-                    if j15m > J15M_SHORT_CEILING:
+                    if not _is_trend_entry and j15m > J15M_SHORT_CEILING:
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "J15M_EXTREME_OB", direction,
                             f"j15m={j15m:.1f} > J15M_SHORT_CEILING={J15M_SHORT_CEILING}"
@@ -772,7 +858,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                         "BEAR" if (ma10 and ma30 and ma60 and ma10 < ma30 < ma60)
                         else "MIXED"
                     )
-                    if _ma_stack_now == "BULL":
+                    if not _is_trend_entry and _ma_stack_now == "BULL":
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "MA_STACK_BULL_BLOCK", direction,
                             f"ma10={ma10:.4f} ma30={ma30:.4f} ma60={ma60:.4f}"
@@ -785,19 +871,22 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                             f"j1h={j1h:.1f} >= J1H_SHORT_MAX={J1H_SHORT_MAX}"))
                         continue
                     # RSI floor gate (enforced) — blocks SHORTs when 15m RSI approaching oversold
-                    if rsi15m <= RSI15M_SHORT_MIN:
+                    if not _is_trend_entry and rsi15m <= RSI15M_SHORT_MIN:
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "RSI_FLOOR_FAIL", direction,
                             f"rsi15m={rsi15m:.1f} need>{RSI15M_SHORT_MIN}"))
                         continue
-                    qualifies = check_bounce_short(j15m, ask_pct, j5m)
+                    qualifies = (g_j15m and g_depth) if _is_trend_entry else check_bounce_short(j15m, ask_pct, j5m)
                     _bid_from_ask = 100 - ask_pct
                     _depth_ok_s   = (ask_pct >= DEPTH_SHORT_MIN)
+                    _j15m_s_need  = 65.0 if _is_trend_entry else J15M_SHORT_GATE
                     _log_gates = (
-                        f"j5m={j5m:.1f}(need>{J5M_SHORT_MIN:.0f})"
-                        f" j15m={j15m:.1f}(need>{J15M_SHORT_GATE})"
+                        f"mode={_trade_mode}"
+                        f" j5m={j5m:.1f}(need>{J5M_SHORT_MIN:.0f})"
+                        f" j15m={j15m:.1f}(need>{_j15m_s_need:.0f})"
                         f" j1h={j1h:.1f}"
                         f" btc={_btc_j1h:.1f}"
+                        f" regime={_regime}"
                         f" depth_ask={ask_pct:.1f}%"
                         f"({'PASS' if _depth_ok_s else 'FAIL'},need>={DEPTH_SHORT_MIN:.0f})"
                     )
@@ -805,10 +894,9 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     if _regime_block_long:
                         log.info(f"[REGIME] {symbol} LONG blocked ÃÂ¢ÃÂÃÂ BTC J1H={_btc_j1h:.1f} corr={_pair_corr}")
                         continue
-                    g_j15m  = j15m < J15M_LONG_GATE
-                    g_j1h   = j1h  >= J1H_LONG_MIN
-                    g_stoch = stoch_k < 25 and stoch_k > stoch_d
-
+                    g_j15m  = j15m < (35.0 if _is_trend_entry else J15M_LONG_GATE)
+                    g_j1h   = True if _is_trend_entry else (j1h >= J1H_LONG_MIN)
+                    g_stoch = True if _is_trend_entry else (stoch_k < 25 and stoch_k > stoch_d)
                     g_depth = bid_pct >= DEPTH_GATE_PCT
                     # BTC regime LONG gate — correlation-gated (corr >= 0.70 only)
                     # Only LONG_BLOCKED (BTC J1H > 80) is a hard entry block.
@@ -842,7 +930,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                                 f"bypass cooldown {_bypass_cd_rem}s remaining ({BYPASS_COOLDOWN_SECONDS//60}min timer)"))
                             continue
                     # J1H ceiling gate (enforced) — blocks LONGs above valid bounce zone
-                    if j1h >= J1H_LONG_MAX:
+                    if not _is_trend_entry and j1h >= J1H_LONG_MAX:
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "J1H_CEILING_FAIL", direction,
                             f"j1h={j1h:.1f} need j1h<{J1H_LONG_MAX}"))
@@ -855,7 +943,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                         "BEAR" if (ma10 and ma30 and ma60 and ma10 < ma30 < ma60)
                         else "MIXED"
                     )
-                    if _ma_stack_long == "BEAR":
+                    if not _is_trend_entry and _ma_stack_long == "BEAR":
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "MA_STACK_BEAR_BLOCK", direction,
                             f"ma10={ma10:.4f} ma30={ma30:.4f} ma60={ma60:.4f}"
@@ -874,7 +962,7 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                         continue
                     # J15M freefall floor gate
                     # Data: j15m < -10 = 22% WR -$278 (entries into free-fall)
-                    if j15m < J15M_LONG_FLOOR:
+                    if not _is_trend_entry and j15m < J15M_LONG_FLOOR:
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "J15M_FREEFALL", direction,
                             f"j15m={j15m:.1f} < J15M_LONG_FLOOR={J15M_LONG_FLOOR}"
@@ -891,25 +979,28 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                     # R5: EU LONG j15m tight gate
                     # EU LONGs only valid when j15m < 15 (deep oversold)
                     # Data: EU LONG j15m 15-30 = 25% WR -$112; EU LONG j15m < 15 = 71% WR +$389
-                    if _cur_sess == "EU" and j15m >= 15:
+                    if not _is_trend_entry and _cur_sess == "EU" and j15m >= 15:
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "EU_LONG_J15M_TIGHT", direction,
                             f"EU j15m={j15m:.1f} >= 15 -- EU LONGs require j15m<15"))
                         continue
                     # RSI ceiling gate (enforced) — blocks LONGs when 15m RSI recovered above neutral
                     # Data: ETH RSI=54.2, SUI RSI=53.9 tail losers Jul 19; all 9 winners had RSI<50
-                    if rsi15m >= RSI15M_LONG_MAX:
+                    if not _is_trend_entry and rsi15m >= RSI15M_LONG_MAX:
                         asyncio.create_task(_log_gate(
                             "HL", symbol, "RSI_CEILING_FAIL", direction,
                             f"rsi15m={rsi15m:.1f} need<{RSI15M_LONG_MAX}"))
                         continue
-                    qualifies = check_bounce_long(j15m, bid_pct, j5m)
+                    qualifies = (g_j15m and g_depth) if _is_trend_entry else check_bounce_long(j15m, bid_pct, j5m)
                     _depth_ok_l  = (bid_pct >= DEPTH_LONG_MIN)
+                    _j15m_l_need = 35.0 if _is_trend_entry else J15M_LONG_GATE
                     _log_gates = (
-                        f"j5m={j5m:.1f}(need<{J5M_LONG_MAX:.0f})"
-                        f" j15m={j15m:.1f}(need<{J15M_LONG_GATE})"
+                        f"mode={_trade_mode}"
+                        f" j5m={j5m:.1f}(need<{J5M_LONG_MAX:.0f})"
+                        f" j15m={j15m:.1f}(need<{_j15m_l_need:.0f})"
                         f" j1h={j1h:.1f}"
                         f" btc={_btc_j1h:.1f}"
+                        f" regime={_regime}"
                         f" depth_bid={bid_pct:.1f}%"
                         f"({'PASS' if _depth_ok_l else 'FAIL'},need>={DEPTH_LONG_MIN:.0f})"
                     )
@@ -957,6 +1048,8 @@ async def run_full_scan(hl_client, market_health: Optional[dict] = None, open_tr
                 alert = {
                     "symbol":       symbol,
                     "btc_regime_context": _btc_regime_context,
+                    "regime":       _regime,
+                    "trade_mode":   _trade_mode,
                     "direction":    direction,
                     "leverage":     LEVERAGE,
                     "entry_price":  price,
