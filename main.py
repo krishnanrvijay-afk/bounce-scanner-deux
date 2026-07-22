@@ -2370,13 +2370,13 @@ async def _exit_monitor_loop():
                 _pp_tp1_dist   = ((tp1_price - _entry) if not is_short else (_entry - tp1_price)) if tp1_price else 0.0
                 _pp_exit_dist  = (current - _entry) if not is_short else (_entry - current)
                 _pp_pct_to_tp1 = (_pp_exit_dist / _pp_tp1_dist) if _pp_tp1_dist > 0 else 0.0
-                _pp_suppressed = _pp_pct_to_tp1 >= 0.60
+                _pp_suppressed = _pp_pct_to_tp1 >= 0.75
                 _pp_decay_th   = 0.60 if _pp_pct_to_tp1 >= 0.40 else 0.70
                 if (not _pp_suppressed
                         and _sh.get("be_armed")
                         and _elapsed >= 16
                         and _dr_ac > 0
-                        and _sh.get("peak_pnl_r", 0) >= 0.05
+                        and _sh.get("peak_pnl_r", 0) >= 0.15
                         and _sh.get("peak_pnl_usd", 0.0) >= _sentinel_min
                         and (_cpnl / _dr_ac) < _sh.get("peak_pnl_r", 0) * _pp_decay_th):
                     _pp_r = _cpnl / _dr_ac
