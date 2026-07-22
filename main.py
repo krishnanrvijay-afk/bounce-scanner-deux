@@ -2579,18 +2579,21 @@ async def _exit_monitor_loop():
                 # Replaces ADVERSE_CUT (90s/0.05R), TREND_ADVERSE_EXIT (300s/0.20R),
                 # DEAD_TRADE_KILL (600s/0.08R), and TIME_ADVERSE_EXIT (600s/0.15R).
                 # Single rule: NOT armed + cpnl <= 0 + MFE < threshold(elapsed).
-                # Thresholds: 0.08R at 120s · 0.15R at 300s · 0.20R at 600s.
-                # MFE from excursion tracking (_mfe_pnl) — works regardless of armed status.
+                # Thresholds: 0.08R at 180s · 0.15R at 300s · 0.20R at 600s.
+                # MFE escape hatch: if mfe_r >= 0.05R the trade showed real excursion
+                # (possibly between scan ticks, missing the be_armed window). Skip BTE
+                # entirely — let PEAK_PROTECT / ARMED_REVERSAL / SL handle it instead.
                 if (not _sh.get("be_armed", False)
                         and _cpnl <= 0
                         and _dr_ac > 0):
                     _bte_mfe_r = _mfe_pnl / _dr_ac
                     _bte_fired = False
-                    for _bte_age, _bte_thr in (
-                            (120, 0.08), (300, 0.15), (600, 0.20)):
-                        if _elapsed >= _bte_age and _bte_mfe_r < _bte_thr:
-                            _bte_fired = True
-                            break
+                    if _bte_mfe_r < 0.05:  # escape hatch: real excursion — skip BTE
+                        for _bte_age, _bte_thr in (
+                                (180, 0.08), (300, 0.15), (600, 0.20)):
+                            if _elapsed >= _bte_age and _bte_mfe_r < _bte_thr:
+                                _bte_fired = True
+                                break
                     if _bte_fired:
                         print(f"[BAD_TRADE_EXIT] HL {sym} {direction}"
                               f" elapsed={_elapsed:.0f}s"
