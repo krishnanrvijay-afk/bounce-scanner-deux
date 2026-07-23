@@ -1939,6 +1939,38 @@ def _do_trailblazer_close(key: str, trade: dict, exit_price: float,
     asyncio.create_task(_write_sign_shadow_rows(key, trade, "TRAILBLAZER", pnl))
     asyncio.create_task(_write_signal_shadow_row(key, trade, "TRAILBLAZER", pnl, r))
     _lk = trade.get("_lock_key")
+def _do_partial_close_profit_lock(key: str, trade: dict, exit_price: float, close_pct: float, tier: str):
+    """Close close_pct of remaining position, banking profit while trade stays open."""
+    sym        = trade["symbol"]
+    direction  = trade["direction"]
+    remaining  = trade.get("remaining_size", trade.get("size", 0)) or 0
+    entry      = trade["entry_price"]
+    close_size = remaining * close_pct
+    rem_size   = remaining - close_size
+    pnl = (exit_price - entry) * close_size if direction == "LONG" \
+          else (entry - exit_price) * close_size
+    r   = _compute_r(pnl, trade)
+    _append_trade_log(trade, exit_price, tier, pnl, r)
+    _update_daily_pnl(pnl)
+    old_margin = trade.get("margin", MARGIN_PER_TRADE)
+    trade["remaining_size"]    = rem_size
+    trade["margin"]            = old_margin * (1.0 - close_pct)
+    app_state.open_trades[key] = trade
+    app_state.margin_deployed  = max(0.0, app_state.margin_deployed - old_margin * close_pct)
+    pct_int = int(close_pct * 100)
+    print(f"[{tier}] HL {sym} {direction} partial lock {pct_int}% at {exit_price} "
+          f"pnl=${pnl:.2f} r={r:+.2f}R \u2014 {rem_size:.1f} remaining")
+    if TELEGRAM_ENABLED:
+        def _pl_tg(s=sym, d=direction, ep=exit_price, p=pnl, t=tier, pct=pct_int, rem=rem_size):
+            sl_lbl = "S" if d == "SHORT" else "L"
+            icon = "\U0001F7E1" if t == "SKIM" else "\U0001F512"
+            _tg_post(icon + " " + s + " " + sl_lbl + " \u00B7 " + t
+                     + " \u2014 " + str(pct) + "% out at " + _fmt_p(ep)
+                     + "\n+$" + f"{p:.2f}" + " banked \u00B7 "
+                     + f"{rem:.0f}" + " running")
+        threading.Thread(target=_pl_tg, daemon=True).start()
+    _save_state()
+
     if _lk:
         _sb2 = _get_supabase()
         if _sb2:
@@ -2299,6 +2331,12 @@ async def _exit_monitor_loop():
                         "d40_at": None, "d40_pnl": None, "d40_phase": None,
                         "last_peak_candle_ts": 0,
                         "peak_set_time":       0.0,
+                        "skim_executed":   False,
+                        "skim_price":      None,
+                        "skim_pnl":        0.0,
+                        "lock_executed":   False,
+                        "lock_price":      None,
+                        "lock_pnl":        0.0,
                     })
                     _sz   = trade.get("remaining_size", trade.get("size", 0)) or 0
                     _ent  = trade.get("entry_price", 0) or 0
@@ -2388,6 +2426,57 @@ async def _exit_monitor_loop():
                           f" decay_th={_pp_decay_th:.0%}"
                           f" cpnl={_cpnl:.2f}")
                     _do_close_trade(key, trade, current, "PEAK_PROTECT")
+                    continue
+
+
+                # -- PROFIT_LOCK SKIM (Tier 1): 20% giveback from peak ----------------
+                # Closes 25% of position when: peak_r >= 0.08R, gave back >= 20% of
+                # peak, current_r still >= 0.04R. Fires once per trade, pre-TP1 only.
+                # Uses price-based R (sl_dist denominator) — size-independent.
+                _pl_sl_d  = (trade.get("sl_dist") or
+                             abs(_ent - (sl_price or _ent)))
+                _pl_pm    = ((current - _ent) if not is_short
+                             else (_ent - current))
+                _pl_cur_r = (_pl_pm / _pl_sl_d) if _pl_sl_d > 0 else 0.0
+                _pl_peak_r   = _sh.get("peak_pnl_r", 0.0)
+                _pl_giveback = ((_pl_peak_r - _pl_cur_r) / _pl_peak_r
+                                if _pl_peak_r > 0 else 0.0)
+                if (not tp1_hit
+                        and not _sh.get("skim_executed", False)
+                        and _sh.get("be_armed")
+                        and _elapsed >= 60
+                        and _dr_ac > 0
+                        and _pl_peak_r >= 0.08
+                        and _pl_giveback >= 0.20
+                        and _pl_cur_r >= 0.04
+                        and not _pp_suppressed):
+                    print(f"[SKIM] HL {sym} {direction}"
+                          f" peak_r={_pl_peak_r:.3f}R cur_r={_pl_cur_r:.3f}R"
+                          f" giveback={_pl_giveback:.0%} cpnl={_cpnl:.2f}")
+                    _do_partial_close_profit_lock(key, trade, current, 0.25, "SKIM")
+                    _sh["skim_executed"] = True
+                    _sh["skim_price"]    = current
+                    _sh["skim_pnl"]      = round(_cpnl * 0.25, 2)
+                    continue
+
+                # -- PROFIT_LOCK LOCK (Tier 2): 35% giveback after SKIM ---------------
+                # Closes 25% of remaining when: peak_r >= 0.10R AND gave back >= 35%
+                # AND current_r still >= 0.02R. Fires once per trade, pre-TP1 only.
+                if (not tp1_hit
+                        and _sh.get("skim_executed", False)
+                        and not _sh.get("lock_executed", False)
+                        and _sh.get("be_armed")
+                        and _dr_ac > 0
+                        and _pl_peak_r >= 0.10
+                        and _pl_giveback >= 0.35
+                        and _pl_cur_r >= 0.02):
+                    print(f"[LOCK] HL {sym} {direction}"
+                          f" peak_r={_pl_peak_r:.3f}R cur_r={_pl_cur_r:.3f}R"
+                          f" giveback={_pl_giveback:.0%} cpnl={_cpnl:.2f}")
+                    _do_partial_close_profit_lock(key, trade, current, 0.25, "LOCK")
+                    _sh["lock_executed"] = True
+                    _sh["lock_price"]    = current
+                    _sh["lock_pnl"]      = round(_cpnl * 0.25, 2)
                     continue
 
 
