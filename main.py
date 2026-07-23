@@ -1791,7 +1791,10 @@ def _do_close_trade(key: str, trade: dict, exit_price: float, reason: str):
     elif pnl > 0:
         _scanner_mod._consec_adverse[_dir_key_c] = 0
 
-    _append_trade_log(trade, exit_price, reason, pnl, r)
+    _banked  = trade.get("banked_pnl", 0.0)
+    _pnl_log = round(pnl + _banked, 2)
+    _r_log   = _compute_r(_pnl_log, trade)
+    _append_trade_log(trade, exit_price, reason, _pnl_log, _r_log)
     _update_daily_pnl(pnl)
     _on_trade_close(reason)
 
@@ -1939,6 +1942,16 @@ def _do_trailblazer_close(key: str, trade: dict, exit_price: float,
     asyncio.create_task(_write_sign_shadow_rows(key, trade, "TRAILBLAZER", pnl))
     asyncio.create_task(_write_signal_shadow_row(key, trade, "TRAILBLAZER", pnl, r))
     _lk = trade.get("_lock_key")
+    if _lk:
+        _sb2 = _get_supabase()
+        if _sb2:
+            try:
+                _sb2.table("trade_open_locks").delete().eq("lock_key", _lk).execute()
+            except Exception as _unlock_e:
+                print(f"[LOCK CLEANUP FAILED] {_lk}: {_unlock_e}")
+    _save_state()
+
+
 def _do_partial_close_profit_lock(key: str, trade: dict, exit_price: float, close_pct: float, tier: str):
     """Close close_pct of remaining position, banking profit while trade stays open."""
     sym        = trade["symbol"]
@@ -1950,11 +1963,16 @@ def _do_partial_close_profit_lock(key: str, trade: dict, exit_price: float, clos
     pnl = (exit_price - entry) * close_size if direction == "LONG" \
           else (entry - exit_price) * close_size
     r   = _compute_r(pnl, trade)
-    _append_trade_log(trade, exit_price, tier, pnl, r)
+    # No _append_trade_log here — that does UPDATE hl_trade_log WHERE
+    # close_time IS NULL, marking this trade as CLOSED in Supabase so
+    # the remaining position's final-close record never writes. Instead
+    # accumulate banked_pnl; _do_close_trade adds it to the final log.
     _update_daily_pnl(pnl)
     old_margin = trade.get("margin", MARGIN_PER_TRADE)
-    trade["remaining_size"]    = rem_size
-    trade["margin"]            = old_margin * (1.0 - close_pct)
+    trade["remaining_size"]             = rem_size
+    trade["margin"]                     = old_margin * (1.0 - close_pct)
+    trade["banked_pnl"]                 = round(trade.get("banked_pnl", 0.0) + pnl, 2)
+    trade[tier.lower() + "_banked_pnl"] = round(pnl, 2)
     app_state.open_trades[key] = trade
     app_state.margin_deployed  = max(0.0, app_state.margin_deployed - old_margin * close_pct)
     pct_int = int(close_pct * 100)
@@ -1969,15 +1987,6 @@ def _do_partial_close_profit_lock(key: str, trade: dict, exit_price: float, clos
                      + "\n+$" + f"{p:.2f}" + " banked \u00B7 "
                      + f"{rem:.0f}" + " running")
         threading.Thread(target=_pl_tg, daemon=True).start()
-    _save_state()
-
-    if _lk:
-        _sb2 = _get_supabase()
-        if _sb2:
-            try:
-                _sb2.table("trade_open_locks").delete().eq("lock_key", _lk).execute()
-            except Exception as _unlock_e:
-                print(f"[LOCK CLEANUP FAILED] {_lk}: {_unlock_e}")
     _save_state()
 
 
